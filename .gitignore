@@ -5,6 +5,10 @@ node_modules/
 *.zip
 dist/
 
+# Private AI context — never commit
+CLAUDE.md
+.claude/
+
 # Secrets — never commit
 key.pat
 *.pat
