@@ -1,14 +1,30 @@
 #!/usr/bin/env bash
 # dev.sh — Summary Editor development toolkit (Bash / WSL / Git Bash)
-# Usage: bash dev.sh
-# Optional: bash dev.sh --no-rebase   (use merge instead of rebase)
+#
+# Interactive:        bash dev.sh
+# Non-interactive:    bash dev.sh --action <action> [--message "msg"] [--no-rebase]
+#
+# Actions: sync | feature | stash | push | pr | push-pr |
+#          commit | commit-push | commit-push-pr | deploy |
+#          release-trigger | tag | status | log
 set -euo pipefail
 
 MAIN_BRANCH='main'
 REMOTE='origin'
 DEPLOY_SCRIPT="$(dirname "$0")/deploy.sh"
 NO_REBASE=false
-[[ "${1:-}" == '--no-rebase' ]] && NO_REBASE=true
+ACTION=''
+MESSAGE=''
+
+# Parse args
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --no-rebase)      NO_REBASE=true; shift ;;
+        --action|-a)      ACTION="${2:-}"; shift 2 ;;
+        --message|-m)     MESSAGE="${2:-}"; shift 2 ;;
+        *) shift ;;
+    esac
+done
 
 # ── Colour helpers ────────────────────────────────────────────
 GRN='\033[0;32m' YLW='\033[1;33m' RED='\033[0;31m' CYN='\033[0;36m' GRY='\033[0;90m' NC='\033[0m'
@@ -48,6 +64,7 @@ show_menu() {
     echo    '  [4]  Push branch'
     echo    '  [5]  Open Pull Request         via gh cli'
     echo    '  [6]  Push + open PR            both at once'
+    echo    '  [c]  Commit + push             stage all, commit, push'
     echo ''
     echo -e "  ${GRY}-- Build & Deploy ------------------------------------${NC}"
     echo    '  [7]  Deploy to SillyTavern     --clean'
@@ -141,6 +158,20 @@ open_pr() {
 
 push_and_pr() { push_branch && open_pr; }
 
+do_commit() {
+    local changed; changed=$(git status --short 2>/dev/null)
+    if [[ -z "$changed" ]]; then warn 'Nothing to commit.'; return; fi
+    local msg="$MESSAGE"
+    if [[ -z "$msg" ]]; then read -rp '  Commit message: ' msg; fi
+    [[ -z "$msg" ]] && warn 'Cancelled — message required.' && return
+    git add -A
+    git commit -m "$msg"
+    ok "Committed: $msg"
+}
+
+commit_push()    { do_commit && push_branch; }
+commit_push_pr() { do_commit && push_and_pr; }
+
 deploy() {
     if [[ ! -f "$DEPLOY_SCRIPT" ]]; then err 'deploy.sh not found.'; return; fi
     bash "$DEPLOY_SCRIPT" --clean
@@ -185,24 +216,52 @@ show_status() {
     done
 }
 
-# ── Main loop ─────────────────────────────────────────────────
+# ── Dispatch ──────────────────────────────────────────────────
+run_action() {
+    case "$1" in
+        sync)            sync_with_main      ;;
+        feature)         new_feature_branch  ;;
+        stash)           smart_stash         ;;
+        push)            push_branch         ;;
+        pr)              open_pr             ;;
+        push-pr)         push_and_pr         ;;
+        commit)          do_commit           ;;
+        commit-push)     commit_push         ;;
+        commit-push-pr)  commit_push_pr      ;;
+        deploy)          deploy              ;;
+        release-trigger) trigger_release     ;;
+        tag)             create_tag          ;;
+        status)          show_status         ;;
+        log)             git log --oneline --graph --decorate -10 ;;
+        *) warn "Unknown action: $1" ;;
+    esac
+}
+
+# ── Entry point ───────────────────────────────────────────────
+if [[ -n "$ACTION" ]]; then
+    run_action "$ACTION"
+    exit $?
+fi
+
+# Interactive menu loop
 while true; do
     show_menu
     read -rp '  Choice: ' choice
     echo ''
     case "$choice" in
-        1) sync_with_main      ;;
-        2) new_feature_branch  ;;
-        3) smart_stash         ;;
-        4) push_branch         ;;
-        5) open_pr             ;;
-        6) push_and_pr         ;;
-        7) deploy              ;;
-        8) trigger_release     ;;
-        9) create_tag          ;;
-        s) show_status         ;;
-        l) git log --oneline --graph --decorate -10 ;;
-        q) echo ''; exit 0    ;;
+        1) run_action sync      ;;
+        2) run_action feature   ;;
+        3) run_action stash     ;;
+        4) run_action push      ;;
+        5) run_action pr        ;;
+        6) run_action push-pr   ;;
+        c) run_action commit-push ;;
+        7) run_action deploy    ;;
+        8) run_action release-trigger ;;
+        9) run_action tag       ;;
+        s) run_action status    ;;
+        l) run_action log       ;;
+        q) echo ''; exit 0     ;;
         *) warn "Unknown option: $choice" ;;
     esac
     echo ''

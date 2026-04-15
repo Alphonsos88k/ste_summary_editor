@@ -1,13 +1,25 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Summary Editor development toolkit — interactive, no flags needed.
+    Summary Editor development toolkit.
+.DESCRIPTION
+    Run with no arguments for the interactive menu.
+    Use -Action for non-interactive / scripted use.
+.PARAMETER Action
+    Non-interactive action: sync | feature | stash | push | pr | push-pr |
+                            commit | commit-push | commit-push-pr | deploy |
+                            release-trigger | status | log
 .PARAMETER Message
-    Optional short description used in the auto-generated stash name.
+    Commit message or stash description (used with commit/stash actions).
 .PARAMETER NoRebase
     Use merge instead of rebase when syncing with main.
+.EXAMPLE
+    .\dev.ps1 -Action commit-push -Message "fix: artifact name slash"
+    .\dev.ps1 -Action deploy
+    .\dev.ps1          # opens interactive menu
 #>
 param(
+    [string]$Action   = '',
     [string]$Message  = '',
     [switch]$NoRebase
 )
@@ -62,6 +74,7 @@ function Show-Menu {
     Write-Host '  [4]  Push branch'
     Write-Host '  [5]  Open Pull Request         via gh cli'
     Write-Host '  [6]  Push + open PR            both at once'
+    Write-Host '  [c]  Commit + push             stage all, commit, push'
     Write-Host ''
     Write-Host '  -- Build & Deploy -----------------------------------' -ForegroundColor DarkGray
     Write-Host '  [7]  Deploy to SillyTavern     --clean'
@@ -158,6 +171,29 @@ function Invoke-OpenPR {
 
 function Invoke-PushAndPR { Invoke-PushBranch; if ($LASTEXITCODE -eq 0) { Invoke-OpenPR } }
 
+function Invoke-Commit {
+    $changed = git status --short 2>$null
+    if (!$changed) { warn 'Nothing to commit.'; return }
+
+    $msg = $script:Message
+    if (!$msg) { $msg = (Read-Host '  Commit message').Trim() }
+    if (!$msg) { warn 'Cancelled — message required.'; return }
+
+    git add -A
+    git commit -m $msg
+    if ($LASTEXITCODE -eq 0) { ok "Committed: $msg" } else { err 'Commit failed.' }
+}
+
+function Invoke-CommitAndPush {
+    Invoke-Commit
+    if ($LASTEXITCODE -eq 0) { Invoke-PushBranch }
+}
+
+function Invoke-CommitPushPR {
+    Invoke-Commit
+    if ($LASTEXITCODE -eq 0) { Invoke-PushAndPR }
+}
+
 function Invoke-Deploy {
     if (!(Test-Path $DEPLOY_SCRIPT)) { err 'deploy.ps1 not found.'; return }
     powershell -ExecutionPolicy Bypass -File $DEPLOY_SCRIPT --clean
@@ -208,24 +244,53 @@ function Show-Status {
         ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
 }
 
-# ── Main loop ─────────────────────────────────────────────────
+# ── Dispatch table (shared by -Action and menu) ───────────────
+function Invoke-Action($a) {
+    switch ($a) {
+        'sync'            { Invoke-SyncWithMain     }
+        'feature'         { Invoke-NewFeatureBranch }
+        'stash'           { Invoke-SmartStash       }
+        'push'            { Invoke-PushBranch       }
+        'pr'              { Invoke-OpenPR           }
+        'push-pr'         { Invoke-PushAndPR        }
+        'commit'          { Invoke-Commit           }
+        'commit-push'     { Invoke-CommitAndPush    }
+        'commit-push-pr'  { Invoke-CommitPushPR     }
+        'deploy'          { Invoke-Deploy           }
+        'release-trigger' { Invoke-TriggerRelease   }
+        'tag'             { Invoke-CreateTag        }
+        'status'          { Show-Status             }
+        'log'             { git log --oneline --graph --decorate -10 }
+        default           { warn "Unknown action: $a" }
+    }
+}
+
+# ── Entry point ───────────────────────────────────────────────
+if ($Action) {
+    # Non-interactive: run the action and exit
+    Invoke-Action $Action.ToLower()
+    exit $LASTEXITCODE
+}
+
+# Interactive menu loop
 while ($true) {
     Show-Menu
     $choice = (Read-Host '  Choice').Trim().ToLower()
     Write-Host ''
     switch ($choice) {
-        '1' { Invoke-SyncWithMain       }
-        '2' { Invoke-NewFeatureBranch   }
-        '3' { Invoke-SmartStash         }
-        '4' { Invoke-PushBranch         }
-        '5' { Invoke-OpenPR             }
-        '6' { Invoke-PushAndPR          }
-        '7' { Invoke-Deploy             }
-        '8' { Invoke-TriggerRelease     }
-        '9' { Invoke-CreateTag          }
-        's' { Show-Status               }
-        'l' { git log --oneline --graph --decorate -10 }
-        'q' { Write-Host ''; exit 0    }
+        '1' { Invoke-Action 'sync'    }
+        '2' { Invoke-Action 'feature' }
+        '3' { Invoke-Action 'stash'   }
+        '4' { Invoke-Action 'push'    }
+        '5' { Invoke-Action 'pr'      }
+        '6' { Invoke-Action 'push-pr' }
+        '7' { Invoke-Action 'deploy'  }
+        '8' { Invoke-Action 'release-trigger' }
+        '9' { Invoke-Action 'tag'     }
+        'c' { Invoke-Action 'commit-push' }
+        's' { Invoke-Action 'status'  }
+        'l' { Invoke-Action 'log'     }
+        'q' { Write-Host ''; exit 0  }
         default { warn "Unknown option: $choice" }
     }
     Write-Host ''
