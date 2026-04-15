@@ -135,10 +135,11 @@ summary-editor/
 ├── index.js                   Entry point (thin orchestrator)
 ├── style.css                  All styles (Monokai dark palette)
 ├── settings.html              ST Extensions panel drawer
-├── dev.ps1 / dev.sh           Interactive dev toolkit (see configs/DEV.md)
+├── dev.ps1 / dev.sh           Interactive dev toolkit (see notes/DEV.md)
 ├── deploy.ps1 / deploy.sh     Deploy to local ST installation
-├── configs/
+├── notes/                     Internal dev notes (gitignored)
 │   ├── DEV.md                 Dev toolkit usage guide
+│   ├── WORKFLOW.md            Git/CI/CD workflow reference
 │   ├── SILLYTAVERN_NOTES.md   ST environment notes
 │   └── WISHLIST.md            Future feature ideas
 ├── lib/

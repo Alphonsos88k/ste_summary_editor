@@ -35,8 +35,9 @@ desktop.ini
 .sonarwork/
 .scannerwork/
 
-# Internal dev docs — not for public repo
-configs/INFO.md
+# Internal markdown docs — only README.md is public
+*.md
+!README.md
 
 # Personal IDE workspace files
 *.code-workspace
