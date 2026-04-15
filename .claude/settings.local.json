@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -ExecutionPolicy Bypass -File deploy.ps1 -clean)",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"c:/Users/david/Documents/Projects/summary-editor/deploy.ps1\" --clean)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \"c:/Users/david/Documents/Projects/summary-editor/deploy.ps1\" --clean)",
+      "Bash(powershell -ExecutionPolicy Bypass -File deploy.ps1 --clean)"
+    ]
+  }
+}

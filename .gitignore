@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+*.zip
+dist/
+
+# Secrets — never commit
+key.pat
+*.pat
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# SonarQube
+.sonarwork/
+.scannerwork/

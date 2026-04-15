@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -ExecutionPolicy Bypass -File deploy.ps1 --copy)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File deploy.ps1 --clean)",
+      "Bash(Get-Date -Format yyyyMMdd-HHmm)",
+      "Bash(powershell.exe -Command \"Compress-Archive -Path 'summary-editor' -DestinationPath '../summary-editor-backup-$\\(Get-Date -Format yyyyMMdd-HHmm\\).zip' -Force\")",
+      "Bash(echo \"exit: $?\")",
+      "Read(//c/Users/david/Documents/Projects/**)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -Command \"Compress-Archive -Path 'summary-editor' -DestinationPath 'summary-editor-backup-$\\(Get-Date -Format yyyyMMdd-HHmm\\).zip' -Force; Write-Host 'Backup done'\")",
+      "Bash(ls \"c:\\\\Users\\\\david\\\\Documents\\\\Projects\\\\summary-editor-backup\"*.zip)",
+      "Bash(cp constants.js core/)",
+      "Bash(cp state.js core/)",
+      "Bash(cp utils.js core/)",
+      "Bash(cp template-loader.js core/)",
+      "Bash(cp keyboard.js core/)",
+      "Bash(sed -i \"s|from './table.js'|from '../table/table.js'|g; s|from './arcs.js'|from '../arcs/arcs.js'|g\" core/keyboard.js)",
+      "Bash(sed -i \"s|from './state.js'|from '../core/state.js'|g\" ingest/gap-detection.js)",
+      "Bash(sed -i \"s|from './constants.js'|from '../core/constants.js'|g; s|from './state.js'|from '../core/state.js'|g; s|from './table.js'|from '../table/table.js'|g; s|from './arcs.js'|from '../arcs/arcs.js'|g\" ingest/ingestion.js)",
+      "Bash(sed -i \"s|from './constants.js'|from '../core/constants.js'|g; s|from './state.js'|from '../core/state.js'|g; s|from './utils.js'|from '../core/utils.js'|g; s|from './template-loader.js'|from '../core/template-loader.js'|g\" table/table.js)",
+      "Bash(sed -i \"s|from './state.js'|from '../core/state.js'|g; s|from './utils.js'|from '../core/utils.js'|g\" table/tags.js)",
+      "Bash(cp causality.js editor/)",
+      "Bash(sed -i \"s|from './state.js'|from '../core/state.js'|g\" editor/causality.js)",
+      "Bash(powershell.exe -File deploy.ps1 --clean)",
+      "Bash(grep -rn \"html\\\\s*[+=]\\\\s*\\\\`\\\\|html\\\\s*[+=]\\\\s*'\" --include=\"*.js\" .)",
+      "Bash(grep -rn \"const html\\\\s*=\\\\s*\\\\`\\\\|let html\\\\s*=\\\\s*\\\\`\\\\|html\\\\s*+=\\\\s*\\\\`\\\\|html\\\\s*=\\\\s*\\\\`\\\\|return \\\\`<\\\\|parts\\\\.push\\(\\\\`<\" --include=\"*.js\" .)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File deploy.ps1 -clean)",
+      "Read(//e/AI/STORY_AI/latestsilly_tavern/SillyTavern/public/scripts/**)",
+      "Read(//c/Users/david/**)",
+      "Read(//c/Users/david/Documents/**)"
+    ]
+  }
+}
