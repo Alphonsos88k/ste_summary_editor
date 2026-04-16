@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+*.zip
+dist/
+
+# Private AI context — never commit
+CLAUDE.md
+.claude/
+
+# Secrets — never commit
+key.pat
+*.pat
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# SonarQube
+.sonarwork/
+.scannerwork/
+
+# Internal notes folder — local only
+notes/
+
+# Internal markdown docs — only README.md is public
+*.md
+!README.md
+
+# Personal IDE workspace files
+*.code-workspace
