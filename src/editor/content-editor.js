@@ -120,8 +120,9 @@ function bindEvents(pop, num, entry) {
     });
 
     pop.querySelector('#se-ce-reset-prompt').addEventListener('click', () => {
-        setPrompt(PROMPT_KEY, DEFAULT_SYSTEM_PROMPT);
-        pop.querySelector('#se-ce-prompt-textarea').value = DEFAULT_SYSTEM_PROMPT;
+        const def = getPrompt(PROMPT_KEY);
+        setPrompt(PROMPT_KEY, def);
+        pop.querySelector('#se-ce-prompt-textarea').value = def;
     });
 
     pop.querySelector('#se-ce-ask-api').addEventListener('click', () => doAskApi(pop, num));
@@ -158,7 +159,7 @@ async function doAskApi(pop, num) {
     const statusEl = pop.querySelector('#se-ce-api-status');
 
     const promptArea = pop.querySelector('#se-ce-prompt-textarea');
-    if (promptArea) setPrompt(PROMPT_KEY, promptArea.value.trim() || DEFAULT_SYSTEM_PROMPT);
+    if (promptArea) setPrompt(PROMPT_KEY, promptArea.value.trim() || getPrompt(PROMPT_KEY));
 
     const content = pop.querySelector('#se-ce-textarea').value;
 
