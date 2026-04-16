@@ -2,8 +2,8 @@
 
 > A SillyTavern third-party extension for ingesting, organizing, and exporting numbered story summaries with arc grouping, gap detection, causal linking, content editing, and visual timeline/location tools.
 
-![Version](https://img.shields.io/github/v/release/sixiongy248k/ste_summary_editor?label=version)
-![CI](https://github.com/sixiongy248k/ste_summary_editor/actions/workflows/ci.yml/badge.svg)
+![Version](https://img.shields.io/github/v/release/Alphonsos88k/ste_summary_editor?label=version)
+![CI](https://github.com/Alphonsos88k/ste_summary_editor/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Platform](https://img.shields.io/badge/platform-SillyTavern-purple)
 
@@ -38,7 +38,7 @@
 
 In ST: Extensions → Manage Extensions → Install from URL:
 ```
-https://github.com/sixiongy248k/ste_summary_editor
+https://github.com/Alphonsos88k/ste_summary_editor
 ```
 
 ### Option 2: Manual
