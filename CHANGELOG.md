@@ -1,4 +1,24 @@
-## [1.0.1](https://github.com/sixiongy248k/ste_summary_editor/compare/v1.0.0...v1.0.1) (2026-04-15)
+## [1.0.2](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.0.1...v1.0.2) (2026-04-16)
+
+
+### Bug Fixes
+
+* use KEY_PAT secret for semantic-release to bypass branch protection rules
+* rename CI job names to match required branch protection status checks
+
+
+### Refactor
+
+* extract 6 inline HTML blocks into templates/partials/ files
+* move system prompt default text from JS into configs/prompts/*.txt
+* move deploy and dev scripts into scripts/ folder
+
+
+### Chore
+
+* squash git history for clean slate; update repo URLs to new GitHub username
+
+## [1.0.1](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.0.0...v1.0.1) (2026-04-15)
 
 
 ### Bug Fixes
