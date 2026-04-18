@@ -1,3 +1,4 @@
+
 ## [1.0.2](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.0.1...v1.0.2) (2026-04-16)
 
 
