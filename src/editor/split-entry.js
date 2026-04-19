@@ -23,6 +23,7 @@ import { escHtml, spawnPanel } from '../core/utils.js';
 import { shiftEntriesUp } from '../table/reorder.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
+import { seConfirm } from '../core/dialogs.js';
 
 /** Visually distinct colors for segment highlighting. */
 const SEGMENT_COLORS = [
@@ -130,8 +131,8 @@ function bindEvents(pop, num, entry) {
         refreshAll(pop, entry.content);
     });
 
-    pop.querySelector('#se-sp-split').addEventListener('click', () => {
-        doSplit(num, entry);
+    pop.querySelector('#se-sp-split').addEventListener('click', async () => {
+        await doSplit(num, entry);
     });
 
     pop.addEventListener('keydown', (e) => {
@@ -230,11 +231,11 @@ export function buildAllPieces(content) {
 
 // ─── Split operation ─────────────────────────────────────────
 
-function doSplit(num, entry) {
+async function doSplit(num, entry) {
     const pieces = buildAllPieces(entry.content);
     if (pieces.length < 2) return;
 
-    const confirmed = confirm(
+    const confirmed = await seConfirm(
         `Split entry #${num} into ${pieces.length} entries?\n` +
         `Entries #${num + 1} and above will shift up by ${pieces.length - 1}.`
     );

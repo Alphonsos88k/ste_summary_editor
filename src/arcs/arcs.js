@@ -15,6 +15,7 @@
 import { ACT_COLORS, TEMPLATES } from '../core/constants.js';
 import { state, persistState, snapshotState, restoreSnapshot } from '../core/state.js';
 import { escHtml, escAttr, makeDraggable, spawnPanel } from '../core/utils.js';
+import { seAlert, seConfirm, sePrompt } from '../core/dialogs.js';
 import { renderTable, renderStatsBar, getCheckedNums, renderSelectionBar, updateUndoButton } from '../table/table.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 import { openColorPicker, closeColorPicker, cpRenderFields, cpApplyFields } from './color-picker.js';
@@ -41,7 +42,7 @@ export function updateActButtonState() {
 /**
  * Create a new act from the currently selected (checked) table entries.
  */
-export function createActFromSelection() {
+export async function createActFromSelection() {
     const nums = getCheckedNums();
     if (nums.length === 0) return;
 
@@ -55,7 +56,7 @@ export function createActFromSelection() {
 
         if (actIds.size > 1) {
             // Mixed acts — error out
-            alert('Selected entries belong to different acts. Select entries from only one act, or use the "Assign to act" dropdown to pick a specific act.');
+            await seAlert('Selected entries belong to different acts. Select entries from only one act, or use the "Assign to act" dropdown to pick a specific act.');
             return;
         }
 
@@ -65,7 +66,7 @@ export function createActFromSelection() {
         if (!act) return;
 
         if (unassigned.length === 0) {
-            alert(`All selected entries already belong to "${act.name}".`);
+            await seAlert(`All selected entries already belong to "${act.name}".`);
             return;
         }
 
@@ -100,7 +101,7 @@ export function createActFromSelection() {
     }
 
     // All entries are unassigned — create a new act
-    const actName = promptForActName(nums);
+    const actName = await promptForActName(nums);
     if (actName === null) return;
 
     const actId = buildAndRegisterAct(actName, nums);
@@ -134,7 +135,7 @@ export function createActFromSelection() {
 /**
  * Prompt the user for an act name, handling retroactive detection.
  */
-function promptForActName(nums) {
+async function promptForActName(nums) {
     const minNum = Math.min(...nums);
     const existingMins = getExistingActMins();
     const isRetroactive = existingMins.length > 0 && minNum < Math.min(...existingMins);
@@ -148,7 +149,7 @@ function promptForActName(nums) {
         ? `This act precedes existing acts. Name it (or leave blank for "${defaultName}"):`
         : `Name this act (or leave blank for "${defaultName}"):`;
 
-    const name = prompt(promptMessage, defaultName);
+    const name = await sePrompt(promptMessage, defaultName);
     if (name === null) return null;
     return name.trim() || defaultName;
 }
@@ -321,8 +322,8 @@ export function undoLastAct() {
 /**
  * Delete a specific act after user confirmation.
  */
-export function deleteAct(actId) {
-    if (!confirm('Delete this act? Entries will become unassigned.')) return;
+export async function deleteAct(actId) {
+    if (!await seConfirm('Delete this act? Entries will become unassigned.', { danger: true })) return;
 
     const act = state.acts.get(actId);
     if (!act) return;
@@ -1292,11 +1293,11 @@ export async function showEntrySelector() {
     });
 
     // New Act pill → prompt for name, create, assign
-    $dialog.on('click', '[data-esg-action="new"]', () => {
+    $dialog.on('click', '[data-esg-action="new"]', async () => {
         if (selected.size === 0) return;
         const nums = [...selected];
         const defaultName = `Act ${state.nextActId}`;
-        const name = prompt(`Name for new act (${nums.length} entries):`, defaultName);
+        const name = await sePrompt(`Name for new act (${nums.length} entries):`, defaultName);
         if (name === null) return;
         const snap = snapshotState();
         const actId = buildAndRegisterAct(name.trim() || defaultName, nums);
@@ -1331,15 +1332,16 @@ export async function showEntrySelector() {
     });
 
     // Clear Acts — deletes all acts entirely from state + unassigns all entries (nuclear, confirm first)
-    $dialog.on('click', '[data-esg-action="clear"]', () => {
-        if (!confirm(
+    $dialog.on('click', '[data-esg-action="clear"]', async () => {
+        if (!await seConfirm(
             '⚠ CLEAR ALL ACTS\n\n' +
             'This will permanently delete every act and remove all act assignments across the entire extension:\n' +
             '  • Act badges disappear from the Review table\n' +
             '  • Manage Acts panel will be empty\n' +
             '  • Timeline diagram and Mindmap lose all groupings\n' +
             '  • Minimap act colors are cleared\n\n' +
-            'This is undoable via the Undo button.\n\nAre you sure?'
+            'This is undoable via the Undo button.',
+            { title: 'Clear All Acts', danger: true }
         )) return;
         const snap = snapshotState();
         for (const entry of state.entries.values()) entry.actId = null;
@@ -1380,10 +1382,10 @@ function assignEntriesToActById(actId, nums) {
 }
 
 /** Prompt for a name, create an act, assign nums to it, then refresh UI. */
-function createActForNums(nums) {
+async function createActForNums(nums) {
     if (nums.length === 0) return;
     const defaultName = `Act ${state.nextActId}`;
-    const name = prompt(`Name for new act (${nums.length} entries):`, defaultName);
+    const name = await sePrompt(`Name for new act (${nums.length} entries):`, defaultName);
     if (name === null) return;
     const actId = buildAndRegisterAct(name.trim() || defaultName, nums);
     assignEntriesToActById(actId, nums);
@@ -1528,10 +1530,10 @@ function showGapPopover(e, num) {
 
     $pop.find('.se-gap-popover-close').on('click', () => closeAllPopovers());
 
-    $pop.find(`#se-gap-add-${num}`).on('click', () => {
+    $pop.find(`#se-gap-add-${num}`).on('click', async () => {
         const content = $(`#se-gap-input-${num}`).val().trim();
         if (!content) {
-            alert('Please enter content for entry #' + num);
+            await seAlert('Please enter content for entry #' + num);
             return;
         }
 
@@ -1561,9 +1563,8 @@ function showGapPopover(e, num) {
         persistState();
     });
 
-    $pop.find(`#se-gap-browse-${num}`).on('click', () => {
-        // Trigger the file input for single-entry browse
-        alert(`File picker for entry #${num} — use the Ingest tab to load files.`);
+    $pop.find(`#se-gap-browse-${num}`).on('click', async () => {
+        await seAlert(`File picker for entry #${num} — use the Ingest tab to load files.`);
         closeAllPopovers();
     });
 }

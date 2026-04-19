@@ -202,28 +202,7 @@
 .se-causal-popover {
     position: absolute;
     z-index: 1200;
-    background: var(--se-bg-dark);
-    border: 1px solid var(--se-border);
-    border-radius: 10px;
-    padding: 12px 14px 14px;
-    width: 260px;
-    box-shadow: 0 8px 28px rgba(0,0,0,0.55);
-}
-
-.se-causal-pop-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-    gap: 8px;
-    cursor: move;
-    user-select: none;
-}
-
-.se-causal-pop-title {
-    color: var(--se-purple);
-    font-weight: 600;
-    font-size: 0.9em;
+    width: 300px;
 }
 
 .se-causal-pop-controls {
@@ -724,6 +703,11 @@
 .se-fr-count { font-size: 0.82em; color: var(--se-cyan); white-space: nowrap; }
 
 .se-fr-actions { display: flex; justify-content: flex-end; gap: 6px; align-items: center; margin-top: 4px; }
+
+/* ─── Custom Dialogs (seAlert / seConfirm / sePrompt) ──────── */
+.se-cd-msg { margin: 0 0 10px; font-size: 0.88em; color: var(--se-text); white-space: pre-wrap; line-height: 1.5; }
+.se-cd-input { margin-bottom: 10px; }
+.se-cd-actions { display: flex; justify-content: flex-end; gap: 6px; }
 
 /* ─── System Prompt edit button (gear icon, inline) ──────── */
 .se-prompt-edit-btn {

@@ -14,6 +14,7 @@
 import { state, persistState } from '../core/state.js';
 import { detectGaps } from '../ingest/gap-detection.js';
 import { renderTable, renderSelectionBar } from './table.js';
+import { seAlert, sePrompt } from '../core/dialogs.js';
 
 /**
  * Move selected entries to before a target position.
@@ -257,7 +258,7 @@ function shiftNumSet(set, aboveNum, count) {
  * Show the move-to-position dialog.
  * Prompts for a target entry number and moves selected entries before it.
  */
-export function showMoveDialog() {
+export async function showMoveDialog() {
     const nums = [...state.selected].sort((a, b) => a - b);
     if (nums.length === 0) return;
 
@@ -265,12 +266,12 @@ export function showMoveDialog() {
         ? `Move entry #${nums[0]} to before which entry number?`
         : `Move ${nums.length} entries to before which entry number?`;
 
-    const target = prompt(label);
+    const target = await sePrompt(label);
     if (target === null) return;
 
     const targetNum = Number.parseInt(target, 10);
     if (Number.isNaN(targetNum) || targetNum < 1) {
-        alert('Please enter a valid entry number.');
+        await seAlert('Please enter a valid entry number.');
         return;
     }
 
@@ -282,7 +283,7 @@ export function showMoveDialog() {
  * If exactly 2 entries are selected, swaps them immediately.
  * Otherwise prompts for the second entry number.
  */
-export function showSwapDialog() {
+export async function showSwapDialog() {
     const nums = [...state.selected].sort((a, b) => a - b);
 
     if (nums.length === 2) {
@@ -291,11 +292,11 @@ export function showSwapDialog() {
     }
 
     if (nums.length === 1) {
-        const other = prompt(`Swap entry #${nums[0]} with which entry number?`);
+        const other = await sePrompt(`Swap entry #${nums[0]} with which entry number?`);
         if (other === null) return;
         const otherNum = Number.parseInt(other, 10);
         if (Number.isNaN(otherNum) || !state.entries.has(otherNum)) {
-            alert('Please enter a valid existing entry number.');
+            await seAlert('Please enter a valid existing entry number.');
             return;
         }
         if (otherNum === nums[0]) return;
@@ -303,5 +304,5 @@ export function showSwapDialog() {
         return;
     }
 
-    alert('Select exactly 1 or 2 entries to swap.');
+    await seAlert('Select exactly 1 or 2 entries to swap.');
 }
