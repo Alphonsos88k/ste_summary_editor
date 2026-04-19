@@ -105,7 +105,6 @@ export function createActFromSelection() {
 
     const actId = buildAndRegisterAct(actName, nums);
     assignEntriesToAct(actId, nums);
-    removeEmptyActs();
 
     // Save for undo
     state.lastAction = {
@@ -270,14 +269,18 @@ function hslToHex(h, s, l) {
  * Assign entries to an act, removing them from any previous act.
  */
 function assignEntriesToAct(actId, nums) {
+    const newAct = state.acts.get(actId);
     for (const num of nums) {
         const entry = state.entries.get(num);
         if (!entry) continue;
-        if (entry.actId && entry.actId !== actId) {
-            const oldAct = state.acts.get(entry.actId);
-            if (oldAct) oldAct.entryNums.delete(num);
+        if (entry.actId !== actId) {
+            if (entry.actId) {
+                const oldAct = state.acts.get(entry.actId);
+                if (oldAct) oldAct.entryNums.delete(num);
+            }
+            entry.actId = actId;
+            if (newAct) newAct.entryNums.add(num);
         }
-        entry.actId = actId;
     }
 }
 
@@ -1185,9 +1188,10 @@ export async function showEntrySelector() {
                 label:     escHtml(act.name),
             })
         ).join('');
-        const newPill  = fillTemplate(pillTmpl, { extraCls: ' se-esg-pill-new',   dataAttr: 'data-esg-action="new"',   style: '', label: '+ New Act' });
-        const clearPill = fillTemplate(pillTmpl, { extraCls: ' se-esg-pill-clear', dataAttr: 'data-esg-action="clear"', style: '', label: 'Clear' });
-        return actPills + newPill + clearPill;
+        const newPill        = fillTemplate(pillTmpl, { extraCls: ' se-esg-pill-new',        dataAttr: 'data-esg-action="new"',        style: '', label: '+ New Act' });
+        const unassignPill   = fillTemplate(pillTmpl, { extraCls: ' se-esg-pill-unassign',   dataAttr: 'data-esg-action="unassign"',   style: '', label: 'Unassign All' });
+        const clearActsPill  = fillTemplate(pillTmpl, { extraCls: ' se-esg-pill-clear',      dataAttr: 'data-esg-action="clear"',      style: '', label: 'Clear Acts' });
+        return actPills + newPill + unassignPill + clearActsPill;
     }
 
     const html = fillTemplate(panelTmpl, { gridHtml: buildGrid(), pillsHtml: buildPills() });
@@ -1245,7 +1249,7 @@ export async function showEntrySelector() {
         if (!Number.isNaN(num)) touchCell(num, $cell);
     });
 
-    $dialog.on('pointerup pointercancel', '#se-esg-grid', () => {
+    $dialog.on('pointerup pointercancel', () => {
         dragMode = null;
         dragTouched = new Set();
     });
@@ -1307,30 +1311,54 @@ export async function showEntrySelector() {
         $('#se-esg-pills').html(buildPills());
     });
 
-    // Clear pill → unassign selected entries
-    $dialog.on('click', '[data-esg-action="clear"]', () => {
-        if (selected.size === 0) return;
-        const snap = snapshotState();
-        const count = selected.size;
-        for (const num of selected) {
-            const entry = state.entries.get(num);
-            if (!entry) continue;
-            if (entry.actId) {
-                const act = state.acts.get(entry.actId);
-                if (act) act.entryNums.delete(num);
-                entry.actId = null;
-            }
-        }
-        removeEmptyActs();
+    function _doUnassignAll(snap) {
+        for (const act of state.acts.values()) act.entryNums.clear();
+        for (const entry of state.entries.values()) entry.actId = null;
         state.lastAction = {
-            description: `Unassign ${count} entr${count === 1 ? 'y' : 'ies'} from act`,
+            description: 'Unassign all act assignments',
             undo: () => { restoreSnapshot(snap); refreshActUI(); persistState(); updateUndoButton(); },
         };
         updateUndoButton();
         persistState();
         selected.clear();
         refreshGrid();
-        $('#se-esg-pills').html(buildPills());
+    }
+
+    // Unassign All — clears all assignments + entryNums; act pills stay
+    $dialog.on('click', '[data-esg-action="unassign"]', () => {
+        _doUnassignAll(snapshotState());
+        $dialog.find('#se-esg-pills').html(buildPills());
+    });
+
+    // Clear Acts — deletes all acts entirely from state + unassigns all entries (nuclear, confirm first)
+    $dialog.on('click', '[data-esg-action="clear"]', () => {
+        if (!confirm(
+            '⚠ CLEAR ALL ACTS\n\n' +
+            'This will permanently delete every act and remove all act assignments across the entire extension:\n' +
+            '  • Act badges disappear from the Review table\n' +
+            '  • Manage Acts panel will be empty\n' +
+            '  • Timeline diagram and Mindmap lose all groupings\n' +
+            '  • Minimap act colors are cleared\n\n' +
+            'This is undoable via the Undo button.\n\nAre you sure?'
+        )) return;
+        const snap = snapshotState();
+        for (const entry of state.entries.values()) entry.actId = null;
+        state.acts.clear();
+        state.nextActId = 1;
+        state.actColorIdx = 0;
+        state.lastAction = {
+            description: 'Clear all acts',
+            undo: () => { restoreSnapshot(snap); refreshActUI(); persistState(); updateUndoButton(); },
+        };
+        updateUndoButton();
+        persistState();
+        selected.clear();
+        refreshGrid();
+        const newPill      = fillTemplate(pillTmpl, { extraCls: ' se-esg-pill-new',      dataAttr: 'data-esg-action="new"',      style: '', label: '+ New Act' });
+        const unassignPill = fillTemplate(pillTmpl, { extraCls: ' se-esg-pill-unassign', dataAttr: 'data-esg-action="unassign"', style: '', label: 'Unassign All' });
+        const clearPill    = fillTemplate(pillTmpl, { extraCls: ' se-esg-pill-clear',    dataAttr: 'data-esg-action="clear"',    style: '', label: 'Clear Acts' });
+        $dialog.find('#se-esg-pills').html(newPill + unassignPill + clearPill);
+        refreshActUI();
     });
 
     const cleanup = () => {
@@ -1348,7 +1376,6 @@ export async function showEntrySelector() {
  */
 function assignEntriesToActById(actId, nums) {
     assignEntriesToAct(actId, nums);
-    removeEmptyActs();
     persistState();
 }
 
