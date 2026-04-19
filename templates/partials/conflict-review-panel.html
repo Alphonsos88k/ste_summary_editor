@@ -1,0 +1,14 @@
+<div class="se-float-panel se-cr-panel" id="se-conflict-review-panel">
+    <div class="se-float-panel-header">
+        <span class="se-float-panel-title">&#x26A0; Conflict Review</span>
+        <button class="se-close-circle se-crp-close" title="Close">&times;</button>
+    </div>
+    <div class="se-crp-toolbar">
+        <button class="se-crp-filter-btn active" data-crp-filter="all">All <span class="se-crp-count" id="se-crp-count-all">{{countAll}}</span></button>
+        <button class="se-crp-filter-btn se-crp-filter-error" data-crp-filter="error">&#9679; Error <span class="se-crp-count" id="se-crp-count-error">{{countError}}</span></button>
+        <button class="se-crp-filter-btn se-crp-filter-warn" data-crp-filter="warning">&#9679; Warning <span class="se-crp-count" id="se-crp-count-warn">{{countWarn}}</span></button>
+        <button class="se-crp-filter-btn se-crp-filter-info" data-crp-filter="info">&#9679; Info <span class="se-crp-count" id="se-crp-count-info">{{countInfo}}</span></button>
+    </div>
+    <div class="se-crp-list" id="se-crp-list">{{itemsHtml}}</div>
+    <div class="se-crp-empty" id="se-crp-empty" style="{{emptyStyle}}">No conflict data. Run Check Conflicts first.</div>
+</div>

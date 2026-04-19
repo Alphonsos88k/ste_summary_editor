@@ -53,8 +53,10 @@ import { autoDetectTimelineFiles, hasTimelineFiles, openTimelinePanel, runTimeli
 import { openTimelineEditor, closeTimelineEditor } from './src/analysis/timeline-editor.js';
 import {
     runConflictCheck, clearConflicts, renderApiStatus, showAnalysisLog,
-    showFeedbackDetail,
+    showFeedbackDetail, openStoryContextPanel,
 } from './src/conflict/conflict-detection.js';
+import { openAnalyticsPanel } from './src/analysis/entry-analytics.js';
+import { openConflictReview, setConflictReviewEditorCallback } from './src/conflict/conflict-review.js';
 import { addRangeLinks, removeRangeLinks, clearAllLinks, renderCausalPanel, toggleCausalPopover } from './src/editor/causality.js';
 import { openContentEditor, closeContentEditor } from './src/editor/content-editor.js';
 import { openBulkRefine, closeBulkRefine } from './src/editor/bulk-refine.js';
@@ -252,6 +254,7 @@ jQuery(async () => {
 
     // Register content cell click handler (fires inside row handler before renderTable)
     setContentCellClickHandler((num) => openContentEditor(num));
+    setConflictReviewEditorCallback((num) => openContentEditor(num));
 
     // Bind all event handlers
     bindSettingsEvents();
@@ -1413,6 +1416,9 @@ function bindActsEvents() {
     });
     $('#se-btn-minimap').on('click', toggleMinimap);
     $('#se-btn-minimap-close').on('click', toggleMinimap);
+    $('#se-btn-story-context').on('click', openStoryContextPanel);
+    $('#se-btn-entry-analytics').on('click', openAnalyticsPanel);
+    $('#se-btn-conflict-review').on('click', openConflictReview);
 
     // ── View toggle: Timeline ↔ Location Bubbles ───────────────
     let currentTlView = 'timeline';
