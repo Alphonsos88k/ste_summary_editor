@@ -159,4 +159,6 @@ export const TEMPLATES = Object.freeze({
     TIMELINE_ANALYSIS_PANEL: 'partials/timeline-analysis-panel',
     FILES_PANEL:             'partials/files-panel',
     TIMELINE_EDITOR_PANEL:   'partials/timeline-editor-panel',
+    ENTRY_ANALYTICS_PANEL:   'partials/entry-analytics-panel',
+    CONFLICT_REVIEW_PANEL:   'partials/conflict-review-panel',
 });

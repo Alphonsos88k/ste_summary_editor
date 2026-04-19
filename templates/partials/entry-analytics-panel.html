@@ -1,0 +1,43 @@
+<div class="se-float-panel se-analytics-panel" id="se-analytics-panel">
+    <div class="se-float-panel-header">
+        <span class="se-float-panel-title">&#x1F4CA; Entry Analytics</span>
+        <button class="se-close-circle se-analytics-close" title="Close">&times;</button>
+    </div>
+    <div class="se-analytics-body">
+        <div class="se-analytics-section">
+            <div class="se-analytics-section-title">Entries</div>
+            <div class="se-analytics-grid">
+                <div class="se-analytics-stat"><span class="se-analytics-val" id="se-an-total">{{totalEntries}}</span><span class="se-analytics-lbl">Total</span></div>
+                <div class="se-analytics-stat"><span class="se-analytics-val" id="se-an-gaps">{{gapCount}}</span><span class="se-analytics-lbl">Gaps</span></div>
+                <div class="se-analytics-stat"><span class="se-analytics-val" id="se-an-acts">{{actCount}}</span><span class="se-analytics-lbl">Acts</span></div>
+                <div class="se-analytics-stat"><span class="se-analytics-val" id="se-an-modified">{{modifiedCount}}</span><span class="se-analytics-lbl">Edited</span></div>
+            </div>
+        </div>
+        <div class="se-analytics-section">
+            <div class="se-analytics-section-title">Word Count</div>
+            <div class="se-analytics-grid">
+                <div class="se-analytics-stat"><span class="se-analytics-val" id="se-an-wc-total">{{wcTotal}}</span><span class="se-analytics-lbl">Total</span></div>
+                <div class="se-analytics-stat"><span class="se-analytics-val" id="se-an-wc-avg">{{wcAvg}}</span><span class="se-analytics-lbl">Avg</span></div>
+                <div class="se-analytics-stat"><span class="se-analytics-val" id="se-an-wc-min">{{wcMin}}</span><span class="se-analytics-lbl">Min</span></div>
+                <div class="se-analytics-stat"><span class="se-analytics-val" id="se-an-wc-max">{{wcMax}}</span><span class="se-analytics-lbl">Max</span></div>
+            </div>
+        </div>
+        <div class="se-analytics-section">
+            <div class="se-analytics-section-title">Metadata Coverage</div>
+            <div class="se-analytics-coverage" id="se-an-coverage">{{coverageHtml}}</div>
+        </div>
+        <div class="se-analytics-section" id="se-an-conflict-section">
+            <div class="se-analytics-section-title">Conflicts</div>
+            <div class="se-analytics-grid">
+                <div class="se-analytics-stat se-analytics-stat-error"><span class="se-analytics-val" id="se-an-cf-error">{{cfError}}</span><span class="se-analytics-lbl">Errors</span></div>
+                <div class="se-analytics-stat se-analytics-stat-warn"><span class="se-analytics-val" id="se-an-cf-warn">{{cfWarn}}</span><span class="se-analytics-lbl">Warnings</span></div>
+                <div class="se-analytics-stat se-analytics-stat-info"><span class="se-analytics-val" id="se-an-cf-info">{{cfInfo}}</span><span class="se-analytics-lbl">Info</span></div>
+                <div class="se-analytics-stat"><span class="se-analytics-val" id="se-an-cf-ok">{{cfOk}}</span><span class="se-analytics-lbl">Clean</span></div>
+            </div>
+        </div>
+        <div class="se-analytics-section" id="se-an-acts-section">
+            <div class="se-analytics-section-title">Per-Act Word Count</div>
+            <div class="se-analytics-act-list" id="se-an-act-list">{{actListHtml}}</div>
+        </div>
+    </div>
+</div>
