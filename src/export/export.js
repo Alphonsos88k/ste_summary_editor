@@ -18,6 +18,7 @@
 
 import { state } from '../core/state.js';
 import { buildBracket, escHtml } from '../core/utils.js';
+import { seAlert, seConfirm } from '../core/dialogs.js';
 
 /**
  * Get entries for export based on the current scope selection.
@@ -355,7 +356,7 @@ export async function handleExport(rewordFn) {
     if (dest === 'new-folder' || dest === 'source-folder') {
         const folderPath = ($('#se-folder-path').val() || '').trim();
         if (!folderPath) {
-            alert('Please enter a folder path for the export.');
+            await seAlert('Please enter a folder path for the export.');
             return;
         }
         const cleanPath = folderPath.replace(/[/\\]+$/, '');
@@ -396,7 +397,7 @@ export async function copyToClipboard() {
         copyToClipboard._timer = setTimeout(() => $popover.removeClass('active'), 3000);
     } catch (err) {
         console.warn('[Summary Editor] Clipboard copy failed:', err);
-        alert('Failed to copy to clipboard. Your browser may not support this feature.');
+        await seAlert('Failed to copy to clipboard. Your browser may not support this feature.');
     }
 }
 
@@ -448,17 +449,17 @@ export function downloadFile(name, content, mime) {
  * Download each source file separately with its entries re-exported.
  * Warns user that files will have the same names as originals.
  */
-export function downloadBySource() {
+export async function downloadBySource() {
     const format = $('#se-export-format').val() || 'txt';
     const grouped = groupEntriesBySource();
 
     if (grouped.size === 0) {
-        alert('No entries to export.');
+        await seAlert('No entries to export.');
         return;
     }
 
     const fileCount = grouped.size;
-    if (!confirm(`This will download ${fileCount} file${fileCount > 1 ? 's' : ''} with their original names. Files with the same name will overwrite if saved to the same folder.\n\nContinue?`)) {
+    if (!await seConfirm(`This will download ${fileCount} file${fileCount > 1 ? 's' : ''} with their original names. Files with the same name will overwrite if saved to the same folder.\n\nContinue?`)) {
         return;
     }
 
@@ -480,7 +481,7 @@ export async function downloadAsZip() {
     const grouped = groupEntriesBySource();
 
     if (grouped.size === 0) {
-        alert('No entries to export.');
+        await seAlert('No entries to export.');
         return;
     }
 
@@ -666,29 +667,29 @@ export async function triggerDestructiveExport() {
     const grouped = groupEntriesBySource();
 
     if (grouped.size === 0) {
-        alert('No entries to export.');
+        await seAlert('No entries to export.');
         return;
     }
 
     const fileCount = grouped.size;
     const noun = fileCount === 1 ? 'file' : 'files';
 
-    const warnOk = confirm(
+    const warnOk = await seConfirm(
         `\u26a0 DESTRUCTIVE EXPORT\n\n` +
         `This will download ${fileCount} ${noun} named to match your originals.\n` +
         `Saving them to the same folder will overwrite the source files.\n\n` +
-        `Would you like to download a backup ZIP before continuing?\n\n` +
-        `OK \u2192 Download backup ZIP then proceed\n` +
-        `Cancel \u2192 Abort`
+        `Click Confirm to download a backup ZIP then proceed, or Cancel to abort.`,
+        { title: 'Destructive Export', danger: true }
     );
     if (!warnOk) return;
 
     await downloadAsZip();
 
-    const finalOk = confirm(
+    const finalOk = await seConfirm(
         `Backup downloaded.\n\n` +
         `Proceed with downloading ${fileCount} ${noun} for overwriting?\n\n` +
-        `This cannot be undone once you replace the originals.`
+        `This cannot be undone once you replace the originals.`,
+        { title: 'Final Confirmation', danger: true }
     );
     if (!finalOk) return;
 

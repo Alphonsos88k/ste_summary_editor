@@ -15,6 +15,7 @@ import { escHtml, spawnPanel } from '../core/utils.js';
 import { registerPrompt, getPrompt } from '../core/system-prompts.js';
 import { renderTable } from '../table/table.js';
 import { TEMPLATES } from '../core/constants.js';
+import { seAlert, seConfirm } from '../core/dialogs.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 
 const PROMPT_KEY = 'timeline-editor';
@@ -45,7 +46,7 @@ let _panel = null;
 export async function openTimelineEditor() {
     const file = _getTimelineFile();
     if (!file) {
-        alert('No timeline-notes file assigned. Assign a supplementary file with category "Timeline Notes" first.');
+        await seAlert('No timeline-notes file assigned. Assign a supplementary file with category "Timeline Notes" first.');
         return;
     }
 
@@ -202,10 +203,10 @@ function _bindEvents(file, isEmpty) {
         if (ta) ta.value = file.content || '';
     });
 
-    _panel.querySelector('#se-te-accept')?.addEventListener('click', () => {
+    _panel.querySelector('#se-te-accept')?.addEventListener('click', async () => {
         const result = _panel.querySelector('#se-te-result')?.value || '';
         if (!result) return;
-        if (!confirm('Accept this AI suggestion and replace the current timeline?')) return;
+        if (!await seConfirm('Accept this AI suggestion and replace the current timeline?')) return;
         const ta = _panel.querySelector('#se-te-content');
         if (ta) ta.value = result;
         _panel.querySelector('#se-te-result-wrap').style.display = 'none';

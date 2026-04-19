@@ -18,6 +18,7 @@
 import { state, persistState } from '../core/state.js';
 import { renderTable } from '../table/table.js';
 import { registerPrompt, getPrompt } from '../core/system-prompts.js';
+import { seAlert } from '../core/dialogs.js';
 
 const PROMPT_KEY = 'rag-reword';
 
@@ -56,7 +57,7 @@ export async function rewordForRAG() {
     showProgress(false);
 
     if (failures.length) {
-        alert(
+        await seAlert(
             `RAG reword completed. ${failures.length} entries failed and kept originals: ` +
             `#${failures.join(', #')}`
         );

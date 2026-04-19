@@ -20,6 +20,7 @@ import { state, persistState } from '../core/state.js';
 import { renderTable } from '../table/table.js';
 import { escHtml, spawnPanel } from '../core/utils.js';
 import { getPrompt } from '../core/system-prompts.js';
+import { seAlert, seConfirm } from '../core/dialogs.js';
 
 /** Shared prompt key — reuses Content Editor's configurable prompt. */
 const PROMPT_KEY = 'content-editor';
@@ -33,10 +34,10 @@ let _panel = null;
  * Open the Bulk Refine panel for currently selected entries.
  * Validates selection and conflict state, then shows the panel.
  */
-export function openBulkRefine() {
+export async function openBulkRefine() {
     const selected = [...state.selected].sort((a, b) => a - b);
     if (selected.length === 0) {
-        alert('Select at least one entry to refine.');
+        await seAlert('Select at least one entry to refine.');
         return;
     }
 
@@ -44,13 +45,13 @@ export function openBulkRefine() {
     const noFeedback   = selected.filter(n => !_hasNonOkConflict(n));
 
     if (noFeedback.length === selected.length) {
-        const ok = confirm(
+        const ok = await seConfirm(
             `None of the ${selected.length} selected entr${selected.length === 1 ? 'y has' : 'ies have'} been conflict-checked.\n\n` +
             `The AI will revise based on content only.\n\nProceed anyway?`
         );
         if (!ok) return;
     } else if (noFeedback.length > 0) {
-        const ok = confirm(
+        const ok = await seConfirm(
             `${withFeedback.length} of ${selected.length} entries have conflict feedback.\n` +
             `${noFeedback.length} entries have no conflict data and will be revised on content only.\n\nProceed?`
         );

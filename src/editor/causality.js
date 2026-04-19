@@ -168,7 +168,7 @@ export async function toggleCausalPopover() {
         });
     }
 
-    makeDraggable($pop[0], $pop.find('.se-causal-pop-header')[0]);
+    makeDraggable($pop[0], $pop.find('.se-fr-header')[0]);
 }
 
 function refreshPopoverBody($pop, links) {

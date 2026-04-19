@@ -14,6 +14,7 @@ import { state } from '../core/state.js';
 import { escHtml, escAttr, spawnPanel } from '../core/utils.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 import { TEMPLATES, ENTRY_FIELDS } from '../core/constants.js';
+import { seAlert, seConfirm } from '../core/dialogs.js';
 
 /** Fields that support tag autocomplete (mirrors ENTRY_FIELDS from constants). */
 const TAG_FIELDS = ENTRY_FIELDS;
@@ -231,7 +232,7 @@ export async function showTagBrowser(onClose) {
 
     const hasTags = sections.some(s => s.tags.length > 0);
     if (!hasTags) {
-        alert('No tags yet. Tags are created as you fill in date, time, and location fields.');
+        await seAlert('No tags yet. Tags are created as you fill in date, time, and location fields.');
         return;
     }
 
@@ -320,8 +321,8 @@ export async function showTagBrowser(onClose) {
     });
 
     // Clear all
-    $dialog.on('click', '.se-tb-clear-all', function () {
-        if (!confirm('Clear all date, time, and location values from all entries?')) return;
+    $dialog.on('click', '.se-tb-clear-all', async function () {
+        if (!await seConfirm('Clear all date, time, and location values from all entries?', { danger: true })) return;
         for (const entry of state.entries.values()) {
             entry.date = '';
             entry.time = '';

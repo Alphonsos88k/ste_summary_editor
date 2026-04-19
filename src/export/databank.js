@@ -24,6 +24,7 @@ import { spawnPanel } from '../core/utils.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
 import { state, persistState } from '../core/state.js';
+import { seAlert } from '../core/dialogs.js';
 
 /** @type {number} Tracks the next append entry number (session-scoped). */
 let nextEntryNum = 1;
@@ -77,7 +78,7 @@ export async function handleDatabankInject() {
     const context = SillyTavern.getContext();
 
     if (context.characterId === undefined && !context.groupId) {
-        alert('No character or group selected. Open a chat first.');
+        await seAlert('No character or group selected. Open a chat first.');
         return;
     }
 
@@ -98,7 +99,7 @@ export async function handleDatabankInject() {
     // Incremental: skip upload if content hasn't changed since last inject
     const contentHash = hashContent(content);
     if (mode === 'overwrite' && contentHash === state.lastInjectHash) {
-        alert('Databank is already up to date — no changes since last inject.');
+        await seAlert('Databank is already up to date — no changes since last inject.');
         return;
     }
 
@@ -110,10 +111,10 @@ export async function handleDatabankInject() {
             state.lastInjectHash = contentHash;
             persistState();
         }
-        alert(`Successfully injected "${fileName}" into databank.`);
+        await seAlert(`Successfully injected "${fileName}" into databank.`);
     } catch (err) {
         console.error('[Summary Editor] Databank inject failed:', err);
-        alert(`Databank injection failed: ${err.message}\n\nYou can still use the Download Export button.`);
+        await seAlert(`Databank injection failed: ${err.message}\n\nYou can still use the Download Export button.`);
     }
 }
 
