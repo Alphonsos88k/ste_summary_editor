@@ -1,3 +1,11 @@
+# [1.3.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.2.0...v1.3.0) (2026-04-22)
+
+
+### Features
+
+* add Story Context, Entry Analytics, and Conflict Review panels to Edit tab ([5be1145](https://github.com/Alphonsos88k/ste_summary_editor/commit/5be11455bc3daa64dbf8dca8ca6ddac3c9ff4ea1))
+* export tab step-by-step form flow redesign and Edit tab panel improvements ([8980d9f](https://github.com/Alphonsos88k/ste_summary_editor/commit/8980d9f20eb9cf559ad0b9a6e92ff1fb6dd7cf50))
+
 # [1.2.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.1.0...v1.2.0) (2026-04-19)
 
 
