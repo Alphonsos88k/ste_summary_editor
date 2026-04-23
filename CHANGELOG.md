@@ -1,3 +1,15 @@
+# [1.4.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.3.0...v1.4.0) (2026-04-23)
+
+
+### Bug Fixes
+
+* Esc closes content editor first, then panel; move ? button before API status ([5e0f15f](https://github.com/Alphonsos88k/ste_summary_editor/commit/5e0f15f9e0ca0e3d977c101539ed63867bcd7653))
+
+
+### Features
+
+* keyboard shortcut discovery panel and act color swatch in assign dropdown ([95a51c4](https://github.com/Alphonsos88k/ste_summary_editor/commit/95a51c42ada0df284302ca4b988cc5abf4519b19))
+
 # [1.3.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.2.0...v1.3.0) (2026-04-22)
 
 
