@@ -922,6 +922,10 @@
 }
 .se-an-act-meta-pct { font-size: 0.72em; color: #75715e; }
 
+.se-analytics-act-list {
+    max-height: 130px;
+    overflow-y: auto;
+}
 .se-an-empty { color: #75715e; font-size: 0.82em; padding: 4px 0; }
 
 /* ─── Conflict Review Panel ─────────────────────────────────────────────── */
