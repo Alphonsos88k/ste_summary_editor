@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import sonarjs from 'eslint-plugin-sonarjs';
 
 export default [
   { ignores: ['node_modules/', 'lib/', '.github/'] },
@@ -7,6 +8,7 @@ export default [
   {
     ...js.configs.recommended,
     files: ['src/**/*.js', 'index.js'],
+    plugins: { sonarjs },
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
@@ -25,6 +27,14 @@ export default [
       'no-console':     'off',
       'prefer-const':   'warn',
       'no-var':         'error',
+      ...sonarjs.configs.recommended.rules,
+      // False positives for this codebase — not security-critical contexts
+      'sonarjs/pseudo-random': 'off',   // Math.random() used for color generation only
+      'sonarjs/slow-regex':    'off',   // regexes are not user-facing attack surfaces
+      // Downgrade to warnings so CI doesn't fail while we work through them
+      'sonarjs/cognitive-complexity':    'warn',
+      'sonarjs/no-nested-conditional':   'warn',
+      'sonarjs/no-nested-template-literals': 'warn',
     },
   },
 ];
