@@ -135,12 +135,31 @@ export async function createActFromSelection() {
 /**
  * Prompt the user for an act name, handling retroactive detection.
  */
+/**
+ * Detect the user's act naming convention and suggest the next name.
+ * E.g. "Chapter 3" → "Chapter 4", "Act 5" → "Act 6", no acts → "Act 1".
+ */
+function suggestNextActName() {
+    const names = [...state.acts.values()].map(a => a.name);
+    if (names.length === 0) return 'Act 1';
+    let bestPrefix = 'Act';
+    let bestNum = 0;
+    for (const name of names) {
+        const m = name.match(/^(.*?)(\d+)\s*$/);
+        if (m) {
+            const n = parseInt(m[2], 10);
+            if (n > bestNum) { bestNum = n; bestPrefix = m[1]; }
+        }
+    }
+    return bestNum === 0 ? `Act ${state.nextActId}` : `${bestPrefix}${bestNum + 1}`;
+}
+
 async function promptForActName(nums) {
     const minNum = Math.min(...nums);
     const existingMins = getExistingActMins();
     const isRetroactive = existingMins.length > 0 && minNum < Math.min(...existingMins);
 
-    let defaultName = `Act ${state.nextActId}`;
+    let defaultName = suggestNextActName();
     if (isRetroactive) {
         defaultName = `Pre-Act (before #${Math.min(...existingMins)})`;
     }
@@ -1303,12 +1322,12 @@ export async function showEntrySelector() {
         $dialog.find('#se-esg-pills').html(buildPills());
     });
 
-    // New Act pill → prompt for name, create, assign
+    // New Act pill → prompt for name, create, assign (works even with 0 selected)
     $dialog.on('click', '[data-esg-action="new"]', async () => {
-        if (selected.size === 0) return;
         const nums = [...selected];
-        const defaultName = `Act ${state.nextActId}`;
-        const name = await sePrompt(`Name for new act (${nums.length} entries):`, defaultName);
+        const defaultName = suggestNextActName();
+        const label = nums.length > 0 ? `Name for new act (${nums.length} entries):` : 'Name for new act:';
+        const name = await sePrompt(label, defaultName);
         if (name === null) return;
         const snap = snapshotState();
         const actId = buildAndRegisterAct(name.trim() || defaultName, nums);
@@ -1394,9 +1413,9 @@ function assignEntriesToActById(actId, nums) {
 
 /** Prompt for a name, create an act, assign nums to it, then refresh UI. */
 async function createActForNums(nums) {
-    if (nums.length === 0) return;
-    const defaultName = `Act ${state.nextActId}`;
-    const name = await sePrompt(`Name for new act (${nums.length} entries):`, defaultName);
+    const defaultName = suggestNextActName();
+    const label = nums.length > 0 ? `Name for new act (${nums.length} entries):` : 'Name for new act:';
+    const name = await sePrompt(label, defaultName);
     if (name === null) return;
     const actId = buildAndRegisterAct(name.trim() || defaultName, nums);
     assignEntriesToActById(actId, nums);
