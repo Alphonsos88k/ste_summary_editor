@@ -7,10 +7,11 @@
     <div class="se-tl-level-wrap">
         <span class="se-tl-level-label">Strictness:</span>
         {{levelButtons}}
-        <button class="se-btn se-btn-sm se-prompt-edit-btn" data-edit-prompt="{{promptKey}}" title="Edit analysis prompt" style="margin-left:6px;">&#9881;</button>
     </div>
     <div class="se-tl-action-row">
-        <button class="se-btn se-btn-primary se-btn-sm" id="se-tl-run">&#9654; Run Analysis</button>
+        <span class="se-btn-split-group">
+            <button class="se-btn se-btn-primary se-btn-sm" id="se-tl-run">&#9654; Run Analysis</button><button class="se-btn-split-cog" data-edit-prompt="{{promptKey}}" title="Edit analysis prompt">&#9881;</button>
+        </span>
         <span id="se-tl-status" class="se-tl-status"></span>
     </div>
 </div>

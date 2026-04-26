@@ -403,7 +403,9 @@
     border-bottom: 1px solid var(--se-border);
     display: flex;
     flex-shrink: 0;
-    overflow: hidden;
+    overflow: visible;
+    position: relative;
+    z-index: 5;
 }
 
 .se-stats-seg {
@@ -1552,3 +1554,14 @@ tr.se-drag-over {
     color: var(--se-muted);
 }
 
+
+/* ---------- File-range row left-accent ---------- */
+/*
+ * Left-bar-only pattern: a 4px colored inset on the first cell of every range row.
+ * No top/bottom borders — avoids clashing where two ranges are adjacent and
+ * eliminates pagination cutoff artifacts. Clean modern table grouping indicator.
+ * --range-color is set per-row inline by applyRangeBorderClasses().
+ */
+tr.se-range td:first-child {
+    box-shadow: inset 4px 0 0 var(--range-color, #4fc3f7);
+}

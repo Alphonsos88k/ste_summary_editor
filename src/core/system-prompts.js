@@ -33,17 +33,19 @@ const _registry = [];
  * @param {string} key - Unique identifier, e.g. 'conflict-check'
  * @param {string} label - Display name shown in the hub card
  * @param {string} defaultText - Default prompt text, seeded on first load
- * @param {{ warnJson?: boolean }} [opts]
+ * @param {{ warnJson?: boolean, location?: string, passive?: boolean }} [opts]
  *   - `warnJson`: show a warning that this prompt must instruct the model to return JSON
+ *   - `location`: human-readable path to where this prompt is used (e.g. 'Review › Check Conflicts')
+ *   - `passive`: prompt fires automatically / has no standalone trigger button
  */
 export function registerPrompt(key, label, defaultText, opts = {}) {
     if (_registry.some(r => r.key === key)) return;
-    _registry.push({ key, label, defaultText, warnJson: !!opts.warnJson });
+    _registry.push({ key, label, location: opts.location || '', defaultText, warnJson: !!opts.warnJson, passive: !!opts.passive });
 }
 
 /**
  * Return a snapshot of all registered prompts (used by the hub).
- * @returns {Array<{key: string, label: string, defaultText: string, warnJson: boolean}>}
+ * @returns {Array<{key: string, label: string, location: string, defaultText: string, warnJson: boolean}>}
  */
 export function getRegisteredPrompts() {
     return [..._registry];
@@ -166,14 +168,18 @@ export async function openSystemPromptHub() {
         loadTemplate(TEMPLATES.SPH_CARD),
     ]);
 
-    const cards = _registry.map(({ key, label, defaultText, warnJson }) => {
-        const warnHtml = warnJson ? '<div class="se-ep-warn">&#9888; Must return valid JSON</div>' : '';
+    const cards = _registry.map(({ key, label, location, defaultText, warnJson, passive }) => {
+        const warnHtml     = warnJson  ? '<div class="se-ep-warn">&#9888; Must return valid JSON</div>' : '';
+        const locationHtml = location  ? `<div class="se-sph-location">— ${escHtml(location)}</div>` : '';
+        const passiveHtml  = passive   ? '<span class="se-sph-passive">background &mdash; no direct UI</span>' : '';
         return fillTemplate(cardTmpl, {
-            label:       escHtml(label),
+            label:        escHtml(label),
+            locationHtml,
+            passiveHtml,
             warnHtml,
-            key:         escHtml(key),
-            defaultText: escHtml(defaultText),
-            promptText:  escHtml(getPrompt(key)),
+            key:          escHtml(key),
+            defaultText:  escHtml(defaultText),
+            promptText:   escHtml(getPrompt(key)),
         });
     }).join('');
 

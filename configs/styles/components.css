@@ -727,6 +727,36 @@
 }
 .se-prompt-edit-btn:hover { color: var(--se-cyan); background: rgba(102,217,232,0.08); }
 
+/* ─── Joined button + cogwheel group (generic, cyan accent) ─ */
+.se-btn-split-group {
+    display: inline-flex;
+    align-items: stretch;
+    gap: 0;
+    flex-shrink: 0;
+}
+.se-btn-split-group > button:first-child {
+    border-radius: 4px 0 0 4px;
+    border-right: none;
+}
+.se-btn-split-cog {
+    background: transparent;
+    border: 1px solid rgba(102, 217, 232, 0.35);
+    border-left: none;
+    border-radius: 0 4px 4px 0;
+    color: rgba(102, 217, 232, 0.7);
+    cursor: pointer;
+    font-size: 0.88em;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.se-btn-split-cog:hover {
+    background: rgba(102, 217, 232, 0.1);
+    border-color: var(--se-cyan);
+    color: var(--se-cyan);
+}
+
 /* ─── Edit Prompt popup ───────────────────────────────────── */
 .se-ep-warn {
     font-size: 0.8em;
@@ -769,6 +799,26 @@
     margin-bottom: 6px;
     letter-spacing: 0.03em;
     text-transform: uppercase;
+}
+
+.se-sph-location {
+    font-size: 0.75em;
+    color: var(--se-muted);
+    margin-top: -4px;
+    margin-bottom: 6px;
+}
+
+.se-sph-passive {
+    font-size: 0.7em;
+    font-weight: 500;
+    color: #cdb4ff;
+    background: rgba(174, 129, 255, 0.12);
+    border: 1px solid rgba(174, 129, 255, 0.3);
+    border-radius: 3px;
+    padding: 1px 5px;
+    vertical-align: middle;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 .se-sph-textarea {

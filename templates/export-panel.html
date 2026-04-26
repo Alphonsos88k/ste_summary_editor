@@ -62,11 +62,13 @@
 
                 <!-- Options -->
                 <div class="se-step-options">
-                    <label class="se-export-check">
-                        <input type="checkbox" id="se-export-rag" />
-                        Reword entries for RAG clarity (Experimental)
+                    <div style="display:inline-flex;align-items:center;gap:4px;">
+                        <label class="se-export-check">
+                            <input type="checkbox" id="se-export-rag" />
+                            Reword entries for RAG clarity (Experimental)
+                        </label>
                         <button class="se-prompt-edit-btn" data-edit-prompt="rag-reword" title="Edit RAG reword prompt">&#9881;</button>
-                    </label>
+                    </div>
                     <label class="se-export-check warn" id="se-export-rag-confirm-wrap" style="display:none; margin-left:20px;">
                         <input type="checkbox" id="se-export-rag-confirm" />
                         I understand this rewrites my content

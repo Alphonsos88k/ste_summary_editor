@@ -32,7 +32,7 @@ const _DEFAULT_PROMPT =
     'Create sections for: Key Topics, Weapons/Items/Potions, Factions/Groups, and any other relevant categories you identify. ' +
     'Do NOT include character names — those are extracted separately. ' +
     'Return only valid JSON. No markdown fences, no commentary.';
-registerPrompt(PROMPT_KEY, 'Story Index — Entity Generation', _DEFAULT_PROMPT, { warnJson: true });
+registerPrompt(PROMPT_KEY, 'Story Index — Entity Generation', _DEFAULT_PROMPT, { warnJson: true, location: 'Utils › Story Index' });
 
 const STOP_WORDS = new Set([
     'the','a','an','in','on','at','to','for','of','and','or','but','with',
@@ -123,7 +123,9 @@ function _buildShell() {
         </div>
         <div class="se-ep-toolbar">
             <input type="text" class="se-ep-filter" id="se-ep-filter" placeholder="Filter across all sections…" />
-            <button class="se-btn se-btn-sm se-ep-gen-btn" id="se-ep-gen" title="Generate AI sections from selected (or all) entries">&#10024; Generate</button>
+            <span class="se-btn-split-group">
+                <button class="se-btn se-btn-sm se-ep-gen-btn" id="se-ep-gen" title="Generate AI sections from selected (or all) entries">&#10024; Generate</button><button class="se-btn-split-cog" data-edit-prompt="entity-panel" title="Edit generation prompt">&#9881;</button>
+            </span>
             <span class="se-ep-gen-status" id="se-ep-gen-status"></span>
         </div>
         <div class="se-ep-grid" id="se-ep-grid"></div>`;

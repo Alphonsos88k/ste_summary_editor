@@ -148,9 +148,9 @@ export function openColorPicker(anchorEl, currentColor, actId, onChange) {
     }
 
     activeActId = actId;
-    onChangeCallback = onChange;
-
+    onChangeCallback = null; // suppress iro.js color:change fired during programmatic color set
     picker.color.hexString = currentColor;
+    onChangeCallback = onChange;
     const mode = $('#se-cp-fmt').val() || 'hex';
     cpRenderFields(picker.color, mode, $('#se-cp-flds'));
     $('#se-cp-swatch').css('background', currentColor);
@@ -174,6 +174,8 @@ export function openColorPicker(anchorEl, currentColor, actId, onChange) {
     top = Math.max(8, top);
 
     $container.css({ left: left + 'px', top: top + 'px', display: 'block' });
+
+    $container.off('mouseleave.autopick').on('mouseleave.autopick', () => closeColorPicker());
 }
 
 /**

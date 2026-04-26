@@ -21,6 +21,7 @@ import { renderTable, renderSelectionBar, updateUndoButton } from '../table/tabl
 import { detectGaps } from '../ingest/gap-detection.js';
 import { escHtml, spawnPanel } from '../core/utils.js';
 import { shiftEntriesUp } from '../table/reorder.js';
+import { inheritRangeFromNeighbor } from '../ingest/file-ranges.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
 import { seConfirm } from '../core/dialogs.js';
@@ -263,6 +264,7 @@ async function doSplit(num, entry) {
             source: entry.source || '',
         });
         if (actId) state.acts.get(actId)?.entryNums.add(newNum);
+        if (i > 0) inheritRangeFromNeighbor(newNum, num);
     }
 
     state.selected.clear();

@@ -1501,6 +1501,7 @@ function showCellPopover(e, num) {
     $pop.css({ left: x, top: y }).show();
     makeDraggable($pop[0], $pop.find('.se-cell-popover-header')[0]);
 
+    $pop.off('mouseleave.popover').on('mouseleave.popover', () => closeAllPopovers());
     $pop.find('.se-cell-popover-close').on('click', () => closeAllPopovers());
 
     $pop.find('.se-pop-new-act-btn').on('click', function () {

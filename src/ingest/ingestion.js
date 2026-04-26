@@ -30,7 +30,8 @@ const PART_HEADER_RE = /\bpart\b/i;
 import { state, persistState } from '../core/state.js';
 import { detectGaps } from './gap-detection.js';
 import { renderTable } from '../table/table.js';
-import { renderActMinimap, updateFilterDropdown, autoCreateAct } from '../arcs/arcs.js';
+import { renderActMinimap, updateFilterDropdown } from '../arcs/arcs.js';
+import { registerFileRange, deleteFileRange } from './file-ranges.js';
 
 /**
  * Parse a text string into numbered summary entries.
@@ -506,25 +507,31 @@ function parseBracketMetadata(content) {
  * @param {string} fileName - Source file name.
  * @param {number[]} duplicates - Array to collect duplicate entry numbers.
  */
+/**
+ * Resolve the act ID for an entry being merged, honouring bracket metadata from re-import format.
+ * @param {object|undefined} existing - Existing entry in state (may be undefined).
+ * @param {string|null} actName - Act name extracted from bracket metadata, or null.
+ * @returns {number|null}
+ */
+function resolveActId(existing, actName) {
+    if (actName) {
+        const matched = [...state.acts.values()].find(
+            a => a.name.toLowerCase() === actName.toLowerCase()
+        );
+        if (matched) return matched.id;
+    }
+    return existing?.actId || null;
+}
+
 function mergeNumberedEntries(parsed, fileName, duplicates) {
+    const newNums = [];
+
     for (const entry of parsed) {
-        if (state.entries.has(entry.num)) {
-            duplicates.push(entry.num);
-        }
+        if (state.entries.has(entry.num)) duplicates.push(entry.num);
 
         const existing = state.entries.get(entry.num);
         const meta = parseBracketMetadata(entry.content);
-
-        // Resolve act ID from bracket act name if provided
-        let actId = existing?.actId || null;
-        if (meta.actName) {
-            const matchedAct = [...state.acts.values()].find(
-                a => a.name.toLowerCase() === meta.actName.toLowerCase()
-            );
-            if (matchedAct) {
-                actId = matchedAct.id;
-            }
-        }
+        const actId = resolveActId(existing, meta.actName);
 
         state.entries.set(entry.num, {
             num: entry.num,
@@ -537,10 +544,23 @@ function mergeNumberedEntries(parsed, fileName, duplicates) {
             source: fileName,
         });
 
-        // Register entry in the act's entryNums set
         if (actId && state.acts.has(actId)) {
             state.acts.get(actId).entryNums.add(entry.num);
         }
+
+        newNums.push(entry.num);
+    }
+
+    // Register all entries from this file as a single range
+    if (state.fileRanges.has(fileName)) {
+        // File already has a range (re-load/duplicate) — merge new nums in
+        const range = state.fileRanges.get(fileName);
+        for (const num of newNums) {
+            if (!range.entryNums.includes(num)) range.entryNums.push(num);
+        }
+        range.entryNums.sort((a, b) => a - b);
+    } else {
+        registerFileRange(fileName, newNums);
     }
 }
 
@@ -559,12 +579,10 @@ function mergePartEntries(parts, fileName) {
         nextNum = Math.max(...state.entries.keys()) + 1;
     }
 
-    let totalEntries = 0;
+    const allNums = [];
 
     for (const part of parts) {
         if (part.paragraphs.length === 0) continue;
-
-        const entryNums = [];
 
         for (const paragraph of part.paragraphs) {
             state.entries.set(nextNum, {
@@ -578,16 +596,16 @@ function mergePartEntries(parts, fileName) {
                 source: fileName,
                 problematic: part.unsplit || false,
             });
-            entryNums.push(nextNum);
+            allNums.push(nextNum);
             nextNum++;
-            totalEntries++;
         }
-
-        // Auto-create an act for this part
-        autoCreateAct(part.title, entryNums);
+        // Acts are not auto-created from Part headers — acts are user-assigned story labels.
     }
 
-    return totalEntries;
+    // All entries from this file share one range regardless of Part boundaries
+    registerFileRange(fileName, allNums);
+
+    return allNums.length;
 }
 
 /**
@@ -648,6 +666,9 @@ export function removeFile(fileName) {
     state.sourceFileNames = state.sourceFileNames.filter(n => n !== fileName);
     state.fileRawContent.delete(fileName);
     state.supplementaryFiles.delete(fileName);
+
+    // Remove the file range; orphaned nums (if any remain after entry deletion) absorbed by neighbors
+    deleteFileRange(fileName);
 }
 
 /**

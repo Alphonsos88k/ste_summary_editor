@@ -17,6 +17,7 @@
 import { ROWS_PER_PAGE, TEMPLATES, MONTH_NAMES } from '../core/constants.js';
 import { state, persistState } from '../core/state.js';
 import { escHtml, escAttr, spawnPanel } from '../core/utils.js';
+import { getRangeKeyForEntry } from '../ingest/file-ranges.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 import { attachAutocomplete } from './tags.js';
 import { moveEntries } from './reorder.js';
@@ -241,6 +242,8 @@ export function renderTable() {
             $body.append(buildEntryRow(entry));
         }
     }
+
+    applyRangeBorderClasses($body[0]);
 
     bindCheckboxEvents($body);
     bindRowClickEvents($body);
@@ -518,7 +521,10 @@ export function openSuppEditor(fileName) {
 }
 
 /**
- * Render the stats bar showing proportional act segments.
+ * Render the stats bar.
+ * - When file ranges exist: shows one segment per range (file-chunking view).
+ * - Otherwise: shows act segments (story-structure view).
+ * Gaps always appended at the end.
  */
 export function renderStatsBar() {
     const $bar = $('#se-stats-bar');
@@ -531,6 +537,37 @@ export function renderStatsBar() {
     $bar.show();
 
     const total = state.entries.size + state.gaps.length;
+
+    if (state.fileRanges.size > 0) {
+        _renderRangeStatsBar($bar, total);
+    } else {
+        _renderActStatsBar($bar, total);
+    }
+
+    // Gaps segment always last
+    if (state.gaps.length > 0) {
+        const pct = (state.gaps.length / total * 100).toFixed(1);
+        $bar.append(
+            `<div class="se-stats-seg" style="background:repeating-linear-gradient(45deg,#fd971f,#fd971f 3px,transparent 3px,transparent 6px);width:${pct}%;">` +
+            `<span class="se-seg-tip">Gaps — ${state.gaps.length} missing</span></div>`
+        );
+    }
+}
+
+function _renderRangeStatsBar($bar, total) {
+    for (const [key, range] of state.fileRanges) {
+        const count = range.entryNums.length;
+        if (count === 0) continue;
+        const pct = (count / total * 100).toFixed(1);
+        const label = range.label || '(unnamed)';
+        $bar.append(
+            `<div class="se-stats-seg se-stats-seg-range" data-range-key="${escAttr(key)}" style="background:${range.color};width:${pct}%;cursor:pointer;" title="Click to change color">` +
+            `<span class="se-seg-tip">${escHtml(label)} — ${count} entries</span></div>`
+        );
+    }
+}
+
+function _renderActStatsBar($bar, total) {
     const actCounts = {};
     let unassigned = 0;
 
@@ -538,9 +575,8 @@ export function renderStatsBar() {
         if (entry.actId) {
             const act = state.acts.get(entry.actId);
             if (act) {
-                const key = act.id;
-                if (!actCounts[key]) actCounts[key] = { count: 0, name: act.name, color: act.color.bg };
-                actCounts[key].count++;
+                if (!actCounts[act.id]) actCounts[act.id] = { count: 0, name: act.name, color: act.color.bg };
+                actCounts[act.id].count++;
             } else {
                 unassigned++;
             }
@@ -549,7 +585,6 @@ export function renderStatsBar() {
         }
     }
 
-    // Render act segments (clickable to change color)
     for (const [actId, { count, name, color }] of Object.entries(actCounts)) {
         const pct = (count / total * 100).toFixed(1);
         $bar.append(
@@ -558,21 +593,11 @@ export function renderStatsBar() {
         );
     }
 
-    // Unassigned segment
     if (unassigned > 0) {
         const pct = (unassigned / total * 100).toFixed(1);
         $bar.append(
             `<div class="se-stats-seg" style="background:#555;width:${pct}%;">` +
             `<span class="se-seg-tip">Unassigned — ${unassigned} entries</span></div>`
-        );
-    }
-
-    // Gaps segment
-    if (state.gaps.length > 0) {
-        const pct = (state.gaps.length / total * 100).toFixed(1);
-        $bar.append(
-            `<div class="se-stats-seg" style="background:repeating-linear-gradient(45deg,#fd971f,#fd971f 3px,transparent 3px,transparent 6px);width:${pct}%;">` +
-            `<span class="se-seg-tip">Gaps — ${state.gaps.length} missing</span></div>`
         );
     }
 }
@@ -769,6 +794,33 @@ function buildEntryRow(entry) {
         notesClass: entry.notes ? '' : 'se-cell-empty',
         feedbackCell,
     });
+}
+
+/**
+ * Apply file-range left-accent color to rendered entry rows.
+ * Sets --range-color and the se-range class on every entry row that belongs to a range.
+ * CSS shows a 4px inset left bar on td:first-child — no top/bottom borders,
+ * so adjacent ranges never clash and pagination cutoffs are invisible.
+ *
+ * @param {HTMLElement} tbody - The <tbody> DOM element.
+ */
+function applyRangeBorderClasses(tbody) {
+    if (!tbody || state.fileRanges.size === 0) return;
+
+    const rows = Array.from(tbody.querySelectorAll('tr[data-num]'));
+    for (const row of rows) {
+        row.classList.remove('se-range');
+        row.style.removeProperty('--range-color');
+
+        const num = parseInt(row.dataset.num, 10);
+        const key = getRangeKeyForEntry(num);
+        if (!key) continue;
+        const range = state.fileRanges.get(key);
+        if (!range) continue;
+
+        row.classList.add('se-range');
+        row.style.setProperty('--range-color', range.color);
+    }
 }
 
 /**
