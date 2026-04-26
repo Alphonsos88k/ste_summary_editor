@@ -20,6 +20,8 @@ export default [
         iro:         'readonly',
         mermaid:     'readonly',
         localforage: 'readonly',
+        Fuse:        'readonly',
+        Diff:        'readonly',
       },
     },
     rules: {
