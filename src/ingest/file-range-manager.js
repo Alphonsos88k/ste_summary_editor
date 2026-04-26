@@ -2,9 +2,10 @@
  * @module file-range-manager
  * @description Output Planner — draggable panel for viewing and reorganising file ranges.
  *
- * Shows each range's estimated export size, allows renaming labels, splitting a range
- * at a chosen entry boundary, merging adjacent ranges, and auto-balancing entries
- * evenly across all ranges.
+ * Each range row shows: color swatch, editable label, entry count, size bar + KB estimate.
+ * Actions per row: Split (disabled when empty), Merge↓ (disabled on last), Delete.
+ * Footer: New File (creates next-pattern empty range), Auto-balance.
+ * Panel has a max-height (~2/3 viewport) with overflow scroll on the table.
  */
 
 import { state, persistState } from '../core/state.js';
@@ -35,7 +36,7 @@ export async function openFileRangeManager() {
     overlay.appendChild(_panel);
 
     const overlayRect = overlay.getBoundingClientRect();
-    _panel.style.left = Math.max(8, Math.round(overlayRect.width / 2 - 210)) + 'px';
+    _panel.style.left = Math.max(8, Math.round(overlayRect.width / 2 - 230)) + 'px';
     _panel.style.top  = '60px';
 
     makeDraggable(_panel, _panel.querySelector('.se-frm-header'));
@@ -59,7 +60,7 @@ export function closeFileRangeManager() {
 
 function _render() {
     if (!_panel) return;
-    const tbody = _panel.querySelector('#se-frm-rows');
+    const tbody   = _panel.querySelector('#se-frm-rows');
     const summary = _panel.querySelector('#se-frm-summary');
     if (!tbody) return;
 
@@ -68,42 +69,59 @@ function _render() {
     if (ranges.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="se-frm-empty">No file ranges loaded.</td></tr>';
         if (summary) summary.textContent = '';
+        _bindEvents();
         return;
     }
 
     tbody.innerHTML = ranges.map(([key, range], idx) => {
-        const sizeKb  = estimateRangeSizeKB(range.entryNums);
-        const over    = sizeKb > FILE_SIZE_LIMIT_KB;
-        const pct     = Math.min(100, (sizeKb / FILE_SIZE_LIMIT_KB) * 100).toFixed(1);
-        const barClr  = over ? '#f92672' : pct > 75 ? '#fd971f' : '#a6e22e';
-        const mergeDis = idx === ranges.length - 1 ? ' disabled' : '';
+        const isEmpty  = range.entryNums.length === 0;
+        const sizeKb   = estimateRangeSizeKB(range.entryNums);
+        const over     = sizeKb > FILE_SIZE_LIMIT_KB;
+        const pct      = Math.min(100, (sizeKb / FILE_SIZE_LIMIT_KB) * 100).toFixed(1);
+        const isLast   = idx === ranges.length - 1;
         const overCls  = over ? ' se-frm-row--over' : '';
+        const emptyCls = isEmpty ? ' se-frm-row--empty' : '';
 
-        return `<tr class="se-frm-row${overCls}" data-key="${escHtml(key)}">
+        const splitDis = isEmpty ? ' disabled' : '';
+        const mergeDis = isLast  ? ' disabled' : '';
+
+        let barClr;
+        if (over) { barClr = '#f92672'; }
+        else if (pct > 75) { barClr = '#fd971f'; }
+        else { barClr = '#a6e22e'; }
+
+        let sizeDisplay;
+        if (isEmpty) {
+            sizeDisplay = '<span class="se-frm-size-txt se-frm-empty-lbl">empty</span>';
+        } else {
+            const overWarn  = over ? '&nbsp;&#9888;' : '';
+            const overClass = over ? ' se-frm-over' : '';
+            sizeDisplay = `<div class="se-frm-bar-wrap" title="${sizeKb} KB / ${FILE_SIZE_LIMIT_KB} KB limit">
+                   <div class="se-frm-bar" style="width:${pct}%;background:${barClr};"></div>
+               </div>
+               <span class="se-frm-size-txt${overClass}">${sizeKb}&nbsp;KB${overWarn}</span>`;
+        }
+
+        return `<tr class="se-frm-row${overCls}${emptyCls}" data-key="${escHtml(key)}">
             <td class="se-frm-td-color">
                 <span class="se-frm-swatch" style="background:${escHtml(range.color)};"></span>
             </td>
             <td class="se-frm-td-label">
                 <input class="se-frm-label-input" value="${escHtml(range.label)}" data-key="${escHtml(key)}" />
             </td>
-            <td class="se-frm-td-count">${range.entryNums.length}</td>
-            <td class="se-frm-td-size">
-                <div class="se-frm-bar-wrap" title="${sizeKb} KB / ${FILE_SIZE_LIMIT_KB} KB limit">
-                    <div class="se-frm-bar" style="width:${pct}%;background:${barClr};"></div>
-                </div>
-                <span class="se-frm-size-txt${over ? ' se-frm-over' : ''}">${sizeKb}&nbsp;KB${over ? '&nbsp;&#9888;' : ''}</span>
-            </td>
+            <td class="se-frm-td-count">${isEmpty ? '—' : range.entryNums.length}</td>
+            <td class="se-frm-td-size">${sizeDisplay}</td>
             <td class="se-frm-td-actions">
-                <button class="se-btn se-btn-xs se-frm-btn-split" data-key="${escHtml(key)}">Split</button>
+                <button class="se-btn se-btn-xs se-frm-btn-split" data-key="${escHtml(key)}"${splitDis}>Split</button>
                 <button class="se-btn se-btn-xs se-frm-btn-merge" data-key="${escHtml(key)}"${mergeDis}>Merge&#8595;</button>
+                <button class="se-btn se-btn-xs se-frm-btn-delete" data-key="${escHtml(key)}" title="Delete range — entries absorbed into previous">&#10005;</button>
             </td>
         </tr>`;
     }).join('');
 
-    // Summary line
     if (summary) {
-        const total    = ranges.reduce((s, [, r]) => s + estimateRangeSizeKB(r.entryNums), 0);
-        const overCnt  = ranges.filter(([, r]) => rangeExceedsLimit(r.entryNums)).length;
+        const total   = ranges.reduce((s, [, r]) => s + estimateRangeSizeKB(r.entryNums), 0);
+        const overCnt = ranges.filter(([, r]) => rangeExceedsLimit(r.entryNums)).length;
         summary.innerHTML =
             `${ranges.length} ranges &middot; ~${Math.round(total * 100) / 100}&nbsp;KB total` +
             (overCnt ? ` &middot; <span class="se-frm-over">${overCnt} over limit</span>` : '');
@@ -115,7 +133,6 @@ function _render() {
 function _bindEvents() {
     if (!_panel) return;
 
-    // Label rename
     _panel.querySelectorAll('.se-frm-label-input').forEach(input => {
         input.onchange = () => {
             const range = state.fileRanges.get(input.dataset.key);
@@ -123,25 +140,40 @@ function _bindEvents() {
         };
     });
 
-    // Split buttons
     _panel.querySelectorAll('.se-frm-btn-split').forEach(btn => {
         btn.onclick = () => _showSplitForm(btn.dataset.key);
     });
 
-    // Merge buttons
     _panel.querySelectorAll('.se-frm-btn-merge').forEach(btn => {
         btn.onclick = () => _mergeWithNext(btn.dataset.key);
     });
 
-    // Auto-balance
+    _panel.querySelectorAll('.se-frm-btn-delete').forEach(btn => {
+        btn.onclick = () => _deleteRange(btn.dataset.key);
+    });
+
     const balBtn = _panel.querySelector('#se-frm-auto-balance');
     if (balBtn) balBtn.onclick = _autoBalance;
+
+    const newBtn = _panel.querySelector('#se-frm-new-file');
+    if (newBtn) newBtn.onclick = _showNewFileForm;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function _sortRanges() {
+    state.fileRanges = new Map(
+        [...state.fileRanges.entries()].sort(([a], [b]) =>
+            a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+        )
+    );
 }
 
 // ─── Split form ───────────────────────────────────────────────────────────────
 
 function _showSplitForm(key) {
     _panel.querySelectorAll('.se-frm-split-form').forEach(el => el.remove());
+    _panel.querySelectorAll('.se-frm-new-form').forEach(el => el.remove());
 
     const range = state.fileRanges.get(key);
     if (!range || range.entryNums.length < 2) return;
@@ -196,20 +228,16 @@ function _doSplitRange(key, splitAfter) {
     const range = state.fileRanges.get(key);
     if (!range) return;
 
-    const nums    = [...range.entryNums].sort((a, b) => a - b);
+    const nums     = [...range.entryNums].sort((a, b) => a - b);
     const splitIdx = nums.indexOf(splitAfter);
     if (splitIdx < 0 || splitIdx >= nums.length - 1) return;
 
     const part1 = nums.slice(0, splitIdx + 1);
     const part2 = nums.slice(splitIdx + 1);
 
-    const existingKeys = [...state.fileRanges.keys()];
-    const newKey = suggestNextFilename(existingKeys);
-
-    // Update part1 in-place
+    const newKey = suggestNextFilename([...state.fileRanges.keys()]);
     range.entryNums = part1;
 
-    // Insert part2 immediately after key, preserving map order
     const newRanges = new Map();
     for (const [k, r] of state.fileRanges) {
         newRanges.set(k, r);
@@ -219,6 +247,7 @@ function _doSplitRange(key, splitAfter) {
     }
     state.fileRanges = newRanges;
 
+    _sortRanges();
     persistState();
     _render();
 }
@@ -226,20 +255,106 @@ function _doSplitRange(key, splitAfter) {
 // ─── Merge ────────────────────────────────────────────────────────────────────
 
 function _mergeWithNext(key) {
-    const keys = [...state.fileRanges.keys()];
-    const idx  = keys.indexOf(key);
+    const keys  = [...state.fileRanges.keys()];
+    const idx   = keys.indexOf(key);
     if (idx < 0 || idx >= keys.length - 1) return;
 
-    const nextKey  = keys[idx + 1];
-    const range    = state.fileRanges.get(key);
+    const nextKey   = keys[idx + 1];
+    const range     = state.fileRanges.get(key);
     const nextRange = state.fileRanges.get(nextKey);
     if (!range || !nextRange) return;
 
     range.entryNums = [...new Set([...range.entryNums, ...nextRange.entryNums])].sort((a, b) => a - b);
     state.fileRanges.delete(nextKey);
 
+    _sortRanges();
     persistState();
     _render();
+}
+
+// ─── Delete ───────────────────────────────────────────────────────────────────
+
+/**
+ * Delete a range. Entries absorbed into the previous range, or next if first.
+ * @param {string} key
+ */
+function _deleteRange(key) {
+    _panel.querySelectorAll('.se-frm-split-form').forEach(el => el.remove());
+
+    const keys  = [...state.fileRanges.keys()];
+    const idx   = keys.indexOf(key);
+    const dying = state.fileRanges.get(key);
+    if (!dying) return;
+
+    // Absorb into previous range (or next if this is the first)
+    const targetKey = idx > 0 ? keys[idx - 1] : keys[idx + 1];
+    if (targetKey && dying.entryNums.length > 0) {
+        const target = state.fileRanges.get(targetKey);
+        target.entryNums = [...new Set([...target.entryNums, ...dying.entryNums])].sort((a, b) => a - b);
+    }
+
+    state.fileRanges.delete(key);
+    _sortRanges();
+    persistState();
+    _render();
+}
+
+// ─── New File form ────────────────────────────────────────────────────────────
+
+function _showNewFileForm() {
+    _panel.querySelectorAll('.se-frm-new-form').forEach(el => el.remove());
+    _panel.querySelectorAll('.se-frm-split-form').forEach(el => el.remove());
+
+    const suggested = suggestNextFilename([...state.fileRanges.keys()]);
+
+    const formRow = document.createElement('tr');
+    formRow.className = 'se-frm-new-form';
+    formRow.innerHTML = `
+        <td colspan="5" class="se-frm-split-td">
+            <div class="se-frm-split-inner">
+                <label class="se-frm-split-lbl">New file name:</label>
+                <input class="se-frm-new-name-input" value="${escHtml(suggested)}" spellcheck="false" />
+                <span class="se-frm-new-err" style="display:none;"></span>
+                <div class="se-frm-split-actions">
+                    <button class="se-btn se-btn-xs se-frm-new-confirm">Add</button>
+                    <button class="se-btn se-btn-xs se-frm-new-cancel">Cancel</button>
+                </div>
+            </div>
+        </td>`;
+
+    // Append after the last data row (before any gap rows)
+    const tbody = _panel.querySelector('#se-frm-rows');
+    tbody.appendChild(formRow);
+
+    const nameInput = formRow.querySelector('.se-frm-new-name-input');
+    const errSpan   = formRow.querySelector('.se-frm-new-err');
+    nameInput.focus();
+    nameInput.select();
+
+    formRow.querySelector('.se-frm-new-confirm').onclick = () => {
+        const name = nameInput.value.trim();
+        if (!name) return;
+        if (state.fileRanges.has(name)) {
+            errSpan.textContent = `"${name}" already exists`;
+            errSpan.style.display = 'inline';
+            return;
+        }
+        state.fileRanges.set(name, { color: nextRangeColor(), entryNums: [], label: name });
+        _sortRanges();
+        persistState();
+        _render();
+    };
+
+    formRow.querySelector('.se-frm-new-cancel').onclick = () => formRow.remove();
+
+    nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') formRow.querySelector('.se-frm-new-confirm').click();
+        if (e.key === 'Escape') formRow.remove();
+    });
+
+    nameInput.addEventListener('input', () => {
+        errSpan.style.display = 'none';
+    });
 }
 
 // ─── Auto-balance ─────────────────────────────────────────────────────────────
@@ -251,7 +366,7 @@ function _autoBalance() {
     const allNums = ranges.flatMap(([, r]) => r.entryNums).sort((a, b) => a - b);
     if (allNums.length === 0) return;
 
-    const n = ranges.length;
+    const n     = ranges.length;
     const chunk = Math.ceil(allNums.length / n);
     for (let i = 0; i < n; i++) {
         ranges[i][1].entryNums = allNums.slice(i * chunk, (i + 1) * chunk);

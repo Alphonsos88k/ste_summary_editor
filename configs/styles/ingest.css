@@ -412,7 +412,7 @@
 
 .se-frm-panel {
     width: 460px;
-    max-height: 70vh;
+    max-height: 66vh;
     display: flex;
     flex-direction: column;
 }
@@ -460,7 +460,9 @@
     vertical-align: middle;
 }
 
-.se-frm-row--over td { background: rgba(249,38,114,0.06); }
+.se-frm-row--over td  { background: rgba(249,38,114,0.06); }
+.se-frm-row--empty td { opacity: 0.65; }
+.se-frm-empty-lbl     { font-style: italic; color: rgba(255,255,255,0.3); }
 
 .se-frm-swatch {
     display: inline-block;
@@ -520,6 +522,29 @@
 .se-frm-split-preview { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.78em; }
 .se-frm-prev-part { color: rgba(255,255,255,0.55); }
 .se-frm-split-actions { display: flex; gap: 4px; margin-left: auto; }
+
+/* New-file form row */
+.se-frm-new-form .se-frm-split-td {
+    padding: 8px 12px;
+    background: rgba(166,226,46,0.05);
+    border-bottom: 1px solid rgba(166,226,46,0.15);
+}
+.se-frm-new-name-input {
+    background: var(--se-bg-dark);
+    border: 1px solid var(--se-border);
+    border-radius: 4px;
+    color: #e8e8e2;
+    font-size: 0.82em;
+    padding: 2px 8px;
+    flex: 1;
+    min-width: 0;
+}
+.se-frm-new-name-input:focus { outline: none; border-color: var(--se-cyan); }
+.se-frm-new-err {
+    font-size: 0.78em;
+    color: var(--se-pink);
+    margin-left: 4px;
+}
 
 .se-frm-empty {
     text-align: center;
