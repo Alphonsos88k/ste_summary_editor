@@ -202,6 +202,87 @@ export async function openAnalyticsPanel() {
         _actDir = this.value;
         $panel.find('#se-an-act-list').html(buildActListHtml(computeAnalytics().acts));
     });
+    $panel.find('#se-an-act-expand').on('click', _openActTablePanel);
+}
+
+/** @type {HTMLElement|null} */
+let _actTablePanel = null;
+
+function _openActTablePanel() {
+    if (_actTablePanel) { _actTablePanel.remove(); _actTablePanel = null; return; }
+    const overlay = document.getElementById('se-modal-overlay');
+    if (!overlay) return;
+
+    _actTablePanel = document.createElement('div');
+    _actTablePanel.className = 'se-float-panel se-act-table-panel';
+    _actTablePanel.innerHTML = `
+        <div class="se-float-panel-header">
+            <span class="se-float-panel-title">&#x1F4CA; Per-Act Summary</span>
+            <div class="se-act-table-controls">
+                <select class="se-an-act-sort" id="se-atp-sort" title="Sort by">
+                    <option value="name">A–Z</option>
+                    <option value="wc">Words</option>
+                    <option value="count">Entries</option>
+                </select>
+                <select class="se-an-act-sort" id="se-atp-dir" title="Direction">
+                    <option value="asc">Asc</option>
+                    <option value="desc">Desc</option>
+                </select>
+            </div>
+            <button class="se-close-circle" title="Close">&times;</button>
+        </div>
+        <div class="se-act-table-wrap">
+            <table class="se-act-table">
+                <thead><tr>
+                    <th>Act</th>
+                    <th class="se-act-th-num">Entries</th>
+                    <th class="se-act-th-num">Words</th>
+                    <th class="se-act-th-pct">Date</th>
+                    <th class="se-act-th-pct">Time</th>
+                    <th class="se-act-th-pct">Loc</th>
+                </tr></thead>
+                <tbody id="se-atp-tbody"></tbody>
+            </table>
+        </div>`;
+    overlay.appendChild(_actTablePanel);
+    spawnPanel(_actTablePanel, overlay, '.se-float-panel-header');
+
+    const render = () => {
+        const acts = computeAnalytics().acts;
+        const sorted = [...acts];
+        const key = _actTablePanel.querySelector('#se-atp-sort').value;
+        const dir = _actTablePanel.querySelector('#se-atp-dir').value;
+        if (key === 'wc')          sorted.sort((a, b) => a.wc    - b.wc);
+        else if (key === 'count')  sorted.sort((a, b) => a.count - b.count);
+        else sorted.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+        if (dir === 'desc') sorted.reverse();
+
+        _actTablePanel.querySelector('#se-atp-tbody').innerHTML = sorted.map(a => {
+            const n = a.count || 0;
+            const pD = n ? Math.round((a.dateFilled     / n) * 100) : 0;
+            const pT = n ? Math.round((a.timeFilled     / n) * 100) : 0;
+            const pL = n ? Math.round((a.locationFilled / n) * 100) : 0;
+            const pctCell = (p) =>
+                `<td class="se-act-td-pct"><div class="se-act-pct-bar-wrap"><div class="se-act-pct-bar" style="width:${p}%"></div></div><span>${p}%</span></td>`;
+            return `<tr>
+                <td><span class="se-an-act-badge" style="background:${escHtml(a.color || '#75715e')}">${escHtml(a.name)}</span></td>
+                <td class="se-act-td-num">${n}</td>
+                <td class="se-act-td-num">${a.wc.toLocaleString()}</td>
+                ${pctCell(pD)}${pctCell(pT)}${pctCell(pL)}
+            </tr>`;
+        }).join('');
+    };
+    render();
+
+    _actTablePanel.querySelector('#se-atp-sort').value = _actSort;
+    _actTablePanel.querySelector('#se-atp-dir').value  = _actDir;
+    _actTablePanel.querySelector('#se-atp-sort').onchange = render;
+    _actTablePanel.querySelector('#se-atp-dir').onchange  = render;
+    const closeActTable = () => { _actTablePanel?.remove(); _actTablePanel = null; };
+    _actTablePanel.querySelector('.se-close-circle').onclick = closeActTable;
+
+    const onKey = (e) => { if (e.key === 'Escape') { closeActTable(); document.removeEventListener('keydown', onKey); } };
+    document.addEventListener('keydown', onKey);
 }
 
 /**

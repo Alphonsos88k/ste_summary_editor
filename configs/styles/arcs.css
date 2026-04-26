@@ -851,6 +851,66 @@
     cursor: pointer;
 }
 .se-an-act-sort:focus { outline: none; border-color: var(--se-cyan); }
+.se-an-act-expand {
+    background: transparent;
+    border: 1px solid var(--se-border);
+    border-radius: 3px;
+    color: #75715e;
+    font-size: 0.75em;
+    padding: 1px 5px;
+    cursor: pointer;
+    line-height: 1;
+}
+.se-an-act-expand:hover { border-color: var(--se-cyan); color: var(--se-cyan); }
+
+/* ─── Expanded Act Table Panel ──────────────────────────────────────────── */
+.se-act-table-panel { width: 480px; }
+.se-act-table-panel .se-float-panel-header { gap: 6px; }
+.se-act-table-controls { display: flex; gap: 4px; margin-left: auto; }
+.se-act-table-wrap { overflow-y: auto; max-height: 55vh; padding: 0 12px 12px; }
+.se-act-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82em;
+}
+.se-act-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--se-bg-dark);
+    color: rgba(255,255,255,0.4);
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 8px 6px 5px;
+    border-bottom: 1px solid var(--se-border);
+    text-align: left;
+    white-space: nowrap;
+}
+.se-act-th-num { text-align: right; width: 60px; }
+.se-act-th-pct { text-align: right; width: 70px; }
+.se-act-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.1s; }
+.se-act-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+.se-act-table tbody tr:last-child { border-bottom: none; }
+.se-act-table td { padding: 6px 6px; vertical-align: middle; }
+.se-act-td-num { text-align: right; color: rgba(255,255,255,0.55); font-variant-numeric: tabular-nums; }
+.se-act-td-pct {
+    text-align: right;
+    white-space: nowrap;
+    color: rgba(255,255,255,0.45);
+    font-variant-numeric: tabular-nums;
+}
+.se-act-td-pct span { font-size: 0.82em; display: inline-block; width: 28px; text-align: right; }
+.se-act-pct-bar-wrap {
+    display: inline-block;
+    width: 36px;
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    vertical-align: middle;
+    margin-right: 3px;
+    overflow: hidden;
+}
+.se-act-pct-bar { height: 100%; background: var(--se-cyan); border-radius: 2px; min-width: 2px; }
 .se-analytics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .se-analytics-stat {
     display: flex;
