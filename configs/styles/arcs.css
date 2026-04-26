@@ -873,10 +873,17 @@
 
 .se-an-act-row {
     display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.82em;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.se-an-act-row:last-child { border-bottom: none; }
+.se-an-act-row-header {
+    display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.82em;
-    padding: 3px 0;
 }
 .se-an-act-badge {
     border-radius: 4px;
@@ -889,8 +896,32 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.se-an-act-wc { color: var(--se-text); margin-left: auto; }
+.se-an-act-wc { color: var(--se-text); margin-left: auto; white-space: nowrap; }
 .se-an-act-entries { color: #75715e; white-space: nowrap; }
+
+/* Per-act metadata completion mini-bars */
+.se-an-act-completion {
+    display: grid;
+    grid-template-columns: 14px 1fr 28px  14px 1fr 28px  14px 1fr 28px;
+    align-items: center;
+    gap: 3px 4px;
+    padding-left: 2px;
+}
+.se-an-act-meta-lbl { font-size: 0.72em; color: #75715e; text-align: right; }
+.se-an-mini-bar-wrap {
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.se-an-mini-bar {
+    height: 100%;
+    background: var(--se-cyan);
+    border-radius: 2px;
+    min-width: 2px;
+}
+.se-an-act-meta-pct { font-size: 0.72em; color: #75715e; }
+
 .se-an-empty { color: #75715e; font-size: 0.82em; padding: 4px 0; }
 
 /* ─── Conflict Review Panel ─────────────────────────────────────────────── */

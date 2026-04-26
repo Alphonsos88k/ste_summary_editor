@@ -70,6 +70,7 @@ function computeAnalytics() {
     const dateFilled     = entries.filter(e => (e.date     || '').trim()).length;
     const timeFilled     = entries.filter(e => (e.time     || '').trim()).length;
     const locationFilled = entries.filter(e => (e.location || '').trim()).length;
+    const actFilled      = entries.filter(e => e.actId).length;
 
     // Conflict counts — count distinct entries (not individual feedback items)
     let cfError = 0, cfWarn = 0, cfInfo = 0, cfOk = 0;
@@ -81,14 +82,17 @@ function computeAnalytics() {
         else                                                 cfOk++;
     }
 
-    // Per-act word counts
+    // Per-act summary (word count + metadata completion)
     const actsData = [];
     for (const [, act] of state.acts) {
-        const actWc = [...act.entryNums]
-            .map(n => state.entries.get(n))
-            .filter(Boolean)
-            .reduce((sum, e) => sum + wordCount(e.content), 0);
-        actsData.push({ name: act.name, color: act.color, wc: actWc, count: act.entryNums.size });
+        const actEntries = [...act.entryNums].map(n => state.entries.get(n)).filter(Boolean);
+        const actWc = actEntries.reduce((sum, e) => sum + wordCount(e.content), 0);
+        actsData.push({
+            name: act.name, color: act.color, wc: actWc, count: actEntries.length,
+            dateFilled:     actEntries.filter(e => (e.date     || '').trim()).length,
+            timeFilled:     actEntries.filter(e => (e.time     || '').trim()).length,
+            locationFilled: actEntries.filter(e => (e.location || '').trim()).length,
+        });
     }
     actsData.sort((a, b) => b.wc - a.wc);
 
@@ -98,17 +102,44 @@ function computeAnalytics() {
         actCount: state.acts.size,
         modifiedCount: state.modified?.size ?? 0,
         wcTotal, wcAvg, wcMin, wcMax,
-        dateFilled, timeFilled, locationFilled,
+        dateFilled, timeFilled, locationFilled, actFilled,
         cfError, cfWarn, cfInfo, cfOk,
         acts: actsData,
     };
 }
 
 /**
+ * Build per-act summary list HTML (word count + metadata completion).
+ * @param {object[]} acts
+ * @returns {string}
+ */
+function buildActListHtml(acts) {
+    if (acts.length === 0) return '<div class="se-an-empty">No acts defined.</div>';
+    return acts.map(a => {
+        const n = a.count || 0;
+        const pctD = n === 0 ? 0 : Math.round((a.dateFilled     / n) * 100);
+        const pctT = n === 0 ? 0 : Math.round((a.timeFilled     / n) * 100);
+        const pctL = n === 0 ? 0 : Math.round((a.locationFilled / n) * 100);
+        return `<div class="se-an-act-row">
+            <div class="se-an-act-row-header">
+                <span class="se-an-act-badge" style="background:${escHtml(a.color || '#75715e')}">${escHtml(a.name)}</span>
+                <span class="se-an-act-entries">${n} entries</span>
+                <span class="se-an-act-wc">${a.wc.toLocaleString()} w</span>
+            </div>
+            <div class="se-an-act-completion">
+                <span class="se-an-act-meta-lbl">D</span><div class="se-an-mini-bar-wrap"><div class="se-an-mini-bar" style="width:${pctD}%"></div></div><span class="se-an-act-meta-pct">${pctD}%</span>
+                <span class="se-an-act-meta-lbl">T</span><div class="se-an-mini-bar-wrap"><div class="se-an-mini-bar" style="width:${pctT}%"></div></div><span class="se-an-act-meta-pct">${pctT}%</span>
+                <span class="se-an-act-meta-lbl">L</span><div class="se-an-mini-bar-wrap"><div class="se-an-mini-bar" style="width:${pctL}%"></div></div><span class="se-an-act-meta-pct">${pctL}%</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+/**
  * Open (or focus) the Entry Analytics floating panel.
  */
 export async function openAnalyticsPanel() {
-    if ($panel && $panel.length && document.body.contains($panel[0])) {
+    if ($panel?.length && document.body.contains($panel[0])) {
         refreshPanel();
         return;
     }
@@ -121,17 +152,10 @@ export async function openAnalyticsPanel() {
         coverageRow('Date',     d.dateFilled,     total),
         coverageRow('Time',     d.timeFilled,     total),
         coverageRow('Location', d.locationFilled, total),
+        coverageRow('Act',      d.actFilled,      total),
     ].join('');
 
-    const actListHtml = d.acts.length === 0
-        ? '<div class="se-an-empty">No acts defined.</div>'
-        : d.acts.map(a =>
-            `<div class="se-an-act-row">
-                <span class="se-an-act-badge" style="background:${escHtml(a.color || '#75715e')}">${escHtml(a.name)}</span>
-                <span class="se-an-act-wc">${a.wc.toLocaleString()} w</span>
-                <span class="se-an-act-entries">${a.count} entries</span>
-            </div>`
-          ).join('');
+    const actListHtml = buildActListHtml(d.acts);
 
     const html = fillTemplate(tmpl, {
         totalEntries: total,
@@ -185,16 +209,8 @@ function refreshPanel() {
         coverageRow('Date',     d.dateFilled,     total),
         coverageRow('Time',     d.timeFilled,     total),
         coverageRow('Location', d.locationFilled, total),
+        coverageRow('Act',      d.actFilled,      total),
     ].join(''));
 
-    const actListHtml = d.acts.length === 0
-        ? '<div class="se-an-empty">No acts defined.</div>'
-        : d.acts.map(a =>
-            `<div class="se-an-act-row">
-                <span class="se-an-act-badge" style="background:${escHtml(a.color || '#75715e')}">${escHtml(a.name)}</span>
-                <span class="se-an-act-wc">${a.wc.toLocaleString()} w</span>
-                <span class="se-an-act-entries">${a.count} entries</span>
-            </div>`
-          ).join('');
-    $panel.find('#se-an-act-list').html(actListHtml);
+    $panel.find('#se-an-act-list').html(buildActListHtml(d.acts));
 }
