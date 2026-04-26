@@ -83,7 +83,7 @@ function computeAnalytics() {
 
     // Per-act word counts
     const actsData = [];
-    for (const [id, act] of state.acts) {
+    for (const [, act] of state.acts) {
         const actWc = [...act.entryNums]
             .map(n => state.entries.get(n))
             .filter(Boolean)

@@ -1,3 +1,22 @@
+# [1.5.0] (Unreleased) — feat/file-range-system
+
+### Features
+
+* **Output Planner** — draggable panel (Utils → 📂 Output Planner) listing file ranges with estimated export sizes, size bars, over-limit warnings, inline label rename, split at entry boundary with live preview, merge-with-next, and auto-balance
+* **File-range integrity** — `shiftEntriesUp` updates `fileRanges.entryNums`; split-entry and new-entry operations inherit range from neighbor via `inheritRangeFromNeighbor`
+* **Golden-angle range colors** — unlimited non-repeating vibrant hex colors with random hue offset per install
+* **System Prompts hub** — location metadata, passive-background badge on each prompt card; cogwheel split-button groups on all LLM-trigger buttons
+* **Range Colors** dialog renamed to "🎨 File Range Colors"; stats bar segment click opens it; color wheel correctly updates when switching ranges
+
+### Bug Fixes
+
+* Cell popover (Edit tab act pill) no longer dismisses on select/input interaction — closes on mouseleave instead
+* Extension panel no longer closes when releasing mouse after dragging the iro.js color wheel (`_backdropPressed` guard)
+* Ingest tooltip fades out in 0.5 s immediately on mouseleave (was 2 s delay)
+* Removed dead code: `removeEmptyActs` (arcs.js), `_DEFAULT_GENERATE` (timeline-editor.js), unused imports across several modules
+
+---
+
 # [1.4.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.3.0...v1.4.0) (2026-04-23)
 
 

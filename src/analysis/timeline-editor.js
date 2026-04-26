@@ -26,12 +26,6 @@ const _DEFAULT_REFINE =
     'Preserve all events. Fix vague durations, unclear ordering, and contradictions. ' +
     'Return only the improved timeline text. No commentary, no headings.';
 
-const _DEFAULT_GENERATE =
-    'You are a story timeline builder. The user will provide numbered story summary entries with optional dates, times, and locations. ' +
-    'Create a clear, ordered timeline of events from this material. ' +
-    'Group events by rough time period where possible. Note key locations. ' +
-    'Return only the timeline text. No commentary, no headings.';
-
 registerPrompt(PROMPT_KEY, 'Timeline Editor — Refine/Generate', _DEFAULT_REFINE, { location: 'Edit › Timeline Editor' });
 
 /** @type {HTMLElement|null} */

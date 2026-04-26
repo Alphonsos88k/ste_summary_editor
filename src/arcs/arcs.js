@@ -985,12 +985,6 @@ function getExistingActMins() {
     return mins;
 }
 
-function removeEmptyActs() {
-    for (const [id, act] of state.acts) {
-        if (act.entryNums.size === 0) state.acts.delete(id);
-    }
-}
-
 
 /**
  * Bind events on the act panel list items.
