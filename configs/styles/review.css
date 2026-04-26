@@ -1329,6 +1329,12 @@ tr.se-drag-over {
     white-space: nowrap;
 }
 
+.se-act-unassigned {
+    font-size: 0.75em;
+    color: rgba(255,255,255,0.2);
+    font-style: italic;
+}
+
 /* Content column */
 #se-table .se-col-content {
     width: var(--se-col-content);
