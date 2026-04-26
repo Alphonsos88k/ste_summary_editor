@@ -21,6 +21,7 @@ import { renderTable } from '../table/table.js';
 import { escHtml, spawnPanel } from '../core/utils.js';
 import { getPrompt } from '../core/system-prompts.js';
 import { seAlert, seConfirm } from '../core/dialogs.js';
+import { showDiffView } from './diff-view.js';
 
 /** Shared prompt key — reuses Content Editor's configurable prompt. */
 const PROMPT_KEY = 'content-editor';
@@ -106,14 +107,7 @@ function _buildHtml(nums) {
                 <span class="se-br-badge ${badgeCls}">${badgeTxt}</span>
                 <span class="se-br-status" id="se-br-status-${n}"></span>
             </div>
-            <div class="se-br-original">${preview}</div>
-            <div class="se-br-result" id="se-br-result-${n}" style="display:none;">
-                <textarea class="se-br-result-text" id="se-br-result-text-${n}" rows="4"></textarea>
-                <div class="se-br-result-actions">
-                    <button class="se-btn se-btn-sm se-br-accept" data-num="${n}">Accept ✓</button>
-                    <button class="se-btn se-btn-sm se-br-discard" data-num="${n}">Discard</button>
-                </div>
-            </div>
+            <div class="se-br-original" id="se-br-original-${n}">${preview}</div>
         </div>`;
     }).join('');
 
@@ -131,16 +125,7 @@ function _buildHtml(nums) {
 
 function _bindEvents(nums) {
     _panel.querySelector('.se-br-close').addEventListener('click', closeBulkRefine);
-
     _panel.querySelector('#se-br-run').addEventListener('click', () => _runAll(nums));
-
-    _panel.addEventListener('click', (e) => {
-        const accept = e.target.closest('.se-br-accept');
-        if (accept) { _acceptResult(Number.parseInt(accept.dataset.num, 10)); return; }
-
-        const discard = e.target.closest('.se-br-discard');
-        if (discard) { _discardResult(Number.parseInt(discard.dataset.num, 10)); }
-    });
 }
 
 async function _runAll(nums) {
@@ -213,11 +198,21 @@ async function _runSingle(num) {
         const result = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
 
         if (result && _panel) {
-            const resultDiv  = _panel.querySelector(`#se-br-result-${num}`);
-            const resultText = _panel.querySelector(`#se-br-result-text-${num}`);
-            if (resultDiv && resultText) {
-                resultText.value       = result.trim();
-                resultDiv.style.display = 'block';
+            const anchor = _panel.querySelector(`#se-br-original-${num}`);
+            if (anchor) {
+                showDiffView(anchor, entry.content, result.trim(), {
+                    id: `se-br-diff-${num}`,
+                    onAccept: (newText) => {
+                        entry.content = newText.trim();
+                        state.modified.add(num);
+                        persistState();
+                        renderTable();
+                        if (statusEl) { statusEl.textContent = 'Saved ✓'; statusEl.style.color = '#a6e22e'; }
+                    },
+                    onCancel: () => {
+                        if (statusEl) { statusEl.textContent = 'Discarded'; statusEl.style.color = '#75715e'; }
+                    },
+                });
             }
             if (statusEl) { statusEl.textContent = 'Ready ✓'; statusEl.style.color = '#a6e22e'; }
         } else if (_panel) {
@@ -229,29 +224,3 @@ async function _runSingle(num) {
     }
 }
 
-function _acceptResult(num) {
-    const textEl = _panel?.querySelector(`#se-br-result-text-${num}`);
-    if (!textEl) return;
-
-    const entry = state.entries.get(num);
-    if (!entry) return;
-
-    entry.content = textEl.value.trim();
-    state.modified.add(num);
-    persistState();
-    renderTable();
-
-    const resultDiv = _panel?.querySelector(`#se-br-result-${num}`);
-    if (resultDiv) resultDiv.innerHTML = '<div class="se-br-accepted">Accepted ✓</div>';
-
-    const statusEl = _panel?.querySelector(`#se-br-status-${num}`);
-    if (statusEl) { statusEl.textContent = 'Saved'; statusEl.style.color = '#a6e22e'; }
-}
-
-function _discardResult(num) {
-    const resultDiv = _panel?.querySelector(`#se-br-result-${num}`);
-    if (resultDiv) resultDiv.style.display = 'none';
-
-    const statusEl = _panel?.querySelector(`#se-br-status-${num}`);
-    if (statusEl) { statusEl.textContent = 'Discarded'; statusEl.style.color = '#75715e'; }
-}

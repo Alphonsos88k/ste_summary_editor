@@ -18,6 +18,7 @@ import { reCheckEntry } from '../conflict/conflict-detection.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 import { TEMPLATES, SEV_CSS } from '../core/constants.js';
 import { registerPrompt, getPrompt, setPrompt } from '../core/system-prompts.js';
+import { showDiffView } from './diff-view.js';
 
 const PROMPT_KEY = 'content-editor';
 
@@ -233,10 +234,16 @@ async function doAskApi(pop, num) {
         const result = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
         if (result) {
             const ta = pop.querySelector('#se-ce-textarea');
-            ta.value = result.trim();
-            const counter = pop.querySelector('#se-ce-counter');
-            if (counter) counter.textContent = countText(ta.value);
-            statusEl.textContent = 'Done ✓';
+            const original = ta.value;
+            showDiffView(pop.querySelector('.se-ce-api-bar'), original, result.trim(), {
+                id: 'se-ce-diff-view',
+                onAccept: (newText) => {
+                    ta.value = newText;
+                    const counter = pop.querySelector('#se-ce-counter');
+                    if (counter) counter.textContent = countText(ta.value);
+                },
+            });
+            statusEl.textContent = 'Done ✓ — review diff below';
             statusEl.style.color = '#a6e22e';
         } else {
             statusEl.textContent = 'No response';

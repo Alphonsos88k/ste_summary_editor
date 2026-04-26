@@ -62,6 +62,7 @@ import { openConflictReview, setConflictReviewEditorCallback } from './src/confl
 import { addRangeLinks, removeRangeLinks, clearAllLinks, renderCausalPanel, toggleCausalPopover } from './src/editor/causality.js';
 import { openContentEditor, closeContentEditor } from './src/editor/content-editor.js';
 import { openBulkRefine, closeBulkRefine } from './src/editor/bulk-refine.js';
+import { showDiffView } from './src/editor/diff-view.js';
 import { openSplitDialog, closeSplitDialog } from './src/editor/split-entry.js';
 import { closeIngestSplit, swapIngestSplit, openIngestPreview, closeIngestPreview, refreshIngestPreviewIfOpen } from './src/ingest/ingest-split.js';
 import { isCharacterBlocked, bindBlacklistEvents, refreshBlockedState } from './src/integration/blacklist.js';
@@ -160,6 +161,40 @@ export function ensureMermaidLoaded() {
 }
 
 /**
+ * Load Fuse.js fuzzy-search library from the bundled file.
+ */
+function loadFuseJS() {
+    return new Promise((resolve) => {
+        if (typeof Fuse !== 'undefined') { resolve(); return; }
+        const script = document.createElement('script');
+        script.src = `/scripts/extensions/third-party/${EXT_NAME}/lib/fuse.min.js`;
+        script.onload = resolve;
+        script.onerror = () => {
+            console.warn('[Summary Editor] Fuse.js failed to load, fuzzy search unavailable');
+            resolve();
+        };
+        document.head.appendChild(script);
+    });
+}
+
+/**
+ * Load jsdiff from the bundled file.
+ */
+function loadDiffJS() {
+    return new Promise((resolve) => {
+        if (typeof Diff !== 'undefined') { resolve(); return; }
+        const script = document.createElement('script');
+        script.src = `/scripts/extensions/third-party/${EXT_NAME}/lib/diff.min.js`;
+        script.onload = resolve;
+        script.onerror = () => {
+            console.warn('[Summary Editor] jsdiff failed to load, diff view unavailable');
+            resolve();
+        };
+        document.head.appendChild(script);
+    });
+}
+
+/**
  * Load localForage from the bundled file (must resolve before any persistState call).
  */
 function loadLocalForageJS() {
@@ -233,11 +268,13 @@ jQuery(async () => {
     const settingsHtml = await $.get(`/scripts/extensions/third-party/${EXT_NAME}/settings.html`);
     $('#extensions_settings2').append(settingsHtml);
 
-    // Load Tailwind, iro.js, localForage, and all HTML templates in parallel
+    // Load Tailwind, iro.js, localForage, Fuse.js, jsdiff, and all HTML templates in parallel
     await Promise.all([
         loadTailwindCDN(),
         loadIroJS(),
         loadLocalForageJS(),
+        loadFuseJS(),
+        loadDiffJS(),
         preloadAllTemplates(),
     ]);
 
@@ -1744,16 +1781,61 @@ function openFindReplace() {
     const overlayEl = document.getElementById('se-modal-overlay');
     overlayEl.appendChild(panel);
 
-    spawnPanel(panel, overlayEl, '.se-fr-header', 320, 180);
+    spawnPanel(panel, overlayEl, '.se-fr-header', 320, 220);
 
-    const searchInput = panel.querySelector('#se-fr-search');
-    const replaceInput = panel.querySelector('#se-fr-replace');
-    const caseCheck = panel.querySelector('#se-fr-case');
-    const countEl = panel.querySelector('#se-fr-count');
+    const searchInput   = panel.querySelector('#se-fr-search');
+    const replaceInput  = panel.querySelector('#se-fr-replace');
+    const caseCheck     = panel.querySelector('#se-fr-case');
+    const fuzzyCheck    = panel.querySelector('#se-fr-fuzzy');
+    const threshRow     = panel.querySelector('#se-fr-threshold-row');
+    const threshSlider  = panel.querySelector('#se-fr-threshold');
+    const threshValEl   = panel.querySelector('#se-fr-thresh-val');
+    const countEl       = panel.querySelector('#se-fr-count');
+
+    // Restore persisted threshold
+    const savedThresh = parseFloat(localStorage.getItem('se-fr-threshold') || '0.4');
+    threshSlider.value = savedThresh;
+    threshValEl.textContent = savedThresh.toFixed(1);
+
+    threshSlider.addEventListener('input', () => {
+        threshValEl.textContent = parseFloat(threshSlider.value).toFixed(1);
+        localStorage.setItem('se-fr-threshold', threshSlider.value);
+        countMatches();
+    });
+
+    panel.querySelector('#se-fr-info-btn').addEventListener('click', () => {
+        const popup = panel.querySelector('#se-fr-info-popup');
+        popup.style.display = popup.style.display === 'none' ? '' : 'none';
+    });
+
+    fuzzyCheck.addEventListener('change', () => {
+        threshRow.style.display = fuzzyCheck.checked ? '' : 'none';
+        countMatches();
+    });
+
+    function _fuseSearch(query) {
+        if (typeof Fuse === 'undefined') return null;
+        const entries = [...state.entries.values()];
+        const fuse = new Fuse(entries, {
+            keys: ['content'],
+            threshold: parseFloat(threshSlider.value),
+            isCaseSensitive: caseCheck.checked,
+            includeScore: false,
+        });
+        return fuse.search(query).map(r => r.item);
+    }
 
     function countMatches() {
         const query = searchInput.value;
         if (!query) { countEl.textContent = ''; return; }
+
+        if (fuzzyCheck.checked) {
+            const matches = _fuseSearch(query);
+            if (!matches) { countEl.textContent = 'Fuse unavailable'; return; }
+            countEl.textContent = `${matches.length} entr${matches.length === 1 ? 'y' : 'ies'} match`;
+            return;
+        }
+
         const caseSensitive = caseCheck.checked;
         let total = 0;
         for (const [, entry] of state.entries) {
@@ -1774,10 +1856,16 @@ function openFindReplace() {
         if (!query) return;
         const replacement = replaceInput.value;
         const caseSensitive = caseCheck.checked;
+        const fuzzy = fuzzyCheck.checked;
+
+        // In fuzzy mode, narrow to Fuse-matched entries; in exact mode, scan all
+        const targetEntries = fuzzy
+            ? (_fuseSearch(query) ?? [...state.entries.values()])
+            : [...state.entries.values()];
 
         snapshotState();
         let totalReplaced = 0;
-        for (const [num, entry] of state.entries) {
+        for (const entry of targetEntries) {
             let updated;
             if (caseSensitive) {
                 updated = entry.content.replaceAll(query, replacement);
@@ -1786,7 +1874,7 @@ function openFindReplace() {
             }
             if (updated !== entry.content) {
                 entry.content = updated;
-                state.modified.add(num);
+                state.modified.add(entry.num);
                 totalReplaced++;
             }
         }
@@ -1891,35 +1979,40 @@ async function openGapSuggest(num) {
         const suggestion = (result || '').trim();
 
         document.getElementById(`${panelId}-loading`).style.display = 'none';
-        const $text = document.getElementById(`${panelId}-text`);
-        $text.value = suggestion || '(No response from model)';
-        $text.style.display = '';
-        document.getElementById(`${panelId}-actions`).style.display = '';
 
-        document.getElementById(`${panelId}-use`).addEventListener('click', () => {
-            const content = $text.value.trim();
-            if (!content) return;
-            const snapshot = snapshotState();
-            state.entries.set(num, {
-                num, content, date: '', time: '', location: '',
-                notes: '', actId: null, source: 'manual',
+        if (!suggestion) {
+            const $load = document.getElementById(`${panelId}-loading`);
+            if ($load) { $load.textContent = 'No response from model'; $load.style.display = ''; }
+        } else {
+            const loadingEl = document.getElementById(`${panelId}-loading`);
+            showDiffView(loadingEl, '', suggestion, {
+                id: `${panelId}-diff`,
+                onAccept: (content) => {
+                    const trimmed = content.trim();
+                    if (!trimmed) return;
+                    const snapshot = snapshotState();
+                    state.entries.set(num, {
+                        num, content: trimmed, date: '', time: '', location: '',
+                        notes: '', actId: null, source: 'manual',
+                    });
+                    state.gaps = state.gaps.filter(g => g !== num);
+                    detectGaps();
+                    persistState();
+                    renderTable();
+                    renderSelectionBar();
+                    updateTabBadges();
+                    pushUndo(`Add suggested entry #${num}`, () => {
+                        restoreSnapshot(snapshot);
+                        detectGaps();
+                        renderTable();
+                        renderSelectionBar();
+                        updateTabBadges();
+                        persistState();
+                    });
+                    panel.remove();
+                },
             });
-            state.gaps = state.gaps.filter(g => g !== num);
-            detectGaps();
-            persistState();
-            renderTable();
-            renderSelectionBar();
-            updateTabBadges();
-            pushUndo(`Add suggested entry #${num}`, () => {
-                restoreSnapshot(snapshot);
-                detectGaps();
-                renderTable();
-                renderSelectionBar();
-                updateTabBadges();
-                persistState();
-            });
-            panel.remove();
-        });
+        }
     } catch (err) {
         const $load = document.getElementById(`${panelId}-loading`);
         if ($load) $load.textContent = 'Error: ' + (err?.message || 'Request failed');

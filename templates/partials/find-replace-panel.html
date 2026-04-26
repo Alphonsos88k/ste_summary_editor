@@ -7,7 +7,24 @@
     <input type="text" class="se-fr-input" id="se-fr-replace" placeholder="Replace with..." autocomplete="off" />
     <div class="se-fr-row">
         <label class="se-fr-case-label"><input type="checkbox" id="se-fr-case" /> Case sensitive</label>
+        <label class="se-fr-case-label"><input type="checkbox" id="se-fr-fuzzy" /> Fuzzy</label>
         <span class="se-fr-count" id="se-fr-count"></span>
+    </div>
+    <div class="se-fr-threshold-row" id="se-fr-threshold-row" style="display:none">
+        <div class="se-fr-thresh-top">
+            <label class="se-fr-thresh-label" for="se-fr-threshold">Threshold <span id="se-fr-thresh-val">0.4</span></label>
+            <span class="se-fr-thresh-hint">tight ←→ loose</span>
+            <span class="se-fr-info-btn" id="se-fr-info-btn" title="Fuzzy threshold examples">&#9432;</span>
+        </div>
+        <input type="range" id="se-fr-threshold" class="se-fr-thresh-slider" min="0.1" max="0.9" step="0.1" value="0.4" />
+        <div class="se-fr-info-popup" id="se-fr-info-popup" style="display:none">
+            <strong>0.1 — Tight:</strong> must be very close<br>
+            <em>"Captan" → "Captain"</em><br><br>
+            <strong>0.4 — Default:</strong> tolerates a few typos<br>
+            <em>"captian" → "Captain"</em><br><br>
+            <strong>0.7 — Loose:</strong> partial / rough match<br>
+            <em>"cap" → "Captain Smith"</em>
+        </div>
     </div>
     <div class="se-fr-actions">
         <button class="se-btn se-btn-sm" id="se-fr-replace-all">Replace All</button>
