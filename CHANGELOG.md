@@ -1,3 +1,11 @@
+# [1.7.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.6.0...v1.7.0) (2026-04-26)
+
+
+### Features
+
+* localForage for large-entry intra-session storage; remove dead loadPersistedState ([5ae12ea](https://github.com/Alphonsos88k/ste_summary_editor/commit/5ae12ea83286e073572a18b9a7d26cfe215f7816))
+* Stage 2+3 — Fuse.js fuzzy search + jsdiff diff view ([d05aa57](https://github.com/Alphonsos88k/ste_summary_editor/commit/d05aa57d187bbefeee73e8959705e1deb456e200))
+
 # [1.6.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.5.0...v1.6.0) (2026-04-26)
 
 
