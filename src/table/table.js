@@ -97,9 +97,9 @@ export function getFilteredEntries() {
                 // Match against num, content, act name, date, time, location
                 if (String(e.num).includes(q)) return true;
                 if (e.content.toLowerCase().includes(q)) return true;
-                if (e.date && e.date.toLowerCase().includes(q)) return true;
-                if (e.time && e.time.toLowerCase().includes(q)) return true;
-                if (e.location && e.location.toLowerCase().includes(q)) return true;
+                if (e.date?.toLowerCase().includes(q)) return true;
+                if (e.time?.toLowerCase().includes(q)) return true;
+                if (e.location?.toLowerCase().includes(q)) return true;
                 if (e.actId) {
                     const actName = state.acts.get(e.actId)?.name || '';
                     if (actName.toLowerCase().includes(q)) return true;
@@ -219,7 +219,7 @@ export function renderTable() {
             const actId = entry.actId || '__unassigned__';
             if (actId !== lastActId) {
                 lastActId = actId;
-                const act = actId !== '__unassigned__' ? state.acts.get(actId) : null;
+                const act = actId === '__unassigned__' ? null : state.acts.get(actId);
                 const name = act ? escHtml(act.name) : 'Unassigned';
                 const bg = act ? act.color.bg : '#555';
                 const fg = act ? act.color.fg : '#ccc';
@@ -414,7 +414,7 @@ function _bindSuppEditableCells($body) {
         const rect = $td[0].getBoundingClientRect();
         const popWidth = isDate ? 260 : 240;
         let left = rect.left;
-        let top  = rect.bottom + 6;
+        const top = rect.bottom + 6;
         if (left + popWidth > window.innerWidth) left = window.innerWidth - popWidth - 10;
         if (left < 4) left = 4;
         pop.style.left = left + 'px';
@@ -656,9 +656,9 @@ export function applyConflictHighlights(content, conflicts) {
     let html = escHtml(content);
     const sorted = [...conflicts].sort((a, b) => b.text.length - a.text.length);
     for (const c of sorted) {
-        const cls = c.severity === 'error' ? 'se-conflict-mark'
-            : c.severity === 'warning' ? 'se-conflict-mark-warn'
-                : 'se-conflict-mark-info';
+        let cls = 'se-conflict-mark-info';
+        if (c.severity === 'error') cls = 'se-conflict-mark';
+        else if (c.severity === 'warning') cls = 'se-conflict-mark-warn';
         const escaped = escHtml(c.text);
         const idx = html.indexOf(escaped);
         if (idx >= 0) {
@@ -760,10 +760,10 @@ function buildEntryRow(entry) {
         healthColor = '#f92672'; healthTitle = 'No content';
     } else if (hasHardConflict) {
         healthColor = '#f92672'; healthTitle = 'Has conflicts';
-    } else if (!hasAllMeta) {
-        healthColor = '#e9c46a'; healthTitle = 'Missing metadata';
-    } else {
+    } else if (hasAllMeta) {
         healthColor = '#a6e22e'; healthTitle = 'Valid';
+    } else {
+        healthColor = '#e9c46a'; healthTitle = 'Missing metadata';
     }
     const textColor = healthColor === '#a6e22e' ? '#1a1b12' : '#f8f8f2';
     const healthBadge = `<span class="se-health-badge" data-tooltip="${healthTitle}" style="background:${healthColor};color:${textColor};">${entry.num}</span>`;
@@ -812,7 +812,7 @@ function applyRangeBorderClasses(tbody) {
         row.classList.remove('se-range');
         row.style.removeProperty('--range-color');
 
-        const num = parseInt(row.dataset.num, 10);
+        const num = Number.parseInt(row.dataset.num, 10);
         const key = getRangeKeyForEntry(num);
         if (!key) continue;
         const range = state.fileRanges.get(key);
@@ -1142,7 +1142,9 @@ function bindEditableCells($body) {
         // Position below the cell, clamped to viewport
         const rect = $td[0].getBoundingClientRect();
         const popWidth = isDate ? 260 : 240;
-        const popHeight = isDate ? 310 : (isTime ? 100 : 120);
+        let popHeight = 120;
+        if (isDate) popHeight = 310;
+        else if (isTime) popHeight = 100;
         let left = rect.left;
         let top = rect.bottom + 6;
         if (left + popWidth > window.innerWidth) left = window.innerWidth - popWidth - 10;
