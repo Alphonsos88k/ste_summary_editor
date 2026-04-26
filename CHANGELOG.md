@@ -1,3 +1,16 @@
+# [1.5.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.4.0...v1.5.0) (2026-04-26)
+
+
+### Bug Fixes
+
+* table.js SonarQube warnings and let→const ([e014a7b](https://github.com/Alphonsos88k/ste_summary_editor/commit/e014a7b1d17dbdb4f97433b74ba9146744d604fd))
+
+
+### Features
+
+* Output Planner, file-range ops, cogwheel buttons, system prompt UI, golden-angle range colors ([9176d28](https://github.com/Alphonsos88k/ste_summary_editor/commit/9176d286ea434ef15c279f555cffb75a44473fee))
+* step 6 acts changes — Unassigned label, confirm on reassign, remove acts registry from JSON ([0b9ded7](https://github.com/Alphonsos88k/ste_summary_editor/commit/0b9ded7dac49792c376ec5e0f61ca3427ccaf2d5))
+
 # [1.5.0] (Unreleased) — feat/file-range-system
 
 ### Features
