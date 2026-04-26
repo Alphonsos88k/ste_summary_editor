@@ -9,6 +9,35 @@
  */
 
 import { escHtml } from '../core/utils.js';
+import { loadTemplate, fillTemplate } from '../core/template-loader.js';
+import { TEMPLATES } from '../core/constants.js';
+
+/** @type {string|null} */
+let _tmpl = null;
+
+function _lineDiv(cls, text) {
+    return `<div class="${cls}">${escHtml(text) || '&nbsp;'}</div>`;
+}
+
+function _buildLeftHtml(parts) {
+    return parts
+        .filter(p => !p.added)
+        .flatMap(part => {
+            const cls = part.removed ? 'se-diff-line se-diff-removed' : 'se-diff-line se-diff-common';
+            return part.value.replace(/\n$/, '').split('\n').map(l => _lineDiv(cls, l));
+        })
+        .join('');
+}
+
+function _plainLines(text) {
+    return text.replace(/\n$/, '').split('\n')
+        .map(l => _lineDiv('se-diff-line se-diff-common', l))
+        .join('');
+}
+
+async function _ensureTemplate() {
+    if (!_tmpl) _tmpl = await loadTemplate(TEMPLATES.DIFF_VIEW);
+}
 
 /**
  * Inject a diff view element after `anchor`.
@@ -18,9 +47,10 @@ import { escHtml } from '../core/utils.js';
  * @param {string} original - Original text (may be empty for new entries)
  * @param {string} revised - AI-generated revised text
  * @param {{ onAccept: (text: string) => void, onCancel?: () => void, id?: string }} opts
- * @returns {HTMLElement} The created diff view element
+ * @returns {Promise<HTMLElement>} The created diff view element
  */
-export function showDiffView(anchor, original, revised, { onAccept, onCancel, id = 'se-diff-view' }) {
+export async function showDiffView(anchor, original, revised, { onAccept, onCancel, id = 'se-diff-view' }) {
+    await _ensureTemplate();
     document.getElementById(id)?.remove();
 
     const hasOriginal = original.trim().length > 0;
@@ -32,49 +62,30 @@ export function showDiffView(anchor, original, revised, { onAccept, onCancel, id
         if (typeof Diff !== 'undefined') {
             const parts = Diff.diffLines(original, revised);
             changedCount = parts.reduce((n, p) => n + (p.added || p.removed ? (p.count ?? 1) : 0), 0);
-            for (const part of parts) {
-                if (part.added) continue;
-                const cls = part.removed ? 'se-diff-line se-diff-removed' : 'se-diff-line se-diff-common';
-                const rawLines = part.value.replace(/\n$/, '').split('\n');
-                for (const line of rawLines) {
-                    leftHtml += `<div class="${cls}">${escHtml(line) || '&nbsp;'}</div>`;
-                }
-            }
+            leftHtml = _buildLeftHtml(parts);
         } else {
-            leftHtml = original.replace(/\n$/, '').split('\n')
-                .map(l => `<div class="se-diff-line se-diff-common">${escHtml(l) || '&nbsp;'}</div>`)
-                .join('');
+            leftHtml = _plainLines(original);
         }
     }
 
-    const countLabel = hasOriginal
-        ? `${changedCount} line${changedCount === 1 ? '' : 's'} changed`
-        : 'New content';
+    const lineSuffix = changedCount === 1 ? '' : 's';
+    const countLabel = hasOriginal ? `${changedCount} line${lineSuffix} changed` : 'New content';
 
     const oldPanel = hasOriginal
         ? `<div class="se-diff-side se-diff-old"><div class="se-diff-side-label">Original</div><div class="se-diff-old-scroll">${leftHtml}</div></div>`
         : '';
 
+    const viewCls = hasOriginal ? 'se-diff-view' : 'se-diff-view se-diff-new-only';
     const el = document.createElement('div');
     el.id = id;
-    el.className = `se-diff-view${hasOriginal ? '' : ' se-diff-new-only'}`;
-    el.innerHTML =
-        `<div class="se-diff-hdr">` +
-            `<span class="se-diff-title">&#9654; Diff <span class="se-diff-count">${escHtml(countLabel)}</span></span>` +
-            `<div class="se-diff-btns">` +
-                `<button class="se-btn se-btn-sm se-diff-cancel-btn">Cancel</button>` +
-                `<button class="se-btn se-btn-primary se-btn-sm se-diff-accept-btn">Accept</button>` +
-            `</div>` +
-        `</div>` +
-        `<div class="se-diff-body">` +
-            oldPanel +
-            `<div class="se-diff-side se-diff-new">` +
-                `<div class="se-diff-side-label">Revised</div>` +
-                `<textarea class="se-diff-new-ta">${escHtml(revised)}</textarea>` +
-            `</div>` +
-        `</div>`;
+    el.className = viewCls;
+    el.innerHTML = fillTemplate(_tmpl, {
+        countLabel:  escHtml(countLabel),
+        oldPanel,
+        revisedText: escHtml(revised),
+    });
 
-    anchor.insertAdjacentElement('afterend', el);
+    anchor.after(el);
 
     el.querySelector('.se-diff-accept-btn').addEventListener('click', () => {
         onAccept(el.querySelector('.se-diff-new-ta').value);

@@ -19,6 +19,8 @@
 import { state, persistState } from '../core/state.js';
 import { renderTable } from '../table/table.js';
 import { escHtml, spawnPanel } from '../core/utils.js';
+import { loadTemplate, fillTemplate } from '../core/template-loader.js';
+import { TEMPLATES } from '../core/constants.js';
 import { getPrompt } from '../core/system-prompts.js';
 import { seAlert, seConfirm } from '../core/dialogs.js';
 import { showDiffView } from './diff-view.js';
@@ -28,6 +30,19 @@ const PROMPT_KEY = 'content-editor';
 
 /** @type {HTMLElement|null} */
 let _panel = null;
+
+/** @type {string|null} */
+let _panelTmpl = null;
+/** @type {string|null} */
+let _entryTmpl = null;
+
+async function _ensureTemplates() {
+    if (_panelTmpl && _entryTmpl) return;
+    [_panelTmpl, _entryTmpl] = await Promise.all([
+        loadTemplate(TEMPLATES.BULK_REFINE_PANEL),
+        loadTemplate(TEMPLATES.BULK_REFINE_ENTRY),
+    ]);
+}
 
 // ─── Public API ──────────────────────────────────────────────
 
@@ -76,51 +91,35 @@ function _hasNonOkConflict(num) {
     return (state.conflicts[num] || []).some(c => c.severity !== 'ok');
 }
 
-function _showPanel(nums) {
+async function _showPanel(nums) {
     closeBulkRefine();
     const overlay = document.getElementById('se-modal-overlay');
     if (!overlay) return;
 
+    await _ensureTemplates();
+
+    const entries = nums.map(n => {
+        const entry = state.entries.get(n);
+        if (!entry) return '';
+        const conflicts = (state.conflicts[n] || []).filter(c => c.severity !== 'ok');
+        const hasConfl  = conflicts.length > 0;
+        const preview   = escHtml(entry.content.slice(0, 140)) + (entry.content.length > 140 ? '…' : '');
+        const badgeCls  = hasConfl ? 'se-br-badge-warn' : 'se-br-badge-none';
+        const conflictWord = conflicts.length > 1 ? 'conflicts' : 'conflict';
+        const badgeTxt  = hasConfl ? `${conflicts.length} ${conflictWord}` : 'no conflicts';
+        return fillTemplate(_entryTmpl, { num: n, badgeCls, badgeTxt, preview });
+    }).join('');
+
+    const entryLabel = `${nums.length} entr${nums.length === 1 ? 'y' : 'ies'}`;
+
     _panel = document.createElement('div');
     _panel.id = 'se-bulk-refine-panel';
     _panel.className = 'se-bulk-refine-panel';
-    _panel.innerHTML = _buildHtml(nums);
+    _panel.innerHTML = fillTemplate(_panelTmpl, { entryLabel, entries });
     overlay.appendChild(_panel);
 
     spawnPanel(_panel, overlay, '.se-br-header', 520, 560);
     _bindEvents(nums);
-}
-
-function _buildHtml(nums) {
-    const rows = nums.map(n => {
-        const entry = state.entries.get(n);
-        if (!entry) return '';
-        const conflicts  = (state.conflicts[n] || []).filter(c => c.severity !== 'ok');
-        const hasConfl   = conflicts.length > 0;
-        const preview    = escHtml(entry.content.slice(0, 140)) + (entry.content.length > 140 ? '…' : '');
-        const badgeCls   = hasConfl ? 'se-br-badge-warn' : 'se-br-badge-none';
-        const badgeTxt   = hasConfl ? `${conflicts.length} conflict${conflicts.length > 1 ? 's' : ''}` : 'no conflicts';
-        return `
-        <div class="se-br-entry" data-num="${n}">
-            <div class="se-br-entry-header">
-                <span class="se-br-num">#${n}</span>
-                <span class="se-br-badge ${badgeCls}">${badgeTxt}</span>
-                <span class="se-br-status" id="se-br-status-${n}"></span>
-            </div>
-            <div class="se-br-original" id="se-br-original-${n}">${preview}</div>
-        </div>`;
-    }).join('');
-
-    return `
-        <div class="se-br-header">
-            <span class="se-br-title">&#9889; Bulk Refine &mdash; ${nums.length} entr${nums.length === 1 ? 'y' : 'ies'}</span>
-            <button class="se-close-circle se-br-close">&times;</button>
-        </div>
-        <div class="se-br-toolbar">
-            <button class="se-btn se-btn-primary se-br-run" id="se-br-run">&#9654; Run All</button>
-            <span class="se-br-overall-status" id="se-br-overall-status"></span>
-        </div>
-        <div class="se-br-body">${rows}</div>`;
 }
 
 function _bindEvents(nums) {

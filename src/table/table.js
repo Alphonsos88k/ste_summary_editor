@@ -34,6 +34,9 @@ let datepickerTmpl = null;
 /** @type {string|null} Cached time picker template HTML. */
 let timepickerTmpl = null;
 
+/** @type {string|null} Cached supplementary file editor template HTML. */
+let suppEditorTmpl = null;
+
 /** @type {HTMLElement|null} Currently active edit popover element. */
 let activeEditPopover = null;
 
@@ -476,7 +479,7 @@ function _suppCategoryLabel(cat) {
  * Open a draggable editor dialog for a supplementary file's content.
  * @param {string} fileName
  */
-export function openSuppEditor(fileName) {
+export async function openSuppEditor(fileName) {
     const supp = state.supplementaryFiles.get(fileName);
     if (!supp) return;
 
@@ -485,22 +488,16 @@ export function openSuppEditor(fileName) {
     const overlay = document.getElementById('se-modal-overlay');
     if (!overlay) return;
 
+    if (!suppEditorTmpl) suppEditorTmpl = await loadTemplate(TEMPLATES.SUPP_EDITOR);
+
     const content = supp.editedContent || supp.content;
     const panel = document.createElement('div');
     panel.id = 'se-supp-editor';
     panel.className = 'se-supp-editor';
-    panel.innerHTML = `
-        <div class="se-se-header">
-            <span class="se-se-title">&#128196; ${escHtml(fileName)}</span>
-            <button class="se-close-circle se-se-close">&times;</button>
-        </div>
-        <div class="se-se-body">
-            <textarea class="se-se-textarea" id="se-se-content" spellcheck="true">${escHtml(content)}</textarea>
-        </div>
-        <div class="se-se-footer">
-            <button class="se-btn se-btn-sm se-se-revert" id="se-se-revert">Revert to Original</button>
-            <button class="se-btn se-btn-primary se-se-save" id="se-se-save">Save</button>
-        </div>`;
+    panel.innerHTML = fillTemplate(suppEditorTmpl, {
+        fileName: escHtml(fileName),
+        content:  escHtml(content),
+    });
 
     overlay.appendChild(panel);
     spawnPanel(panel, overlay, '.se-se-header', 560, 480);
