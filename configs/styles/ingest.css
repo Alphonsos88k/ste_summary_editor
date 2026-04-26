@@ -412,7 +412,7 @@
 
 .se-frm-panel {
     width: 460px;
-    max-height: 66vh;
+    max-height: 38vh;
     display: flex;
     flex-direction: column;
 }
