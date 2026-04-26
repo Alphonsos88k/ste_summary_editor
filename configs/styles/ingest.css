@@ -422,6 +422,7 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    overflow: hidden;
     padding: 0;
 }
 
@@ -568,4 +569,5 @@
     border-top: 1px solid var(--se-border);
     gap: 8px;
 }
+.se-frm-footer-left { display: flex; gap: 6px; }
 
