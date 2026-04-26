@@ -21,7 +21,7 @@ import { registerPrompt, getPrompt, setPrompt } from '../core/system-prompts.js'
 
 const PROMPT_KEY = 'content-editor';
 
-registerPrompt(PROMPT_KEY, 'Content Editor Revise');
+registerPrompt(PROMPT_KEY, 'Content Editor Revise', '', { location: 'Review › Content Editor › Revise button' });
 
 // ─── Template cache ───────────────────────────────
 

@@ -13,6 +13,7 @@
 
 import { state, persistState } from '../core/state.js';
 import { detectGaps } from '../ingest/gap-detection.js';
+import { shiftRangeEntryNums } from '../ingest/file-ranges.js';
 import { renderTable, renderSelectionBar } from './table.js';
 import { seAlert, sePrompt } from '../core/dialogs.js';
 
@@ -210,6 +211,7 @@ export function shiftEntriesUp(aboveNum, count) {
     shiftEntryKeys(aboveNum, count);
     shiftActEntryNums(aboveNum, count);
     shiftCausalityKeys(aboveNum, count);
+    shiftRangeEntryNums(aboveNum, count);
     state.gaps     = state.gaps.map(g => (g > aboveNum ? g + count : g));
     state.selected = shiftNumSet(state.selected, aboveNum, count);
     state.modified = shiftNumSet(state.modified, aboveNum, count);

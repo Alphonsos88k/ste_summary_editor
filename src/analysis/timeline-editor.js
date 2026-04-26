@@ -32,7 +32,7 @@ const _DEFAULT_GENERATE =
     'Group events by rough time period where possible. Note key locations. ' +
     'Return only the timeline text. No commentary, no headings.';
 
-registerPrompt(PROMPT_KEY, 'Timeline Editor — Refine/Generate', _DEFAULT_REFINE);
+registerPrompt(PROMPT_KEY, 'Timeline Editor — Refine/Generate', _DEFAULT_REFINE, { location: 'Edit › Timeline Editor' });
 
 /** @type {HTMLElement|null} */
 let _panel = null;

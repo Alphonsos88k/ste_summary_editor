@@ -33,6 +33,27 @@ export const ACT_COLORS = [
 ];
 
 /**
+ * Cycling palette for file-range border colors.
+ * Distinct from ACT_COLORS — these are border/highlight colors, not badge fills.
+ * Intentionally softer/more transparent-friendly so they don't overwhelm the table.
+ */
+export const FILE_RANGE_COLORS = [
+    '#4fc3f7', // light blue
+    '#81c784', // light green
+    '#ffb74d', // amber
+    '#ce93d8', // lavender
+    '#f48fb1', // pink
+    '#80cbc4', // teal
+    '#fff176', // yellow
+    '#ffcc80', // peach
+    '#b0bec5', // slate
+    '#ef9a9a', // rose
+];
+
+/** Maximum estimated TXT file size (KB) for RAG embedding compatibility. */
+export const FILE_SIZE_LIMIT_KB = 9.5;
+
+/**
  * Regex patterns for detecting numbered summary entries.
  * Tries strict "1. text" first, then progressively fuzzier formats.
  * Each pattern captures: group(1) = entry number, group(2) = content text.
@@ -162,4 +183,5 @@ export const TEMPLATES = Object.freeze({
     ENTRY_ANALYTICS_PANEL:   'partials/entry-analytics-panel',
     CONFLICT_REVIEW_PANEL:   'partials/conflict-review-panel',
     KEYBOARD_SHORTCUTS_PANEL:'partials/keyboard-shortcuts-panel',
+    FILE_RANGE_MANAGER:      'partials/file-range-manager',
 });

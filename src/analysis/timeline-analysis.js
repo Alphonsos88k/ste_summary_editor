@@ -19,7 +19,7 @@ import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 
 const PROMPT_KEY = 'timeline-analysis';
 
-registerPrompt(PROMPT_KEY, 'Timeline Analysis', '', { warnJson: true });
+registerPrompt(PROMPT_KEY, 'Timeline Analysis', '', { warnJson: true, location: 'Review › 📅 Timeline' });
 
 /** Judgment level descriptions — prepended to user message */
 const LEVEL_HINTS = {

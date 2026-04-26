@@ -48,6 +48,21 @@ export const state = {
     /** @type {number} Index into ACT_COLORS palette (cycles) */
     actColorIdx: 0,
 
+    /**
+     * File ranges — maps a range key (originally the source filename) to its display data.
+     * Ranges are independently editable after ingest; `entry.source` records the original file
+     * but the range a given entry belongs to is determined by scanning `fileRanges` for its num.
+     * Shape: `{ color: string, entryNums: number[], label: string }`
+     * @type {Map<string, {color: string, entryNums: number[], label: string}>}
+     */
+    fileRanges: new Map(),
+
+    /** @type {number} Counter for golden-angle color generation (never resets) */
+    fileRangeColorIdx: 0,
+
+    /** @type {number} Random hue offset (0-359) seeded once so first color varies per install */
+    fileRangeHueOffset: Math.floor(Math.random() * 360),
+
     /** @type {number} Current pagination page (1-based) */
     currentPage: 1,
 
@@ -157,8 +172,11 @@ export function persistState() {
             lastInjectHash: state.lastInjectHash,
             lastInjectArcHashes: state.lastInjectArcHashes,
             timelineFiles:    [...state.timelineFiles],
-        entitySections:   state.entitySections ?? null,
-        supplementaryFiles: [...state.supplementaryFiles.entries()].map(([k, v]) => [k, v]),
+            entitySections:   state.entitySections ?? null,
+            supplementaryFiles: [...state.supplementaryFiles.entries()].map(([k, v]) => [k, v]),
+            fileRanges: [...state.fileRanges.entries()].map(([k, v]) => [k, { ...v, entryNums: [...v.entryNums] }]),
+            fileRangeColorIdx: state.fileRangeColorIdx,
+            fileRangeHueOffset: state.fileRangeHueOffset,
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (err) {
@@ -237,6 +255,9 @@ export function loadPersistedState() {
         state.timelineFiles    = new Set(data.timelineFiles || []);
         state.entitySections   = data.entitySections ?? null;
         state.supplementaryFiles = new Map((data.supplementaryFiles || []).map(([k, v]) => [k, v]));
+        state.fileRanges = new Map((data.fileRanges || []).map(([k, v]) => [k, { ...v, entryNums: [...(v.entryNums || [])] }]));
+        state.fileRangeColorIdx  = data.fileRangeColorIdx  || 0;
+        state.fileRangeHueOffset = data.fileRangeHueOffset ?? state.fileRangeHueOffset;
     } catch (err) {
         console.warn('[Summary Editor] Failed to load persisted state:', err);
     }

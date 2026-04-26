@@ -22,7 +22,7 @@ import { seAlert } from '../core/dialogs.js';
 
 const PROMPT_KEY = 'rag-reword';
 
-registerPrompt(PROMPT_KEY, 'RAG Reword');
+registerPrompt(PROMPT_KEY, 'RAG Reword', '', { location: 'Export › RAG Reword', passive: true });
 
 /**
  * Reword all entries using ST's active model for RAG optimization.

@@ -3,8 +3,9 @@
     <button class="se-close-circle se-te-close">&times;</button>
 </div>
 <div class="se-te-toolbar">
-    {{actionBtn}}
-    <button class="se-prompt-edit-btn" data-edit-prompt="{{promptKey}}" title="Edit system prompt">&#9881;</button>
+    <span class="se-btn-split-group">
+        {{actionBtn}}<button class="se-btn-split-cog" data-edit-prompt="{{promptKey}}" title="Edit system prompt">&#9881;</button>
+    </span>
     <span class="se-te-status" id="se-te-status"></span>
 </div>
 <div class="se-te-body">

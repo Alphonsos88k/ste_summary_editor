@@ -19,9 +19,9 @@ let $storyCtxEl = null;
 
 // ─── Prompt registration ─────────────────────────────────────────────────────
 
-registerPrompt('conflict-check', 'Conflict Check', '', { warnJson: true });
+registerPrompt('conflict-check', 'Conflict Check', '', { warnJson: true, location: 'Review › Check Conflicts' });
 
-registerPrompt('story-context', 'Story Context Generation');
+registerPrompt('story-context', 'Story Context Generation', '', { location: 'Review › Check Conflicts (auto after full check)' });
 
 // ─── Analysis Log ────────────────────────
 
@@ -654,7 +654,7 @@ export function hasConflictFeedback() {
  * Draggable, non-blocking. Shows state.storyContext in an editable textarea.
  */
 export async function openStoryContextPanel() {
-    if ($storyCtxEl && $storyCtxEl.length && document.body.contains($storyCtxEl[0])) {
+    if ($storyCtxEl?.length && document.body.contains($storyCtxEl[0])) {
         $storyCtxEl.find('#se-story-ctx-textarea').trigger('focus');
         return;
     }

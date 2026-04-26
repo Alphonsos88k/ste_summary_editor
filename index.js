@@ -21,6 +21,8 @@ import { loadTemplate, fillTemplate, preloadAllTemplates } from './src/core/temp
 
 // ─── Feature modules ───
 import { handleFileInput, removeFile } from './src/ingest/ingestion.js';
+import { inheritRangeFromNeighbor } from './src/ingest/file-ranges.js';
+import { openFileRangeManager, closeFileRangeManager } from './src/ingest/file-range-manager.js';
 import { detectGaps } from './src/ingest/gap-detection.js';
 import {
     initTable, renderTable, getTotalPages,
@@ -32,7 +34,7 @@ import {
     renderActPanel, toggleMinimap, buildMinimapOverlay,
     updateFilterDropdown, updateBulkActDropdown, updateBulkActSwatch, updateTabBadges,
     closeAllPopovers, showActColorDialog, showEntrySelector,
-    buildTimelineDiagram, setTimelineRenderer,
+    buildTimelineDiagram, setTimelineRenderer, getLuminance,
 } from './src/arcs/arcs.js';
 import { buildLocationBubbles } from './src/arcs/location-bubbles.js';
 import {
@@ -72,7 +74,7 @@ registerPrompt('gap-suggest', 'Gap Suggest');
 
 // ─── Tailwind CDN & Libraries ───
 import { configureTailwind } from './lib/tailwind-config.js';
-import { closeColorPicker, isColorPickerOpen } from './src/arcs/color-picker.js';
+import { openColorPicker, closeColorPicker, isColorPickerOpen, cpRenderFields, cpApplyFields } from './src/arcs/color-picker.js';
 import { seAlert, seConfirm } from './src/core/dialogs.js';
 
 // ─────────────────────────────────────────────
@@ -396,6 +398,7 @@ function closeEditor() {
     closeBulkRefine();
     closeTimelineEditor();
     closeSplitDialog();
+    closeFileRangeManager();
     persistState();
 }
 
@@ -430,8 +433,14 @@ function bindModalEvents() {
 function bindCoreEvents() {
     $('#se-btn-close').on('click', closeEditor);
     $('#se-btn-shortcuts').on('click', openKeyboardShortcutsPanel);
-    $('#se-modal-overlay').on('click', (e) => {
-        if (e.target.id === 'se-modal-overlay') closeEditor();
+    // Only close when BOTH mousedown and click land on the bare backdrop —
+    // prevents iro.js drag-release from dismissing the whole extension.
+    let _backdropPressed = false;
+    $('#se-modal-overlay').on('mousedown', (e) => {
+        _backdropPressed = e.target.id === 'se-modal-overlay';
+    }).on('click', (e) => {
+        if (e.target.id === 'se-modal-overlay' && _backdropPressed) closeEditor();
+        _backdropPressed = false;
     });
 
     const TAB_NAMES = ['Ingest', 'Review', 'Edit', 'Export'];
@@ -581,7 +590,7 @@ function bindIngestEvents() {
         function scheduleHideIngestTooltip() {
             _hideTimer = setTimeout(() => {
                 $('#se-ingest-tooltip').removeClass('se-ingest-tooltip--visible');
-            }, 2000);
+            }, 0);
         }
         $(document).on('mouseenter', '#se-ingest-info, #se-ingest-tooltip', showIngestTooltip);
         $(document).on('mouseleave', '#se-ingest-info, #se-ingest-tooltip', scheduleHideIngestTooltip);
@@ -792,7 +801,84 @@ function bindReviewEvents() {
         if (nums.length === 1) openSplitDialog(nums[0]);
     });
     $('#se-btn-bulk-fill').on('click', openBulkFill);
-    $('#se-bulk-act-assign').on('change', () => { handleBulkActAssign(); updateBulkActSwatch(); });
+    $('#se-bulk-act-assign').on('change', function () { handleBulkActAssign(this); updateBulkActSwatch(); });
+
+    // ── Range color dialog ──────────────────────────────────────
+    async function openRangeColorPicker(anchorEl) {
+        if (state.fileRanges.size === 0) return;
+
+        const [panelTmpl, itemTmpl] = await Promise.all([
+            loadTemplate(TEMPLATES.DIALOG_COLOR_PICKER),
+            loadTemplate(TEMPLATES.ACD_ITEM),
+        ]);
+
+        const ranges = [...state.fileRanges.entries()];
+        const [firstKey, firstRange] = ranges[0];
+
+        const listHtml = ranges.map(([key, range], i) =>
+            fillTemplate(itemTmpl, {
+                selCls:    i === 0 ? ' se-acd-selected' : '',
+                id:        key,
+                selBorder: i === 0 ? ` style="border-left-color:${range.color};"` : '',
+                bg:        range.color,
+                name:      escHtml(range.label || key),
+                count:     range.entryNums.length,
+            })
+        ).join('');
+
+        const html = fillTemplate(panelTmpl, { actListHtml: listHtml, firstColor: firstRange.color });
+        const overlay = document.getElementById('se-modal-overlay');
+        const $dialog = $(html).appendTo(overlay);
+        spawnPanel($dialog[0], overlay, '.se-float-panel-header');
+
+        const picker = new iro.ColorPicker('#se-acd-wheel', {
+            width: 220, color: firstRange.color || '#a6e22e', borderWidth: 0, handleRadius: 7,
+            layout: [
+                { component: iro.ui.Box },
+                { component: iro.ui.Slider, options: { sliderType: 'hue' } },
+            ],
+        });
+
+        let selectedKey = firstKey;
+        const getMode = () => $dialog.find('#se-acd-fmt').val() || 'hex';
+        const $flds = () => $dialog.find('#se-acd-flds');
+        cpRenderFields(picker.color, getMode(), $flds());
+
+        picker.on('color:change', (color) => {
+            const hex = color.hexString;
+            const range = state.fileRanges.get(selectedKey);
+            if (!range) return;
+            range.color = hex;
+            $dialog.find(`.se-acd-item[data-acd-id="${CSS.escape(selectedKey)}"]`)
+                .find('.se-acd-swatch').css('background', hex)
+                .end().css('border-left-color', hex);
+            $dialog.find('#se-acd-preview').css('background', hex);
+            cpRenderFields(color, getMode(), $flds());
+            renderStatsBar();
+            renderTable();
+        });
+
+        $dialog.on('change', '#se-acd-fmt', () => cpRenderFields(picker.color, getMode(), $flds()));
+        $dialog.on('input', '.se-cp-field', () => cpApplyFields(picker.color, getMode(), $flds()));
+
+        $dialog.on('click', '.se-acd-item', function () {
+            const key = $(this).data('acd-id');
+            const range = state.fileRanges.get(String(key));
+            if (!range) return;
+            selectedKey = String(key);
+            $dialog.find('.se-acd-item').removeClass('se-acd-selected').css('border-left-color', '');
+            $(this).addClass('se-acd-selected').css('border-left-color', range.color);
+            picker.color.set(range.color);
+            $dialog.find('#se-acd-preview').css('background', range.color);
+            cpRenderFields(picker.color, getMode(), $flds());
+        });
+
+        $dialog.find('.se-dialog-ok, .se-dialog-close').on('click', () => {
+            $dialog.remove();
+            persistState();
+            renderStatsBar();
+        });
+    }
 
     // ── Utils panel (draggable floating panel) ──────────────────
     let _utilsPanel = null;
@@ -819,6 +905,12 @@ function bindReviewEvents() {
         _utilsPanel.querySelector('#se-btn-entity-panel').addEventListener('click', () => { _utilsPanel?.remove(); _utilsPanel = null; toggleEntitySidebar(); });
         _utilsPanel.querySelector('#se-btn-tag-browser').addEventListener('click', () => showTagBrowser(renderTable));
         _utilsPanel.querySelector('#se-btn-bulk-refine').addEventListener('click', () => { _utilsPanel?.remove(); _utilsPanel = null; openBulkRefine(); });
+        _utilsPanel.querySelector('#se-btn-range-colors')?.addEventListener('click', function () {
+            openRangeColorPicker(this);
+        });
+        _utilsPanel.querySelector('#se-btn-output-planner')?.addEventListener('click', () => {
+            _utilsPanel?.remove(); _utilsPanel = null; openFileRangeManager();
+        });
     }
     $('#se-btn-utils').on('click', openUtilsPanel);
 
@@ -875,12 +967,19 @@ function bindReviewEvents() {
         showActColorDialog();
     });
 
+    // File-range segment click: open the range color dialog
+    $(document).on('click', '.se-stats-seg-range', function (e) {
+        e.stopPropagation();
+        openRangeColorPicker(this);
+    });
+
     // Close color picker on click outside
     $(document).on('click', (e) => {
         if (!isColorPickerOpen()) return;
         const $t = $(e.target);
         if ($t.closest('#se-iro-picker').length) return;
         if ($t.closest('.se-act-badge').length) return;
+        if ($t.closest('.se-stats-seg-range').length) return;
         closeColorPicker();
     });
 
@@ -900,8 +999,8 @@ function bindReviewEvents() {
 /**
  * Handle bulk act assignment from the selection bar dropdown.
  */
-function handleBulkActAssign() {
-    const val = $(this).val();
+function handleBulkActAssign(el) {
+    const val = $(el).val();
     if (!val) return;
 
     if (val === 'new') {
@@ -909,7 +1008,7 @@ function handleBulkActAssign() {
     } else {
         reassignSelectedEntriesToAct(Number.parseInt(val, 10));
     }
-    $(this).val('');
+    $(el).val('');
 }
 
 /**
@@ -1014,6 +1113,7 @@ function insertNewEntry() {
     if (afterEntry?.actId) {
         state.acts.get(afterEntry.actId)?.entryNums.add(newNum);
     }
+    inheritRangeFromNeighbor(newNum, afterNum);
 
     // Re-sort entries map by key
     state.entries = new Map([...state.entries.entries()].sort(([a], [b]) => a - b));
@@ -1598,13 +1698,11 @@ function bindGlobalClickHandlers() {
         if (!$(e.target).closest('.se-color-picker-popover, [data-color-picker]').length) {
             $('.se-color-picker-popover').removeClass('open');
         }
-        if (!$(e.target).closest('.se-cell-popover, .se-gap-popover, .se-minimap-cell').length) {
-            closeAllPopovers();
-        }
         if (!$(e.target).closest('#se-causal-popover, #se-causal-btn, #se-utils-panel').length) {
             $('#se-causal-popover').remove();
         }
     });
+
 }
 
 // ─────────────────────────────────────────────
