@@ -15,6 +15,11 @@ import { TEMPLATES } from '../core/constants.js';
 /** @type {jQuery|null} Cached panel element. */
 let $panel = null;
 
+/** @type {'name'|'wc'|'count'} Current act sort key. */
+let _actSort = 'name';
+/** @type {'asc'|'desc'} Current act sort direction. */
+let _actDir = 'asc';
+
 /**
  * Count words in a string.
  * @param {string} text
@@ -94,7 +99,7 @@ function computeAnalytics() {
             locationFilled: actEntries.filter(e => (e.location || '').trim()).length,
         });
     }
-    actsData.sort((a, b) => b.wc - a.wc);
+    // sorting deferred to buildActListHtml
 
     return {
         totalEntries: total,
@@ -111,11 +116,17 @@ function computeAnalytics() {
 /**
  * Build per-act summary list HTML (word count + metadata completion).
  * @param {object[]} acts
+ * @param {string} [sortKey]
  * @returns {string}
  */
-function buildActListHtml(acts) {
+function buildActListHtml(acts, sortKey = _actSort, dir = _actDir) {
     if (acts.length === 0) return '<div class="se-an-empty">No acts defined.</div>';
-    return acts.map(a => {
+    const sorted = [...acts];
+    if (sortKey === 'wc')         sorted.sort((a, b) => a.wc    - b.wc);
+    else if (sortKey === 'count') sorted.sort((a, b) => a.count - b.count);
+    else sorted.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+    if (dir === 'desc') sorted.reverse();
+    return sorted.map(a => {
         const n = a.count || 0;
         const pctD = n === 0 ? 0 : Math.round((a.dateFilled     / n) * 100);
         const pctT = n === 0 ? 0 : Math.round((a.timeFilled     / n) * 100);
@@ -181,6 +192,15 @@ export async function openAnalyticsPanel() {
     $panel.find('.se-analytics-close').on('click', () => {
         $panel.remove();
         $panel = null;
+    });
+
+    $panel.find('#se-an-act-sort').val(_actSort).on('change', function () {
+        _actSort = this.value;
+        $panel.find('#se-an-act-list').html(buildActListHtml(computeAnalytics().acts));
+    });
+    $panel.find('#se-an-act-dir').val(_actDir).on('change', function () {
+        _actDir = this.value;
+        $panel.find('#se-an-act-list').html(buildActListHtml(computeAnalytics().acts));
     });
 }
 
