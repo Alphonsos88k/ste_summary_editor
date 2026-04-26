@@ -33,6 +33,9 @@
 | **Timeline Analysis** | LLM-powered timeline consistency check against reference files; Relaxed/Medium/Thorough strictness |
 | **System Prompts Hub** | Central panel to view/edit all LLM prompts; location metadata; passive-background badge |
 | **Broad Undo** | Covers file load, clear all, new entry, merge, split, move, swap, act operations, links, field edits |
+| **Fuzzy Search** | Find & Replace has an optional fuzzy mode (Fuse.js) with an adjustable threshold slider and inline examples |
+| **AI Diff View** | Content Editor, Bulk Refine, and Gap Suggest show a side-by-side diff (red original / green editable) before accepting AI output |
+| **Bulk Refine** | Select multiple entries → run LLM revision on all sequentially; accept or discard each result individually |
 
 ---
 
@@ -97,7 +100,7 @@ bash scripts/deploy.sh --clean
 
 **Table columns:** Checkbox | # | Arc | Content | Date | Time | Location | Notes
 
-- **Content cell** → opens the draggable Content Editor (edit, API revise, re-check conflicts)
+- **Content cell** → opens the draggable Content Editor (edit, API revise with diff view, re-check conflicts)
 - **Date** → custom calendar picker; **Time** → custom clock picker
 - Selection bar: Assign act, Create act, Move Before, Swap, New Entry, Merge, Split
 - Shift+click to select a contiguous range
@@ -117,7 +120,7 @@ bash scripts/deploy.sh --clean
 - **Minimap** — colour-coded grid of all entries; click any cell for a content popover
 - **Timeline view** — monthly-grouped, alternating above/below axis, causality arrows
 - **Location Bubbles** — physics-based bubble cluster chart by visit frequency
-- **Utils panel** — Find & Replace, Story Index, Tag Browser, Causal Links, Range Colors, **Output Planner**, Bulk Refine
+- **Utils panel** — Find & Replace (with fuzzy mode + threshold slider), Story Index, Tag Browser, Causal Links, Range Colors, **Output Planner**, **Bulk Refine**
 - **Output Planner** — view estimated export sizes per file range; split at entry boundary, merge, or auto-balance
 - **System Prompts Hub** — view and edit all LLM prompts; shows which feature each prompt belongs to
 
@@ -154,7 +157,10 @@ summary-editor/
 │   └── WISHLIST.md            Future feature ideas
 ├── lib/
 │   ├── tailwind-config.js     Tailwind CDN configuration
-│   └── iro.min.js             iro.js v5.5.2 color picker (MPL 2.0)
+│   ├── iro.min.js             iro.js v5.5.2 color picker (MPL 2.0)
+│   ├── fuse.min.js            Fuse.js v7.0.0 fuzzy search
+│   ├── diff.min.js            jsdiff v7.0.0 line diff
+│   └── localforage.min.js     localForage async storage
 ├── src/
 │   ├── core/                  state, utils, system-prompts, constants, keyboard
 │   ├── ingest/                ingestion, gap-detection, ingest-split, files-panel, file-ranges, file-range-manager
@@ -180,8 +186,10 @@ summary-editor/
 | UI | jQuery (ST-native global) |
 | Styling | Tailwind Play CDN + custom CSS (`se-` prefix) |
 | Color theme | Monokai Dark (`#272822` bg, `#a6e22e` green, `#f92672` pink) |
-| State | `localStorage` |
+| State | `localStorage` + `localForage` (async fallback) |
 | Templates | HTML files loaded via `fetch` |
+| Fuzzy search | Fuse.js v7.0.0 |
+| Diff rendering | jsdiff v7.0.0 |
 | Linting | ESLint 9 |
 | Versioning | semantic-release + conventional commits |
 
