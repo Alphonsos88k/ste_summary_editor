@@ -832,6 +832,25 @@
     border-bottom: 1px solid var(--se-border);
     padding-bottom: 3px;
 }
+.se-an-acts-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid var(--se-border);
+    padding-bottom: 3px;
+    margin-bottom: 0;
+}
+.se-an-acts-header .se-analytics-section-title { border-bottom: none; padding-bottom: 0; flex: 1; }
+.se-an-act-sort {
+    background: var(--se-bg-dark);
+    border: 1px solid var(--se-border);
+    border-radius: 3px;
+    color: #75715e;
+    font-size: 0.7em;
+    padding: 1px 4px;
+    cursor: pointer;
+}
+.se-an-act-sort:focus { outline: none; border-color: var(--se-cyan); }
 .se-analytics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .se-analytics-stat {
     display: flex;

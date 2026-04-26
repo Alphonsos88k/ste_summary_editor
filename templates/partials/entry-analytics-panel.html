@@ -36,7 +36,18 @@
             </div>
         </div>
         <div class="se-analytics-section" id="se-an-acts-section">
-            <div class="se-analytics-section-title">Per-Act Summary</div>
+            <div class="se-an-acts-header">
+                <span class="se-analytics-section-title">Per-Act Summary</span>
+                <select class="se-an-act-sort" id="se-an-act-sort" title="Sort by">
+                    <option value="name">A–Z</option>
+                    <option value="wc">Word count</option>
+                    <option value="count">Entry count</option>
+                </select>
+                <select class="se-an-act-sort" id="se-an-act-dir" title="Direction">
+                    <option value="asc">Asc</option>
+                    <option value="desc">Desc</option>
+                </select>
+            </div>
             <div class="se-analytics-act-list" id="se-an-act-list">{{actListHtml}}</div>
         </div>
     </div>
