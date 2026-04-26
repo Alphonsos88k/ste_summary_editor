@@ -25,10 +25,13 @@
 | **Timeline Diagram** | Monthly-grouped top/bottom alternating layout; dated entries grouped by month |
 | **Location Bubbles** | Physics-based bubble cluster chart — bubble size ∝ location visit frequency |
 | **Export** | `.txt` / `.json` / `.yaml`; scoped; re-export to source; zip; databank inject; per-arc inject |
+| **File-Range System** | Maps source files to export chunks; stats bar segments; golden-angle colors; Output Planner panel |
+| **Output Planner** | Utils → 📂 Output Planner: estimated export sizes, size bars, split/merge/auto-balance ranges |
 | **Token Counts** | Per-entry badge, live counter in Content Editor, per-arc total in Edit tab, running total in Export |
 | **Story Context** | Auto-generated narrative summary after conflict check; editable; sent with every API call |
 | **Named Entities** | Heuristic entity sidebar — recurring capitalised names/places with entry-count badges; click to filter |
 | **Timeline Analysis** | LLM-powered timeline consistency check against reference files; Relaxed/Medium/Thorough strictness |
+| **System Prompts Hub** | Central panel to view/edit all LLM prompts; location metadata; passive-background badge |
 | **Broad Undo** | Covers file load, clear all, new entry, merge, split, move, swap, act operations, links, field edits |
 
 ---
@@ -85,6 +88,7 @@ bash scripts/deploy.sh --clean
 - **Parsing modes:** numbered entries, Part-based sections, rich bracket re-import format
 - Click the **Ingested Files** header to open the assignment panel — toggle any file as a Timeline reference
 - File list drawer with entry counts, status icons, and per-file removal
+- Each ingested file becomes a **file range** — a named export chunk with a golden-angle color
 
 </details>
 
@@ -101,6 +105,7 @@ bash scripts/deploy.sh --clean
 - **Conflict Detection** — LLM analysis with severity chips (Error / Warning / Info); per-entry re-check
 - **Named Entities sidebar** — recurring capitalised names/places; click to filter table
 - **Timeline Analysis** — check entries against reference timeline files
+- **Stats bar** — shows file-range segments when ranges are loaded (click a segment to recolor)
 
 </details>
 
@@ -108,10 +113,13 @@ bash scripts/deploy.sh --clean
 <summary><strong>Tab 3: Edit (Arcs)</strong></summary>
 
 - Arc list + detail view (entry list, notes, range)
-- Color picker (iro.js wheel), rename inline, arc notes, delete
+- Color picker (iro.js wheel), rename inline, arc notes, delete; click the color swatch to edit
 - **Minimap** — colour-coded grid of all entries; click any cell for a content popover
 - **Timeline view** — monthly-grouped, alternating above/below axis, causality arrows
 - **Location Bubbles** — physics-based bubble cluster chart by visit frequency
+- **Utils panel** — Find & Replace, Story Index, Tag Browser, Causal Links, Range Colors, **Output Planner**, Bulk Refine
+- **Output Planner** — view estimated export sizes per file range; split at entry boundary, merge, or auto-balance
+- **System Prompts Hub** — view and edit all LLM prompts; shows which feature each prompt belongs to
 
 </details>
 
@@ -149,7 +157,7 @@ summary-editor/
 │   └── iro.min.js             iro.js v5.5.2 color picker (MPL 2.0)
 ├── src/
 │   ├── core/                  state, utils, system-prompts, constants, keyboard
-│   ├── ingest/                ingestion, gap-detection, ingest-split, files-panel
+│   ├── ingest/                ingestion, gap-detection, ingest-split, files-panel, file-ranges, file-range-manager
 │   ├── table/                 table, tags, tooltip, reorder, entity-sidebar
 │   ├── arcs/                  arcs, location-bubbles, color-picker
 │   ├── editor/                content-editor, split-entry, causality

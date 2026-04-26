@@ -27,14 +27,14 @@ import { detectGaps } from './src/ingest/gap-detection.js';
 import {
     initTable, renderTable, getTotalPages,
     renderStatsBar, renderWarningBanner, renderSelectionBar,
-    closeEditPopover, setContentCellClickHandler, updateUndoButton, openSuppEditor,
+    closeEditPopover, setContentCellClickHandler, updateUndoButton,
 } from './src/table/table.js';
 import {
     initActs, updateActButtonState, createActFromSelection,
     renderActPanel, toggleMinimap, buildMinimapOverlay,
     updateFilterDropdown, updateBulkActDropdown, updateBulkActSwatch, updateTabBadges,
     closeAllPopovers, showActColorDialog, showEntrySelector,
-    buildTimelineDiagram, setTimelineRenderer, getLuminance,
+    buildTimelineDiagram, setTimelineRenderer,
 } from './src/arcs/arcs.js';
 import { buildLocationBubbles } from './src/arcs/location-bubbles.js';
 import {
@@ -51,7 +51,7 @@ import { showMoveDialog, showSwapDialog } from './src/table/reorder.js';
 import { showTagBrowser } from './src/table/tags.js';
 import { toggleEntitySidebar, setEntityFilterCallback } from './src/table/entity-sidebar.js';
 import { toggleFilesPanel, refreshFilesPanel } from './src/ingest/files-panel.js';
-import { autoDetectTimelineFiles, hasTimelineFiles, openTimelinePanel, runTimelineAnalysis } from './src/analysis/timeline-analysis.js';
+import { autoDetectTimelineFiles, hasTimelineFiles } from './src/analysis/timeline-analysis.js';
 import { openTimelineEditor, closeTimelineEditor } from './src/analysis/timeline-editor.js';
 import {
     runConflictCheck, clearConflicts, renderApiStatus, showAnalysisLog,
@@ -74,7 +74,7 @@ registerPrompt('gap-suggest', 'Gap Suggest');
 
 // ─── Tailwind CDN & Libraries ───
 import { configureTailwind } from './lib/tailwind-config.js';
-import { openColorPicker, closeColorPicker, isColorPickerOpen, cpRenderFields, cpApplyFields } from './src/arcs/color-picker.js';
+import { closeColorPicker, isColorPickerOpen, cpRenderFields, cpApplyFields } from './src/arcs/color-picker.js';
 import { seAlert, seConfirm } from './src/core/dialogs.js';
 
 // ─────────────────────────────────────────────
@@ -804,7 +804,7 @@ function bindReviewEvents() {
     $('#se-bulk-act-assign').on('change', function () { handleBulkActAssign(this); updateBulkActSwatch(); });
 
     // ── Range color dialog ──────────────────────────────────────
-    async function openRangeColorPicker(anchorEl) {
+    async function openRangeColorPicker(_anchorEl) {
         if (state.fileRanges.size === 0) return;
 
         const [panelTmpl, itemTmpl] = await Promise.all([

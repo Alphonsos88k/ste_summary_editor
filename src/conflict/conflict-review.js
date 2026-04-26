@@ -11,7 +11,7 @@
 import { state } from '../core/state.js';
 import { escHtml, spawnPanel } from '../core/utils.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
-import { TEMPLATES, SEVERITY, SEV_CSS } from '../core/constants.js';
+import { TEMPLATES, SEV_CSS } from '../core/constants.js';
 
 /** @type {jQuery|null} Cached panel element. */
 let $panel = null;

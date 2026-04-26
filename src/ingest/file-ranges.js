@@ -12,7 +12,7 @@
  */
 
 import { FILE_SIZE_LIMIT_KB } from '../core/constants.js';
-import { state, persistState } from '../core/state.js';
+import { state } from '../core/state.js';
 
 // ─── Color allocation ────────────────────────────────────────────────────────
 
@@ -203,7 +203,8 @@ export function estimateRangeSizeKB(entryNums) {
         if (!entry) continue;
         // Approximate TXT export line: "N. (meta) content\n"
         const meta = [entry.date, entry.time, entry.location].filter(Boolean).join(' | ');
-        const line = `${num}. ${meta ? `[${meta}] ` : ''}${entry.content}\n`;
+        const metaStr = meta ? `[${meta}] ` : '';
+        const line = `${num}. ${metaStr}${entry.content}\n`;
         chars += line.length;
     }
     return Math.round((chars / 1024) * 100) / 100;
@@ -239,7 +240,7 @@ export function suggestNextFilename(existingNames) {
 
     if (matches.length === existingNames.length) {
         // All follow the pattern — find max number and increment
-        const nums = matches.map(m => parseInt(m[2], 10));
+        const nums = matches.map(m => Number.parseInt(m[2], 10));
         const next = Math.max(...nums) + 1;
         const ref = matches[0];
         const padLen = ref[2].length; // preserve zero-padding if any
@@ -248,10 +249,10 @@ export function suggestNextFilename(existingNames) {
     }
 
     // Fallback: use the stem+ext of the last filename
-    const last = existingNames[existingNames.length - 1];
+    const last = existingNames.at(-1);
     const extIdx = last.lastIndexOf('.');
-    const stem = extIdx !== -1 ? last.slice(0, extIdx) : last;
-    const ext = extIdx !== -1 ? last.slice(extIdx) : '.txt';
+    const stem = extIdx === -1 ? last : last.slice(0, extIdx);
+    const ext  = extIdx === -1 ? '.txt' : last.slice(extIdx);
     const n = existingNames.length + 1;
     return `${stem}_${n}${ext}`;
 }
