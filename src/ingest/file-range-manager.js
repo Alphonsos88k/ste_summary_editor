@@ -9,7 +9,7 @@
 
 import { state, persistState } from '../core/state.js';
 import { makeDraggable, escHtml } from '../core/utils.js';
-import { loadTemplate } from '../core/template-loader.js';
+import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 import { TEMPLATES, FILE_SIZE_LIMIT_KB } from '../core/constants.js';
 import {
     estimateRangeSizeKB, rangeExceedsLimit, nextRangeColor, suggestNextFilename,
@@ -17,6 +17,9 @@ import {
 
 /** @type {HTMLElement|null} */
 let _panel = null;
+
+/** @type {string|null} */
+let _splitFormTmpl = null;
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -140,33 +143,23 @@ function _bindEvents() {
 
 // ─── Split form ───────────────────────────────────────────────────────────────
 
-function _showSplitForm(key) {
+async function _showSplitForm(key) {
     _panel.querySelectorAll('.se-frm-split-form').forEach(el => el.remove());
 
     const range = state.fileRanges.get(key);
     if (!range || range.entryNums.length < 2) return;
 
+    if (!_splitFormTmpl) _splitFormTmpl = await loadTemplate(TEMPLATES.FRM_SPLIT_FORM);
+
     const sourceRow = _panel.querySelector(`tr[data-key="${CSS.escape(key)}"]`);
     if (!sourceRow) return;
 
     const nums = [...range.entryNums].sort((a, b) => a - b);
+    const optionsHtml = nums.slice(0, -1).map(n => `<option value="${n}">#${n}</option>`).join('');
     const formRow = document.createElement('tr');
     formRow.className = 'se-frm-split-form';
     formRow.dataset.key = key;
-    formRow.innerHTML = `
-        <td colspan="5" class="se-frm-split-td">
-            <div class="se-frm-split-inner">
-                <label class="se-frm-split-lbl">Split after entry:</label>
-                <select class="se-frm-split-sel">
-                    ${nums.slice(0, -1).map(n => `<option value="${n}">#${n}</option>`).join('')}
-                </select>
-                <div class="se-frm-split-preview"></div>
-                <div class="se-frm-split-actions">
-                    <button class="se-btn se-btn-xs se-frm-split-ok" data-key="${escHtml(key)}">Split</button>
-                    <button class="se-btn se-btn-xs se-frm-split-cancel">Cancel</button>
-                </div>
-            </div>
-        </td>`;
+    formRow.innerHTML = fillTemplate(_splitFormTmpl, { key: escHtml(key), optionsHtml });
     sourceRow.after(formRow);
 
     const sel     = formRow.querySelector('.se-frm-split-sel');

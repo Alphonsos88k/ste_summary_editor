@@ -184,4 +184,12 @@ export const TEMPLATES = Object.freeze({
     CONFLICT_REVIEW_PANEL:   'partials/conflict-review-panel',
     KEYBOARD_SHORTCUTS_PANEL:'partials/keyboard-shortcuts-panel',
     FILE_RANGE_MANAGER:      'partials/file-range-manager',
+    DIFF_VIEW:               'partials/diff-view',
+    SUPP_EDITOR:             'partials/supp-editor',
+    FRM_SPLIT_FORM:          'partials/frm-split-form',
+    CD_ALERT:                'partials/cd-alert',
+    CD_CONFIRM:              'partials/cd-confirm',
+    CD_PROMPT:               'partials/cd-prompt',
+    BULK_REFINE_PANEL:       'partials/bulk-refine-panel',
+    BULK_REFINE_ENTRY:       'partials/bulk-refine-entry',
 });
