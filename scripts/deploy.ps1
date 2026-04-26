@@ -4,20 +4,20 @@
 
 .DESCRIPTION
     Copies extension files into SillyTavern's third-party extensions folder,
-    or removes them. Use --set-path to save your ST install location,
-    or edit $ST_EXTENSIONS_DIR below manually.
+    or removes them. Your SillyTavern path is stored in scripts/deploy.config
+    (gitignored) so it is never committed. Use --set-path to write it there.
 
 .PARAMETER Action
     --copy      (default) Copy extension files to the target directory.
     --clean     Delete the existing extension folder, then copy fresh.
     --delete    Only remove the extension folder (no copy).
-    --set-path  Save a new SillyTavern extensions directory path.
+    --set-path  Save your SillyTavern extensions path to deploy.config.
 
 .EXAMPLE
-    .\deploy.ps1                                          # Copy (default)
-    .\deploy.ps1 --clean                                  # Delete old + copy fresh
-    .\deploy.ps1 --delete                                 # Remove only
-    .\deploy.ps1 --set-path "C:\ST\public\scripts\extensions\third-party"
+    .\deploy.ps1                                                    # Copy (default)
+    .\deploy.ps1 --clean                                            # Delete old + copy fresh
+    .\deploy.ps1 --delete                                           # Remove only
+    .\deploy.ps1 --set-path "<path>\public\scripts\extensions\third-party"
 #>
 
 param(
@@ -26,16 +26,10 @@ param(
     [string]$setPath
 )
 
-# -- CONFIGURATION -----------------------------
-# Set this to your SillyTavern third-party extensions directory.
-# Or use: .\deploy.ps1 --set-path "C:\your\path\here"
-$ST_EXTENSIONS_DIR = "E:\AI\STORY_AI\latestsilly_tavern\SillyTavern\public\scripts\extensions\third-party"
-
 # Extension folder name (matches the extension ID)
-$EXT_FOLDER = "summary-editor"
-# ----------------------------------------------
-
-$SourceDir = Split-Path $PSScriptRoot -Parent
+$EXT_FOLDER    = "summary-editor"
+$SourceDir     = Split-Path $PSScriptRoot -Parent
+$ConfigFile    = Join-Path $PSScriptRoot "deploy.config"
 
 # -- Handle --set-path ------------------------
 
@@ -51,31 +45,37 @@ if ($setPath) {
         }
     }
 
-    # Read the current script content and replace the path line
-    $scriptPath = Join-Path $PSScriptRoot "deploy.ps1"
-    $content = Get-Content $scriptPath -Raw
-    $replacement = '$ST_EXTENSIONS_DIR = "' + $resolvedPath + '"'
-    $content = $content -replace '(?m)^\$ST_EXTENSIONS_DIR\s*=\s*"[^"]*"', $replacement
-    Set-Content -Path $scriptPath -Value $content -NoNewline
+    # Write to deploy.config (gitignored) — never touches the script itself
+    $configContent = "ST_EXTENSIONS_DIR=$resolvedPath"
+    Set-Content -Path $ConfigFile -Value $configContent -Encoding utf8
 
     Write-Host ""
-    Write-Host "Path saved to deploy.ps1:" -ForegroundColor Cyan
+    Write-Host "Path saved to scripts/deploy.config:" -ForegroundColor Cyan
     Write-Host "  $resolvedPath" -ForegroundColor Green
     Write-Host ""
     Write-Host "You can now run: .\deploy.ps1" -ForegroundColor Gray
     exit 0
 }
 
+# -- Load path from deploy.config -------------
+
+$ST_EXTENSIONS_DIR = ""
+if (Test-Path $ConfigFile) {
+    Get-Content $ConfigFile | Where-Object { $_ -match '^ST_EXTENSIONS_DIR\s*=\s*(.+)$' } | ForEach-Object {
+        $ST_EXTENSIONS_DIR = $Matches[1].Trim()
+    }
+}
+
 $TargetDir = Join-Path $ST_EXTENSIONS_DIR $EXT_FOLDER
 
 # Verify the ST path is configured
-if ($ST_EXTENSIONS_DIR -match "PUT_YOUR_SILLYTAVERN_PATH_HERE") {
+if ([string]::IsNullOrWhiteSpace($ST_EXTENSIONS_DIR)) {
     Write-Host "ERROR: SillyTavern path not configured." -ForegroundColor Red
     Write-Host ""
     Write-Host "Set it with:" -ForegroundColor Yellow
-    Write-Host '  .\deploy.ps1 --set-path "C:\SillyTavern\public\scripts\extensions\third-party"' -ForegroundColor Gray
+    Write-Host '  .\deploy.ps1 --set-path "<your-st-path>\public\scripts\extensions\third-party"' -ForegroundColor Gray
     Write-Host ""
-    Write-Host "Or edit the `$ST_EXTENSIONS_DIR variable in deploy.ps1 directly." -ForegroundColor Gray
+    Write-Host "Or copy scripts/deploy.config.example to scripts/deploy.config and fill in the path." -ForegroundColor Gray
     exit 1
 }
 
@@ -83,7 +83,7 @@ if ($ST_EXTENSIONS_DIR -match "PUT_YOUR_SILLYTAVERN_PATH_HERE") {
 if (-not (Test-Path $ST_EXTENSIONS_DIR)) {
     Write-Host "ERROR: ST extensions directory not found: $ST_EXTENSIONS_DIR" -ForegroundColor Red
     Write-Host "Check that your SillyTavern path is correct, or update it with:" -ForegroundColor Yellow
-    Write-Host "  .\deploy.ps1 --set-path `"C:\correct\path\here`"" -ForegroundColor Gray
+    Write-Host "  .\deploy.ps1 --set-path `"<your-st-path>\public\scripts\extensions\third-party`"" -ForegroundColor Gray
     exit 1
 }
 
