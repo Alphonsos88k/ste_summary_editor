@@ -129,11 +129,6 @@ function buildJsonExport(sorted) {
             location: e.location || null,
             act: e.actId ? state.acts.get(e.actId)?.name || null : null,
         })),
-        acts: [...state.acts.values()].map(a => ({
-            name: a.name,
-            entries: [...a.entryNums].sort((x, y) => x - y),
-            notes: a.notes || null,
-        })),
     };
     return JSON.stringify(data, null, 2);
 }

@@ -733,7 +733,7 @@ function buildEntryRow(entry) {
     const act = entry.actId ? state.acts.get(entry.actId) : null;
     const actBadge = act
         ? `<span class="se-act-badge" style="background:${act.color.bg};color:${act.color.fg};">${escHtml(act.name)}</span>`
-        : '';
+        : '<span class="se-act-unassigned">Unassigned</span>';
 
     const isSelected = state.selected.has(entry.num);
     const conflicts = state.conflicts[entry.num];
