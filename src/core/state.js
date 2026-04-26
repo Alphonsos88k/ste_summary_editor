@@ -150,38 +150,42 @@ export const state = {
 };
 
 /**
- * Save the current state to localStorage.
- * Converts Maps and Sets to serializable formats.
- * Call this after any mutation that should survive a page reload.
+ * Save the current state for intra-session recovery (tab switches, panel open/close).
+ * Uses localForage (IndexedDB) when available — no 5 MB cap for large entry sets.
+ * Falls back to localStorage if localForage hasn't loaded yet.
+ * State is always wiped on page reload; this is not cross-session persistence.
  */
 export function persistState() {
-    try {
-        const data = {
-            entries: [...state.entries.entries()].map(([k, v]) => [k, { ...v }]),
-            acts: [...state.acts.entries()].map(([k, v]) => [k, {
-                ...v,
-                entryNums: [...v.entryNums],
-            }]),
-            nextActId: state.nextActId,
-            actColorIdx: state.actColorIdx,
-            sourceFileNames: state.sourceFileNames,
-            causality: state.causality,
-            lastIngestFolder: state.lastIngestFolder,
-            modified: [...state.modified],
-            storyContext: state.storyContext,
-            lastInjectHash: state.lastInjectHash,
-            lastInjectArcHashes: state.lastInjectArcHashes,
-            timelineFiles:    [...state.timelineFiles],
-            entitySections:   state.entitySections ?? null,
-            supplementaryFiles: [...state.supplementaryFiles.entries()].map(([k, v]) => [k, v]),
-            fileRanges: [...state.fileRanges.entries()].map(([k, v]) => [k, { ...v, entryNums: [...v.entryNums] }]),
-            fileRangeColorIdx: state.fileRangeColorIdx,
-            fileRangeHueOffset: state.fileRangeHueOffset,
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (err) {
-        console.warn('[Summary Editor] Failed to persist state:', err);
+    const data = {
+        entries: [...state.entries.entries()].map(([k, v]) => [k, { ...v }]),
+        acts: [...state.acts.entries()].map(([k, v]) => [k, {
+            ...v,
+            entryNums: [...v.entryNums],
+        }]),
+        nextActId: state.nextActId,
+        actColorIdx: state.actColorIdx,
+        sourceFileNames: state.sourceFileNames,
+        causality: state.causality,
+        lastIngestFolder: state.lastIngestFolder,
+        modified: [...state.modified],
+        storyContext: state.storyContext,
+        lastInjectHash: state.lastInjectHash,
+        lastInjectArcHashes: state.lastInjectArcHashes,
+        timelineFiles:    [...state.timelineFiles],
+        entitySections:   state.entitySections ?? null,
+        supplementaryFiles: [...state.supplementaryFiles.entries()].map(([k, v]) => [k, v]),
+        fileRanges: [...state.fileRanges.entries()].map(([k, v]) => [k, { ...v, entryNums: [...v.entryNums] }]),
+        fileRangeColorIdx: state.fileRangeColorIdx,
+        fileRangeHueOffset: state.fileRangeHueOffset,
+    };
+    if (typeof localforage === 'undefined') {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+        catch (err) { console.warn('[Summary Editor] Failed to persist state:', err); }
+        return;
     }
+    localforage.setItem(STORAGE_KEY, data).catch(err =>
+        console.warn('[Summary Editor] Failed to persist state:', err)
+    );
 }
 
 /**
@@ -226,39 +230,3 @@ export function restoreSnapshot(snap) {
     state.fileRawContent  = snap.fileRawContent;
 }
 
-/**
- * Load previously saved state from localStorage.
- * Restores Maps and Sets from their serialized forms.
- * Safe to call even if no saved state exists — it simply does nothing.
- */
-export function loadPersistedState() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-
-        const data = JSON.parse(raw);
-
-        state.entries = new Map(data.entries || []);
-        state.acts = new Map((data.acts || []).map(([k, v]) => [k, {
-            ...v,
-            entryNums: new Set(v.entryNums || []),
-        }]));
-        state.nextActId = data.nextActId || 1;
-        state.actColorIdx = data.actColorIdx || 0;
-        state.sourceFileNames = data.sourceFileNames || [];
-        state.causality = data.causality || {};
-        state.lastIngestFolder = data.lastIngestFolder || '';
-        state.modified = new Set(data.modified || []);
-        state.storyContext = data.storyContext || '';
-        state.lastInjectHash = data.lastInjectHash || '';
-        state.lastInjectArcHashes = data.lastInjectArcHashes || {};
-        state.timelineFiles    = new Set(data.timelineFiles || []);
-        state.entitySections   = data.entitySections ?? null;
-        state.supplementaryFiles = new Map((data.supplementaryFiles || []).map(([k, v]) => [k, v]));
-        state.fileRanges = new Map((data.fileRanges || []).map(([k, v]) => [k, { ...v, entryNums: [...(v.entryNums || [])] }]));
-        state.fileRangeColorIdx  = data.fileRangeColorIdx  || 0;
-        state.fileRangeHueOffset = data.fileRangeHueOffset ?? state.fileRangeHueOffset;
-    } catch (err) {
-        console.warn('[Summary Editor] Failed to load persisted state:', err);
-    }
-}
