@@ -44,3 +44,6 @@ notes/
 
 # Personal IDE workspace files
 *.code-workspace
+
+# Local deploy config — never commit (contains personal paths)
+scripts/deploy.config

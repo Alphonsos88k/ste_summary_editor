@@ -3,32 +3,25 @@
 # Summary Editor — Deploy Script (Bash)
 #
 # Copies extension files into SillyTavern's third-party
-# extensions folder, or removes them.
+# extensions folder, or removes them. Your SillyTavern path
+# is stored in scripts/deploy.config (gitignored) so it is
+# never committed. Use --set-path to write it there.
 #
 # Usage:
 #   bash deploy.sh                          # Copy (default)
 #   bash deploy.sh --clean                  # Delete old + copy fresh
 #   bash deploy.sh --delete                 # Remove only
 #   bash deploy.sh --set-path "/path/to/st/extensions/third-party"
-#
-# Use --set-path to save your ST install location,
-# or edit ST_EXTENSIONS_DIR below manually.
 # ============================================================
 
 set -euo pipefail
 
-# ── CONFIGURATION ─────────────────────────────
-# Set this to your SillyTavern third-party extensions directory.
-# Or use: bash deploy.sh --set-path "/your/path/here"
-ST_EXTENSIONS_DIR="/PUT_YOUR_SILLYTAVERN_PATH_HERE/public/scripts/extensions/third-party"
-
 # Extension folder name (matches the extension ID)
 EXT_FOLDER="summary-editor"
-# ──────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
-SCRIPT_PATH="${SCRIPT_DIR}/deploy.sh"
+CONFIG_FILE="${SCRIPT_DIR}/deploy.config"
 
 # Files and folders to copy (excludes deploy scripts, CLAUDE.md, .git, etc.)
 INCLUDE_ITEMS=(
@@ -54,7 +47,6 @@ gray()   { echo -e "\033[90m$1\033[0m"; }
 
 handle_set_path() {
     local new_path="$1"
-    # Strip trailing slashes
     new_path="${new_path%/}"
 
     if [[ ! -d "$new_path" ]]; then
@@ -66,38 +58,45 @@ handle_set_path() {
         fi
     fi
 
-    # Escape forward slashes for sed
-    local escaped_path
-    escaped_path=$(printf '%s\n' "$new_path" | sed 's/[&/\]/\\&/g')
-
-    # Replace the ST_EXTENSIONS_DIR line in this script
-    sed -i "s|^ST_EXTENSIONS_DIR=.*|ST_EXTENSIONS_DIR=\"${new_path}\"|" "$SCRIPT_PATH"
+    # Write to deploy.config (gitignored) — never touches the script itself
+    printf 'ST_EXTENSIONS_DIR=%s\n' "$new_path" > "$CONFIG_FILE"
 
     echo ""
-    cyan "Path saved to deploy.sh:"
+    cyan "Path saved to scripts/deploy.config:"
     green "  $new_path"
     echo ""
     gray "You can now run: bash deploy.sh"
     exit 0
 }
 
+# ── Load path from deploy.config ─────────────
+
+load_config() {
+    ST_EXTENSIONS_DIR=""
+    if [[ -f "$CONFIG_FILE" ]]; then
+        local val
+        val=$(grep -E '^ST_EXTENSIONS_DIR\s*=\s*.+' "$CONFIG_FILE" | head -1 | sed 's/^ST_EXTENSIONS_DIR\s*=\s*//')
+        ST_EXTENSIONS_DIR="${val%$'\r'}"  # strip Windows CR if present
+    fi
+}
+
 # ── Verify configuration ─────────────────────
 
 verify_config() {
-    if [[ "$ST_EXTENSIONS_DIR" == *"PUT_YOUR_SILLYTAVERN_PATH_HERE"* ]]; then
+    if [[ -z "$ST_EXTENSIONS_DIR" ]]; then
         red "ERROR: SillyTavern path not configured."
         echo ""
         yellow "Set it with:"
         gray '  bash deploy.sh --set-path "/path/to/SillyTavern/public/scripts/extensions/third-party"'
         echo ""
-        gray "Or edit the ST_EXTENSIONS_DIR variable in deploy.sh directly."
+        gray "Or copy scripts/deploy.config.example to scripts/deploy.config and fill in the path."
         exit 1
     fi
 
     if [[ ! -d "$ST_EXTENSIONS_DIR" ]]; then
         red "ERROR: ST extensions directory not found: $ST_EXTENSIONS_DIR"
         yellow "Check that your SillyTavern path is correct, or update it with:"
-        gray "  bash deploy.sh --set-path \"/correct/path/here\""
+        gray '  bash deploy.sh --set-path "<your-st-path>/public/scripts/extensions/third-party"'
         exit 1
     fi
 }
@@ -153,6 +152,7 @@ if [[ "$ACTION" == "--set-path" ]]; then
     handle_set_path "$2"
 fi
 
+load_config
 verify_config
 
 TARGET_DIR="${ST_EXTENSIONS_DIR}/${EXT_FOLDER}"
