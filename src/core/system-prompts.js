@@ -9,7 +9,7 @@
  *
  * ## Persistence
  * Prompts are stored in `state.systemPrompts` (plain object, persisted via localStorage).
- * Call `seedDefaultPrompts()` once after `loadPersistedState()` to fill in missing keys.
+ * Call `seedDefaultPrompts()` once after init to fill in missing keys.
  */
 
 import { EXT_NAME, TEMPLATES } from './constants.js';

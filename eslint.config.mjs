@@ -19,6 +19,7 @@ export default [
         jQuery:      'readonly',
         iro:         'readonly',
         mermaid:     'readonly',
+        localforage: 'readonly',
       },
     },
     rules: {

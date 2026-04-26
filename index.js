@@ -160,6 +160,23 @@ export function ensureMermaidLoaded() {
 }
 
 /**
+ * Load localForage from the bundled file (must resolve before any persistState call).
+ */
+function loadLocalForageJS() {
+    return new Promise((resolve) => {
+        if (typeof localforage !== 'undefined') { resolve(); return; }
+        const script = document.createElement('script');
+        script.src = `/scripts/extensions/third-party/${EXT_NAME}/lib/localforage.min.js`;
+        script.onload = resolve;
+        script.onerror = () => {
+            console.warn('[Summary Editor] localForage failed to load, falling back to localStorage');
+            resolve();
+        };
+        document.head.appendChild(script);
+    });
+}
+
+/**
  * Load iro.js color picker library from the bundled file.
  */
 function loadIroJS() {
@@ -216,10 +233,11 @@ jQuery(async () => {
     const settingsHtml = await $.get(`/scripts/extensions/third-party/${EXT_NAME}/settings.html`);
     $('#extensions_settings2').append(settingsHtml);
 
-    // Load Tailwind, iro.js, and all HTML templates in parallel
+    // Load Tailwind, iro.js, localForage, and all HTML templates in parallel
     await Promise.all([
         loadTailwindCDN(),
         loadIroJS(),
+        loadLocalForageJS(),
         preloadAllTemplates(),
     ]);
 
@@ -244,8 +262,7 @@ jQuery(async () => {
     await injectModalShell();
 
     // Clear any stale persisted state — each page refresh starts fresh
-    // (state only persists within a session via in-memory state object)
-    localStorage.removeItem(STORAGE_KEY);
+    window.localforage?.removeItem(STORAGE_KEY);
     // Load prompt defaults from configs/prompts/*.txt, then seed into state
     await loadPromptDefaults();
     seedDefaultPrompts();
