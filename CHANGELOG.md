@@ -1,3 +1,22 @@
+# [1.6.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.5.0...v1.6.0) (2026-04-26)
+
+
+### Bug Fixes
+
+* + New Act works with 0 selected entries; suggests next name from user's naming convention ([b0c86d0](https://github.com/Alphonsos88k/ste_summary_editor/commit/b0c86d0e5473fa071c088d6d80504799ea9bdc0f))
+* act table panel scrolls after ~6 rows ([dd1b784](https://github.com/Alphonsos88k/ste_summary_editor/commit/dd1b784c689f839d789d624b2b744037326baac3))
+* cap per-act summary list at ~3 rows with overflow-y scroll ([e8601d7](https://github.com/Alphonsos88k/ste_summary_editor/commit/e8601d78653aaf512d249d0e23e54d99de97960c))
+* group New File next to Auto-balance; fix overflow-y scroll in Output Planner ([9c18a8a](https://github.com/Alphonsos88k/ste_summary_editor/commit/9c18a8a3ebbbed564a991a47b1d0a1199b2ddc08))
+* use double-class selector to override float-panel max-height for Output Planner ([4f73dc2](https://github.com/Alphonsos88k/ste_summary_editor/commit/4f73dc207487c8c2ca5cd2114d4346f5ecd63df6))
+
+
+### Features
+
+* add act coverage to analytics metadata section and per-act completion mini-bars ([c279817](https://github.com/Alphonsos88k/ste_summary_editor/commit/c279817d3d9747263c35a4fd5aab1ff49ba1575d))
+* expand button opens sleek per-act table panel with sort/dir controls and Esc to close ([b86a18b](https://github.com/Alphonsos88k/ste_summary_editor/commit/b86a18b2ba72ef44980ef89c82b01370c4755afd))
+* Output Planner v2 — New File, Delete, empty-row state, alphanumeric sort ([b761393](https://github.com/Alphonsos88k/ste_summary_editor/commit/b7613936df11af3aa4e80b1c169ded3ec83d3959))
+* per-act summary sort/direction dropdowns (A-Z, word count, entry count · asc/desc) ([9ae686f](https://github.com/Alphonsos88k/ste_summary_editor/commit/9ae686f6f1bd98897382152f6a34cbcef8b37315))
+
 # [1.5.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.4.0...v1.5.0) (2026-04-26)
 
 
