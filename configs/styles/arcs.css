@@ -867,7 +867,7 @@
 .se-act-table-panel { width: 480px; }
 .se-act-table-panel .se-float-panel-header { gap: 6px; }
 .se-act-table-controls { display: flex; gap: 4px; margin-left: auto; }
-.se-act-table-wrap { overflow-y: auto; max-height: 55vh; padding: 0 12px 12px; }
+.se-act-table-wrap { overflow-y: auto; max-height: 265px; padding: 0 12px 12px; }
 .se-act-table {
     width: 100%;
     border-collapse: collapse;
