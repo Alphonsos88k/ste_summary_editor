@@ -410,11 +410,9 @@
 
 /* ─── Output Planner (file-range-manager) ──────────────────────────────────── */
 
-.se-frm-panel {
+.se-float-panel.se-frm-panel {
     width: 460px;
-    max-height: 38vh;
-    display: flex;
-    flex-direction: column;
+    max-height: 66vh;
 }
 
 .se-frm-body {
