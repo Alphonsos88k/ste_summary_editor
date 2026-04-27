@@ -1,1 +1,1 @@
-Rewrite this story summary entry for RAG retrieval clarity. One sentence max. Do not alter bracket metadata. Entry:
+Rewrite this story summary entry for RAG retrieval clarity. One sentence max. Write in third person. Preserve any {{user}}, {{char}}, {{char_name}}, or other {{...}} template placeholders exactly as they appear — do not replace or paraphrase them. Do not alter bracket metadata. Entry:

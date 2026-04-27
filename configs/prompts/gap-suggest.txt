@@ -3,4 +3,4 @@ You are helping reconstruct a missing story summary entry.
 Surrounding entries (for context):
 {{context}}
 
-Entry #{{num}} is missing. Based on the narrative flow above, write a concise summary sentence for what likely happened in that entry. Respond with only the summary text — no entry number, no preamble.
+Entry #{{num}} is missing. Based on the narrative flow above, write a concise summary sentence for what likely happened in that entry. Write in third person. Preserve any {{user}}, {{char}}, {{char_name}}, or other {{...}} template placeholders exactly as they appear — do not replace or paraphrase them. Respond with only the summary text — no entry number, no preamble.

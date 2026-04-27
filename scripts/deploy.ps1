@@ -26,26 +26,31 @@ param(
     [string]$setPath
 )
 
+# -- CONFIGURATION -----------------------------
+# Option 1: Hard-code your path here (leave as-is to use workspace file or flag instead)
+$ST_EXTENSIONS_DIR = "/PUT_YOUR_SILLYTAVERN_PATH_HERE/public/scripts/extensions/third-party"
+
 # Extension folder name (matches the extension ID)
-$EXT_FOLDER    = "summary-editor"
-$SourceDir     = Split-Path $PSScriptRoot -Parent
+$EXT_FOLDER = "summary-editor"
+# ----------------------------------------------
+
+$SourceDir = Split-Path $PSScriptRoot -Parent
 $WorkspaceFile = Join-Path $SourceDir "summary-editor.code-workspace"
 
-# -- Handle --set-path ------------------------
+# -- Handle -setPath (writes to workspace file) ------
 
 if ($setPath) {
     $resolvedPath = $setPath.TrimEnd('\').TrimEnd('/')
 
     if (-not (Test-Path $resolvedPath)) {
         Write-Host "WARNING: Directory does not exist yet: $resolvedPath" -ForegroundColor Yellow
-        $confirm = Read-Host "Save this path anyway? (y/N)"
-        if ($confirm -ne 'y' -and $confirm -ne 'Y') {
-            Write-Host "Aborted." -ForegroundColor Gray
-            exit 0
-        }
     }
 
-    # Update remote_st_path in the workspace file
+    if (-not (Test-Path $WorkspaceFile)) {
+        Write-Host "ERROR: Workspace file not found: $WorkspaceFile" -ForegroundColor Red
+        exit 1
+    }
+
     $raw = Get-Content $WorkspaceFile -Raw
     $escaped = $resolvedPath -replace '\\', '\\\\'
     $raw = $raw -replace '("remote_st_path"\s*:\s*)"[^"]*"', "`$1`"$escaped`""
@@ -55,34 +60,34 @@ if ($setPath) {
     Write-Host "Path saved to summary-editor.code-workspace:" -ForegroundColor Cyan
     Write-Host "  $resolvedPath" -ForegroundColor Green
     Write-Host ""
-    Write-Host "You can now run: .\deploy.ps1" -ForegroundColor Gray
+    Write-Host "You can now run: .\deploy.ps1 -clean" -ForegroundColor Gray
     exit 0
 }
 
-# -- Load path from workspace file ------------
+# -- Resolve ST path: hardcoded → workspace fallback --
 
-$ST_EXTENSIONS_DIR = ""
-if (Test-Path $WorkspaceFile) {
-    $raw = Get-Content $WorkspaceFile -Raw
-    $raw = $raw -replace ',(\s*[}\]])', '$1'   # strip trailing commas (JSONC)
-    try {
-        $ws = $raw | ConvertFrom-Json
-        $ST_EXTENSIONS_DIR = $ws.remote_st_path
-    } catch {
-        Write-Host "WARNING: Could not parse workspace file: $_" -ForegroundColor Yellow
+if ($ST_EXTENSIONS_DIR -match "PUT_YOUR_SILLYTAVERN_PATH_HERE") {
+    # No hardcoded path — extract from workspace file via regex (handles JSONC comments)
+    if (Test-Path $WorkspaceFile) {
+        $raw = Get-Content $WorkspaceFile -Raw
+        $match = [regex]::Match($raw, '"remote_st_path"\s*:\s*"([^"]*)"')
+        if ($match.Success) {
+            $ST_EXTENSIONS_DIR = $match.Groups[1].Value -replace '\\\\', '\'
+        }
     }
 }
 
-$TargetDir = Join-Path $ST_EXTENSIONS_DIR $EXT_FOLDER
-
-# Verify the ST path is configured
-if ([string]::IsNullOrWhiteSpace($ST_EXTENSIONS_DIR)) {
+if (-not $ST_EXTENSIONS_DIR -or $ST_EXTENSIONS_DIR -match "PUT_YOUR_SILLYTAVERN_PATH_HERE" -or $ST_EXTENSIONS_DIR -eq '') {
     Write-Host "ERROR: SillyTavern path not configured." -ForegroundColor Red
     Write-Host ""
-    Write-Host "Set it with:" -ForegroundColor Yellow
-    Write-Host '  .\deploy.ps1 --set-path "<your-st-path>\public\scripts\extensions\third-party"' -ForegroundColor Gray
+    Write-Host "Options:" -ForegroundColor Yellow
+    Write-Host "  1. Edit `$ST_EXTENSIONS_DIR in scripts/deploy.ps1" -ForegroundColor Gray
+    Write-Host '  2. Run: .\deploy.ps1 -setPath "E:\SillyTavern\public\scripts\extensions\third-party"' -ForegroundColor Gray
+    Write-Host "  3. Set remote_st_path in summary-editor.code-workspace" -ForegroundColor Gray
     exit 1
 }
+
+$TargetDir = Join-Path $ST_EXTENSIONS_DIR $EXT_FOLDER
 
 # Verify the ST extensions directory exists
 if (-not (Test-Path $ST_EXTENSIONS_DIR)) {
