@@ -89,8 +89,6 @@ export function seedDefaultPrompts() {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}'); } catch { /* ignore */ }
     for (const { key, defaultText } of _registry) {
-        // Only use saved value if it is non-empty; otherwise fall back to the registered default.
-        // This ensures that adding a default to a previously-blank prompt populates it on next load.
         const savedVal = key in saved ? saved[key] : '';
         state.systemPrompts[key] = savedVal.trim() ? savedVal : (defaultText ?? '');
     }
@@ -196,6 +194,29 @@ export async function openSystemPromptHub() {
 
     spawnPanel(hub, overlay, '#se-sph-hdr', 460, 600);
     hub.querySelector('#se-sph-close').addEventListener('click', () => hub.remove());
+
+    const refreshBtn = hub.querySelector('#se-sph-refresh-all');
+    refreshBtn.addEventListener('click', () => {
+        const hasChanges = _registry.some(({ key, defaultText }) => getPrompt(key) !== (defaultText ?? ''));
+        if (!hasChanges) {
+            refreshBtn.textContent = '⚠ Already at defaults';
+            refreshBtn.style.color = '#f92672';
+            setTimeout(() => {
+                refreshBtn.textContent = '↺ Reset to Defaults';
+                refreshBtn.style.color = '';
+            }, 2000);
+            return;
+        }
+        try { localStorage.removeItem(PROMPTS_KEY); } catch { /* ignore */ }
+        seedDefaultPrompts();
+        hub.querySelectorAll('.se-sph-textarea').forEach(ta => {
+            ta.value = getPrompt(ta.dataset.promptKey);
+        });
+        refreshBtn.textContent = '✓ Defaults restored';
+        refreshBtn.disabled = true;
+        refreshBtn.style.opacity = '0.45';
+        refreshBtn.style.cursor = 'default';
+    });
 
     // Auto-save on blur
     hub.querySelectorAll('.se-sph-textarea').forEach(ta => {

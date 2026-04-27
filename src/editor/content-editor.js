@@ -137,6 +137,14 @@ function bindEvents(pop, num, entry) {
             showDiffView(anchor, state.prevContent[num], pop.querySelector('#se-ce-textarea').value, {
                 id: 'se-ce-history-view',
                 readOnly: true,
+                onUndo: () => {
+                    const ta = pop.querySelector('#se-ce-textarea');
+                    ta.value = state.prevContent[num];
+                    const counter = pop.querySelector('#se-ce-counter');
+                    if (counter) counter.textContent = countText(ta.value);
+                    delete state.prevContent[num];
+                    prevBtn.style.display = 'none';
+                },
             });
         });
     }
