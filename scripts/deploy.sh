@@ -16,6 +16,10 @@
 
 set -euo pipefail
 
+# ── CONFIGURATION ─────────────────────────────
+# Option 1: Hard-code your path here (leave as-is to use workspace file or flag instead)
+ST_EXTENSIONS_DIR="/PUT_YOUR_SILLYTAVERN_PATH_HERE/public/scripts/extensions/third-party"
+
 # Extension folder name (matches the extension ID)
 EXT_FOLDER="summary-editor"
 
@@ -43,7 +47,7 @@ yellow() { echo -e "\033[33m$1\033[0m"; }
 cyan()   { echo -e "\033[36m$1\033[0m"; }
 gray()   { echo -e "\033[90m$1\033[0m"; }
 
-# ── Handle --set-path ────────────────────────
+# ── Handle --set-path (writes to workspace file) ─────
 
 handle_set_path() {
     local new_path="$1"
@@ -51,50 +55,53 @@ handle_set_path() {
 
     if [[ ! -d "$new_path" ]]; then
         yellow "WARNING: Directory does not exist yet: $new_path"
-        read -r -p "Save this path anyway? (y/N) " confirm
-        if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-            gray "Aborted."
-            exit 0
-        fi
     fi
 
-    # Update remote_st_path in workspace file (escape backslashes for JSON + sed)
-    local escaped
-    escaped=$(printf '%s' "$new_path" | sed 's/\\/\\\\\\\\/g; s/[&/]/\\&/g')
-    sed -i "s|\"remote_st_path\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"remote_st_path\": \"${escaped}\"|" "$WORKSPACE_FILE"
+    if [[ ! -f "$WORKSPACE_FILE" ]]; then
+        red "ERROR: Workspace file not found: $WORKSPACE_FILE"
+        exit 1
+    fi
+
+    local escaped_path
+    escaped_path=$(printf '%s' "$new_path" | sed 's/\\/\\\\/g; s/[&/]/\\&/g')
+    sed -i "s|\"remote_st_path\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"remote_st_path\": \"${escaped_path}\"|" "$WORKSPACE_FILE"
 
     echo ""
     cyan "Path saved to summary-editor.code-workspace:"
     green "  $new_path"
     echo ""
-    gray "You can now run: bash deploy.sh"
+    gray "You can now run: bash deploy.sh --clean"
     exit 0
 }
 
-# ── Load path from workspace file ────────────
+# ── Resolve ST path: hardcoded → workspace fallback ──
 
-load_config() {
-    ST_EXTENSIONS_DIR=""
-    if [[ -f "$WORKSPACE_FILE" ]]; then
-        local val
-        val=$(grep '"remote_st_path"' "$WORKSPACE_FILE" | sed 's/.*"remote_st_path"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/')
-        # unescape JSON backslashes and strip Windows CR
-        val=$(printf '%s' "$val" | sed 's/\\\\/\\/g')
-        ST_EXTENSIONS_DIR="${val%$'\r'}"
+resolve_path() {
+    if [[ "$ST_EXTENSIONS_DIR" == *"PUT_YOUR_SILLYTAVERN_PATH_HERE"* ]]; then
+        # No hardcoded path — try workspace file
+        if [[ -f "$WORKSPACE_FILE" ]]; then
+            local val
+            val=$(grep '"remote_st_path"' "$WORKSPACE_FILE" | sed 's/.*"remote_st_path"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/')
+            val=$(printf '%s' "$val" | sed 's/\\\\/\\/g')
+            val="${val%$'\r'}"
+            ST_EXTENSIONS_DIR="$val"
+        fi
+    fi
+
+    if [[ -z "$ST_EXTENSIONS_DIR" || "$ST_EXTENSIONS_DIR" == *"PUT_YOUR_SILLYTAVERN_PATH_HERE"* ]]; then
+        red "ERROR: SillyTavern path not configured."
+        echo ""
+        yellow "Options:"
+        gray "  1. Edit ST_EXTENSIONS_DIR in scripts/deploy.sh"
+        gray '  2. Run: bash deploy.sh --set-path "/path/to/SillyTavern/public/scripts/extensions/third-party"'
+        gray "  3. Set remote_st_path in summary-editor.code-workspace"
+        exit 1
     fi
 }
 
-# ── Verify configuration ─────────────────────
+# ── Verify directory exists ───────────────────
 
 verify_config() {
-    if [[ -z "$ST_EXTENSIONS_DIR" ]]; then
-        red "ERROR: SillyTavern path not configured."
-        echo ""
-        yellow "Set it with:"
-        gray '  bash deploy.sh --set-path "/path/to/SillyTavern/public/scripts/extensions/third-party"'
-        exit 1
-    fi
-
     if [[ ! -d "$ST_EXTENSIONS_DIR" ]]; then
         red "ERROR: ST extensions directory not found: $ST_EXTENSIONS_DIR"
         yellow "Check that your SillyTavern path is correct, or update it with:"
@@ -154,7 +161,7 @@ if [[ "$ACTION" == "--set-path" ]]; then
     handle_set_path "$2"
 fi
 
-load_config
+resolve_path
 verify_config
 
 TARGET_DIR="${ST_EXTENSIONS_DIR}/${EXT_FOLDER}"

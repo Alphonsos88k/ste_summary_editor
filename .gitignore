@@ -45,3 +45,6 @@ notes/
 # Personal IDE workspace files
 *.code-workspace
 
+# Local formatting config
+.prettierrc
+.prettierignore

@@ -131,7 +131,7 @@ function bindEvents(pop, num, entry) {
 
     const prevBtn = pop.querySelector('#se-ce-show-prev');
     if (prevBtn) {
-        if (state.prevContent[num] !== undefined) prevBtn.style.display = '';
+        if (state.prevContent[num] !== undefined) prevBtn.style.display = 'inline-flex';
         prevBtn.addEventListener('click', () => {
             const anchor = pop.querySelector('.se-ce-api-bar');
             showDiffView(anchor, state.prevContent[num], pop.querySelector('#se-ce-textarea').value, {
@@ -256,7 +256,7 @@ async function doAskApi(pop, num) {
                     const counter = pop.querySelector('#se-ce-counter');
                     if (counter) counter.textContent = countText(ta.value);
                     const prevBtn = pop.querySelector('#se-ce-show-prev');
-                    if (prevBtn) prevBtn.style.display = '';
+                    if (prevBtn) prevBtn.style.display = 'inline-flex';
                 },
             });
             statusEl.textContent = 'Done ✓ — review diff below';
