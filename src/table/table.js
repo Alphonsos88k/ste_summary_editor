@@ -262,8 +262,35 @@ export function renderTable() {
     updateEntryCount();
     syncSelectAllCheckbox($body);
     updateUndoButton();
+    _updateCollapseAllBtn();
 
     $wrap.scrollTop(scrollTop);
+}
+
+function _updateCollapseAllBtn() {
+    const btn = document.getElementById('se-collapse-all-btn');
+    if (!btn) return;
+    const isActSort = state.sortBy === 'act';
+    btn.style.display = isActSort ? '' : 'none';
+    if (!isActSort) return;
+    const actIds = [...state.acts.keys(), '__unassigned__'];
+    const anyExpanded = actIds.some(id => !collapsedActs.has(id));
+    btn.textContent = anyExpanded ? 'Collapse All' : 'Expand All';
+}
+
+/**
+ * Toggle all act groups collapsed or expanded.
+ * Collapses all if any are expanded; expands all if all are collapsed.
+ */
+export function toggleCollapseAll() {
+    const actIds = [...state.acts.keys(), '__unassigned__'];
+    const anyExpanded = actIds.some(id => !collapsedActs.has(id));
+    if (anyExpanded) {
+        actIds.forEach(id => collapsedActs.add(id));
+    } else {
+        collapsedActs.clear();
+    }
+    renderTable();
 }
 
 /**
@@ -434,11 +461,17 @@ function _bindSuppEditableCells($body) {
                 const input = pop.querySelector('input, textarea');
                 newVal = input ? input.value.trim() : '';
             }
+            const oldVal = supp[field];
             supp[field] = newVal;
             $display.text(newVal || label);
             $display.toggleClass('se-cell-empty', !newVal);
             closeEditPopover();
             persistState();
+            state.lastAction = {
+                description: `Edit supplementary ${field}`,
+                undo: () => { supp[field] = oldVal; persistState(); renderTable(); updateUndoButton(); },
+            };
+            updateUndoButton();
         };
 
         if (isDate) {

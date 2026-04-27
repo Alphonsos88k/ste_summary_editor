@@ -202,6 +202,7 @@ async function _runSingle(num) {
                 showDiffView(anchor, entry.content, result.trim(), {
                     id: `se-br-diff-${num}`,
                     onAccept: (newText) => {
+                        state.prevContent[num] = entry.content;
                         entry.content = newText.trim();
                         state.modified.add(num);
                         persistState();
