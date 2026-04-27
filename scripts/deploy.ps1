@@ -67,7 +67,7 @@ if ($setPath) {
 # -- Resolve ST path: hardcoded → workspace fallback --
 
 if ($ST_EXTENSIONS_DIR -match "PUT_YOUR_SILLYTAVERN_PATH_HERE") {
-    # No hardcoded path — extract from workspace file via regex (handles JSONC comments)
+    # No hardcoded path — extract remote_st_path from workspace file via regex (handles JSONC comments)
     if (Test-Path $WorkspaceFile) {
         $raw = Get-Content $WorkspaceFile -Raw
         $match = [regex]::Match($raw, '"remote_st_path"\s*:\s*"([^"]*)"')
