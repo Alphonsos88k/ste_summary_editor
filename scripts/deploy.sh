@@ -3,9 +3,9 @@
 # Summary Editor — Deploy Script (Bash)
 #
 # Copies extension files into SillyTavern's third-party
-# extensions folder, or removes them. Your SillyTavern path
-# is stored in scripts/deploy.config (gitignored) so it is
-# never committed. Use --set-path to write it there.
+# extensions folder, or removes them. The SillyTavern path
+# is read from "remote_st_path" in summary-editor.code-workspace
+# (gitignored). Use --set-path to update it.
 #
 # Usage:
 #   bash deploy.sh                          # Copy (default)
@@ -21,7 +21,7 @@ EXT_FOLDER="summary-editor"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
-CONFIG_FILE="${SCRIPT_DIR}/deploy.config"
+WORKSPACE_FILE="${SOURCE_DIR}/summary-editor.code-workspace"
 
 # Files and folders to copy (excludes deploy scripts, CLAUDE.md, .git, etc.)
 INCLUDE_ITEMS=(
@@ -58,25 +58,29 @@ handle_set_path() {
         fi
     fi
 
-    # Write to deploy.config (gitignored) — never touches the script itself
-    printf 'ST_EXTENSIONS_DIR=%s\n' "$new_path" > "$CONFIG_FILE"
+    # Update remote_st_path in workspace file (escape backslashes for JSON + sed)
+    local escaped
+    escaped=$(printf '%s' "$new_path" | sed 's/\\/\\\\\\\\/g; s/[&/]/\\&/g')
+    sed -i "s|\"remote_st_path\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"remote_st_path\": \"${escaped}\"|" "$WORKSPACE_FILE"
 
     echo ""
-    cyan "Path saved to scripts/deploy.config:"
+    cyan "Path saved to summary-editor.code-workspace:"
     green "  $new_path"
     echo ""
     gray "You can now run: bash deploy.sh"
     exit 0
 }
 
-# ── Load path from deploy.config ─────────────
+# ── Load path from workspace file ────────────
 
 load_config() {
     ST_EXTENSIONS_DIR=""
-    if [[ -f "$CONFIG_FILE" ]]; then
+    if [[ -f "$WORKSPACE_FILE" ]]; then
         local val
-        val=$(grep -E '^ST_EXTENSIONS_DIR\s*=\s*.+' "$CONFIG_FILE" | head -1 | sed 's/^ST_EXTENSIONS_DIR\s*=\s*//')
-        ST_EXTENSIONS_DIR="${val%$'\r'}"  # strip Windows CR if present
+        val=$(grep '"remote_st_path"' "$WORKSPACE_FILE" | sed 's/.*"remote_st_path"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/')
+        # unescape JSON backslashes and strip Windows CR
+        val=$(printf '%s' "$val" | sed 's/\\\\/\\/g')
+        ST_EXTENSIONS_DIR="${val%$'\r'}"
     fi
 }
 
@@ -88,8 +92,6 @@ verify_config() {
         echo ""
         yellow "Set it with:"
         gray '  bash deploy.sh --set-path "/path/to/SillyTavern/public/scripts/extensions/third-party"'
-        echo ""
-        gray "Or copy scripts/deploy.config.example to scripts/deploy.config and fill in the path."
         exit 1
     fi
 

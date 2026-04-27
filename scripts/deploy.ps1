@@ -4,14 +4,14 @@
 
 .DESCRIPTION
     Copies extension files into SillyTavern's third-party extensions folder,
-    or removes them. Your SillyTavern path is stored in scripts/deploy.config
-    (gitignored) so it is never committed. Use --set-path to write it there.
+    or removes them. The SillyTavern path is read from the "remote_st_path" key
+    in summary-editor.code-workspace (gitignored). Use --set-path to update it.
 
 .PARAMETER Action
     --copy      (default) Copy extension files to the target directory.
     --clean     Delete the existing extension folder, then copy fresh.
     --delete    Only remove the extension folder (no copy).
-    --set-path  Save your SillyTavern extensions path to deploy.config.
+    --set-path  Update remote_st_path in the workspace file.
 
 .EXAMPLE
     .\deploy.ps1                                                    # Copy (default)
@@ -29,7 +29,7 @@ param(
 # Extension folder name (matches the extension ID)
 $EXT_FOLDER    = "summary-editor"
 $SourceDir     = Split-Path $PSScriptRoot -Parent
-$ConfigFile    = Join-Path $PSScriptRoot "deploy.config"
+$WorkspaceFile = Join-Path $SourceDir "summary-editor.code-workspace"
 
 # -- Handle --set-path ------------------------
 
@@ -45,24 +45,31 @@ if ($setPath) {
         }
     }
 
-    # Write to deploy.config (gitignored) — never touches the script itself
-    $configContent = "ST_EXTENSIONS_DIR=$resolvedPath"
-    Set-Content -Path $ConfigFile -Value $configContent -Encoding utf8
+    # Update remote_st_path in the workspace file
+    $raw = Get-Content $WorkspaceFile -Raw
+    $escaped = $resolvedPath -replace '\\', '\\\\'
+    $raw = $raw -replace '("remote_st_path"\s*:\s*)"[^"]*"', "`$1`"$escaped`""
+    Set-Content -Path $WorkspaceFile -Value $raw -NoNewline -Encoding utf8
 
     Write-Host ""
-    Write-Host "Path saved to scripts/deploy.config:" -ForegroundColor Cyan
+    Write-Host "Path saved to summary-editor.code-workspace:" -ForegroundColor Cyan
     Write-Host "  $resolvedPath" -ForegroundColor Green
     Write-Host ""
     Write-Host "You can now run: .\deploy.ps1" -ForegroundColor Gray
     exit 0
 }
 
-# -- Load path from deploy.config -------------
+# -- Load path from workspace file ------------
 
 $ST_EXTENSIONS_DIR = ""
-if (Test-Path $ConfigFile) {
-    Get-Content $ConfigFile | Where-Object { $_ -match '^ST_EXTENSIONS_DIR\s*=\s*(.+)$' } | ForEach-Object {
-        $ST_EXTENSIONS_DIR = $Matches[1].Trim()
+if (Test-Path $WorkspaceFile) {
+    $raw = Get-Content $WorkspaceFile -Raw
+    $raw = $raw -replace ',(\s*[}\]])', '$1'   # strip trailing commas (JSONC)
+    try {
+        $ws = $raw | ConvertFrom-Json
+        $ST_EXTENSIONS_DIR = $ws.remote_st_path
+    } catch {
+        Write-Host "WARNING: Could not parse workspace file: $_" -ForegroundColor Yellow
     }
 }
 
@@ -74,8 +81,6 @@ if ([string]::IsNullOrWhiteSpace($ST_EXTENSIONS_DIR)) {
     Write-Host ""
     Write-Host "Set it with:" -ForegroundColor Yellow
     Write-Host '  .\deploy.ps1 --set-path "<your-st-path>\public\scripts\extensions\third-party"' -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "Or copy scripts/deploy.config.example to scripts/deploy.config and fill in the path." -ForegroundColor Gray
     exit 1
 }
 
