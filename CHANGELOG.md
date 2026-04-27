@@ -1,3 +1,15 @@
+# [1.8.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.7.0...v1.8.0) (2026-04-27)
+
+
+### Bug Fixes
+
+* deploy.ps1 workspace parse uses regex instead of ConvertFrom-Json (handles JSONC comments) ([aa32c67](https://github.com/Alphonsos88k/ste_summary_editor/commit/aa32c67b68f337ce1a1352bc765515a52eefb5a9))
+
+
+### Features
+
+* undo coverage, collapse/expand, version history, TS typecheck ([b308c8d](https://github.com/Alphonsos88k/ste_summary_editor/commit/b308c8d9b2bce3d27f08548f04336fb885cf3534))
+
 # [1.7.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.6.0...v1.7.0) (2026-04-26)
 
 
