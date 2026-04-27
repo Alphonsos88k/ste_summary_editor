@@ -27,7 +27,7 @@ import { detectGaps } from './src/ingest/gap-detection.js';
 import {
     initTable, renderTable, getTotalPages,
     renderStatsBar, renderWarningBanner, renderSelectionBar,
-    closeEditPopover, setContentCellClickHandler, updateUndoButton,
+    closeEditPopover, setContentCellClickHandler, updateUndoButton, toggleCollapseAll,
 } from './src/table/table.js';
 import {
     initActs, updateActButtonState, createActFromSelection,
@@ -796,6 +796,8 @@ function bindReviewEvents() {
         renderTable();
         updateSortIndicators();
     });
+
+    $('#se-collapse-all-btn').on('click', toggleCollapseAll);
 
     $(document).on('click', '.se-sortable', function () {
         const sortKey = $(this).data('sort');

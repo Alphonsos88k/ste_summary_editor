@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "lint": "eslint src/ index.js",
-    "lint:fix": "eslint src/ index.js --fix"
+    "lint:fix": "eslint src/ index.js --fix",
+    "typecheck": "tsc --noEmit"
   },
   "repository": {
     "type": "git",
@@ -21,6 +22,7 @@
     "eslint": "^9.14.0",
     "eslint-plugin-sonarjs": "^4.0.3",
     "globals": "^15.12.0",
-    "semantic-release": "^24.1.0"
+    "semantic-release": "^24.1.0",
+    "typescript": "^5.9.3"
   }
 }

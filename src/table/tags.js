@@ -10,11 +10,12 @@
  * to view/manage all collected tags organized by category.
  */
 
-import { state } from '../core/state.js';
+import { state, persistState } from '../core/state.js';
 import { escHtml, escAttr, spawnPanel } from '../core/utils.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 import { TEMPLATES, ENTRY_FIELDS } from '../core/constants.js';
 import { seAlert, seConfirm } from '../core/dialogs.js';
+import { updateUndoButton } from './table.js';
 
 /** Fields that support tag autocomplete (mirrors ENTRY_FIELDS from constants). */
 const TAG_FIELDS = ENTRY_FIELDS;
@@ -313,22 +314,48 @@ export async function showTagBrowser(onClose) {
     // Clear section
     $dialog.on('click', '.se-tb-clear-section', function () {
         const field = $(this).data('tb-field');
-        for (const entry of state.entries.values()) {
-            entry[field] = '';
-        }
+        const snapshot = new Map([...state.entries.entries()].map(([k, v]) => [k, v[field]]));
+        for (const entry of state.entries.values()) entry[field] = '';
         $dialog.find(`.se-tb-panel[data-tb-panel="${field}"] .se-tb-pill-list`)
             .html('<div class="se-tb-empty">No tags</div>');
+        persistState();
+        state.lastAction = {
+            description: `Clear all ${field} values`,
+            undo: () => {
+                for (const [k, val] of snapshot) {
+                    const e = state.entries.get(k);
+                    if (e) e[field] = val;
+                }
+                persistState();
+                updateUndoButton();
+            },
+        };
+        updateUndoButton();
     });
 
     // Clear all
     $dialog.on('click', '.se-tb-clear-all', async function () {
         if (!await seConfirm('Clear all date, time, and location values from all entries?', { danger: true })) return;
+        const snapshot = new Map([...state.entries.entries()].map(([k, v]) => [k, { date: v.date, time: v.time, location: v.location }]));
         for (const entry of state.entries.values()) {
             entry.date = '';
             entry.time = '';
             entry.location = '';
         }
         $dialog.find('.se-tb-pill-list').html('<div class="se-tb-empty">No tags</div>');
+        persistState();
+        state.lastAction = {
+            description: 'Clear all date, time, and location values',
+            undo: () => {
+                for (const [k, vals] of snapshot) {
+                    const e = state.entries.get(k);
+                    if (e) { e.date = vals.date; e.time = vals.time; e.location = vals.location; }
+                }
+                persistState();
+                updateUndoButton();
+            },
+        };
+        updateUndoButton();
     });
 
     const closeDialog = () => { $dialog.remove(); if (onClose) onClose(); };

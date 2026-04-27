@@ -46,10 +46,10 @@ async function _ensureTemplate() {
  * @param {HTMLElement} anchor - Element to insert the diff view after
  * @param {string} original - Original text (may be empty for new entries)
  * @param {string} revised - AI-generated revised text
- * @param {{ onAccept: (text: string) => void, onCancel?: () => void, id?: string }} opts
+ * @param {{ onAccept: (text: string) => void, onCancel?: () => void, id?: string, readOnly?: boolean }} opts
  * @returns {Promise<HTMLElement>} The created diff view element
  */
-export async function showDiffView(anchor, original, revised, { onAccept, onCancel, id = 'se-diff-view' }) {
+export async function showDiffView(anchor, original, revised, { onAccept, onCancel, id = 'se-diff-view', readOnly = false }) {
     await _ensureTemplate();
     document.getElementById(id)?.remove();
 
@@ -87,15 +87,29 @@ export async function showDiffView(anchor, original, revised, { onAccept, onCanc
 
     anchor.after(el);
 
-    el.querySelector('.se-diff-accept-btn').addEventListener('click', () => {
-        onAccept(el.querySelector('.se-diff-new-ta').value);
-        el.remove();
-    });
-
-    el.querySelector('.se-diff-cancel-btn').addEventListener('click', () => {
-        onCancel?.();
-        el.remove();
-    });
+    if (readOnly) {
+        const ta = el.querySelector('.se-diff-new-ta');
+        ta.setAttribute('readonly', '');
+        ta.style.cursor = 'default';
+        const oldLabel = el.querySelector('.se-diff-side.se-diff-old .se-diff-side-label');
+        const newLabel = el.querySelector('.se-diff-side.se-diff-new .se-diff-side-label');
+        if (oldLabel) oldLabel.textContent = 'Previous';
+        if (newLabel) newLabel.textContent = 'Current';
+        const titleEl = el.querySelector('.se-diff-title');
+        if (titleEl) titleEl.innerHTML = '📜 Version History';
+        el.querySelector('.se-diff-accept-btn').textContent = 'Close';
+        el.querySelector('.se-diff-cancel-btn').style.display = 'none';
+        el.querySelector('.se-diff-accept-btn').addEventListener('click', () => el.remove());
+    } else {
+        el.querySelector('.se-diff-accept-btn').addEventListener('click', () => {
+            onAccept(el.querySelector('.se-diff-new-ta').value);
+            el.remove();
+        });
+        el.querySelector('.se-diff-cancel-btn').addEventListener('click', () => {
+            onCancel?.();
+            el.remove();
+        });
+    }
 
     return el;
 }

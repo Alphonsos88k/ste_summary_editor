@@ -129,6 +129,18 @@ function bindEvents(pop, num, entry) {
     pop.querySelector('#se-ce-ask-api').addEventListener('click', () => doAskApi(pop, num));
     pop.querySelector('#se-ce-recheck').addEventListener('click', () => doRecheck(pop, num));
 
+    const prevBtn = pop.querySelector('#se-ce-show-prev');
+    if (prevBtn) {
+        if (state.prevContent[num] !== undefined) prevBtn.style.display = '';
+        prevBtn.addEventListener('click', () => {
+            const anchor = pop.querySelector('.se-ce-api-bar');
+            showDiffView(anchor, state.prevContent[num], pop.querySelector('#se-ce-textarea').value, {
+                id: 'se-ce-history-view',
+                readOnly: true,
+            });
+        });
+    }
+
     pop.querySelector('#se-ce-expand').addEventListener('click', () => {
         pop.classList.toggle('se-ce-fullscreen');
     });
@@ -148,6 +160,7 @@ function bindEvents(pop, num, entry) {
 
 function doSave(pop, num, entry) {
     const newContent = pop.querySelector('#se-ce-textarea').value;
+    if (newContent !== entry.content) state.prevContent[num] = entry.content;
     entry.content = newContent;
     state.modified.add(num);
     persistState();
@@ -238,9 +251,12 @@ async function doAskApi(pop, num) {
             showDiffView(pop.querySelector('.se-ce-api-bar'), original, result.trim(), {
                 id: 'se-ce-diff-view',
                 onAccept: (newText) => {
+                    state.prevContent[num] = original;
                     ta.value = newText;
                     const counter = pop.querySelector('#se-ce-counter');
                     if (counter) counter.textContent = countText(ta.value);
+                    const prevBtn = pop.querySelector('#se-ce-show-prev');
+                    if (prevBtn) prevBtn.style.display = '';
                 },
             });
             statusEl.textContent = 'Done ✓ — review diff below';

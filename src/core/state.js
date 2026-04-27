@@ -147,6 +147,9 @@ export const state = {
      * @type {Array<{key: string, title: string, items: Array<{name: string}>}>|null}
      */
     entitySections: null,
+
+    /** @type {Object<number, string>} Last accepted content per entry, before the most recent AI revision — session-only */
+    prevContent: {},
 };
 
 /**

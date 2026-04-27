@@ -1060,7 +1060,13 @@ function bindActPanelEvents($list) {
 export function applyActColor(actId, bg, fg) {
     const act = state.acts.get(actId);
     if (!act) return;
+    const oldColor = { ...act.color };
     act.color = { bg, fg };
+    state.lastAction = {
+        description: `Change color of "${act.name}"`,
+        undo: () => { act.color = oldColor; refreshActUI(); persistState(); updateUndoButton(); },
+    };
+    updateUndoButton();
     refreshActUI();
     persistState();
 }
