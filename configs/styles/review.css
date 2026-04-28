@@ -111,6 +111,32 @@
 }
 .se-utils-item-accent:hover { background: rgba(166,226,46,0.08); }
 
+.se-gaps-btn-badge {
+    display: inline-block;
+    margin-left: 4px;
+    background: rgba(253,151,31,0.2);
+    color: #fd971f;
+    font-size: 0.75em;
+    padding: 0 5px;
+    border-radius: 8px;
+    vertical-align: middle;
+}
+
+/* ── Gaps Panel ───────────────────────────────────────────── */
+.se-gaps-panel-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 2px;
+    border-bottom: 1px solid rgba(62,61,50,0.5);
+}
+.se-gaps-panel-row:last-child { border-bottom: none; }
+.se-gaps-panel-num {
+    font-size: 0.85em;
+    color: #fd971f;
+    font-family: monospace;
+}
+
 /* ── Bulk Refine Panel ──────────────────────────────────── */
 .se-bulk-refine-panel {
     position: absolute;

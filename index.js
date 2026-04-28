@@ -86,6 +86,7 @@ let _tplUtilsPanel      = '';
 let _tplFindReplace     = '';
 let _tplBulkFill        = '';
 let _tplGapSuggest      = '';
+let _tplGapsPanel       = '';
 let _tplNewEntryPrompt  = '';
 let _tplFileItem        = '';
 
@@ -279,7 +280,7 @@ jQuery(async () => {
     ]);
 
     // Cache panel templates (preloadAllTemplates already fetched them)
-    [_tplUtilsPanel, _tplFindReplace, _tplBulkFill, _tplGapSuggest, _tplNewEntryPrompt, _tplFileItem] =
+    [_tplUtilsPanel, _tplFindReplace, _tplBulkFill, _tplGapSuggest, _tplNewEntryPrompt, _tplFileItem, _tplGapsPanel] =
         await Promise.all([
             loadTemplate(TEMPLATES.UTILS_PANEL),
             loadTemplate(TEMPLATES.FIND_REPLACE_PANEL),
@@ -287,6 +288,7 @@ jQuery(async () => {
             loadTemplate(TEMPLATES.GAP_SUGGEST_PANEL),
             loadTemplate(TEMPLATES.NEW_ENTRY_PROMPT),
             loadTemplate(TEMPLATES.FILE_ITEM),
+            loadTemplate(TEMPLATES.GAPS_PANEL),
         ]);
 
     // Initialize template-dependent modules
@@ -967,6 +969,10 @@ function bindReviewEvents() {
         _utilsPanel.querySelector('#se-btn-output-planner')?.addEventListener('click', () => {
             _utilsPanel?.remove(); _utilsPanel = null; openFileRangeManager();
         });
+        _utilsPanel.querySelector('#se-btn-gaps-panel')?.addEventListener('click', () => {
+            _utilsPanel?.remove(); _utilsPanel = null; openGapsPanel();
+        });
+        updateGapsBadge(_utilsPanel);
     }
     $('#se-btn-utils').on('click', openUtilsPanel);
 
@@ -1937,6 +1943,77 @@ function openBulkFill() {
 }
 
 // ─────────────────────────────────────────────
+//  Gaps Panel
+// ─────────────────────────────────────────────
+
+/**
+ * Update the gap count badge on the Gaps button inside any utils panel container.
+ * @param {HTMLElement} [container] - If provided, only updates within that element.
+ */
+function updateGapsBadge(container = document) {
+    const badge = container.querySelector?.('#se-gaps-btn-badge') ?? document.getElementById('se-gaps-btn-badge');
+    if (!badge) return;
+    const count = state.gaps?.length ?? 0;
+    if (count > 0) {
+        badge.textContent = String(count);
+        badge.style.display = '';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+let _gapsPanel = null;
+
+/**
+ * Open the Gaps floating panel showing all current gaps with individual suggest buttons.
+ */
+function openGapsPanel() {
+    document.getElementById('se-gaps-panel')?.remove();
+
+    const overlay = document.getElementById('se-modal-overlay');
+    if (!overlay) return;
+
+    _gapsPanel = document.createElement('div');
+    _gapsPanel.id = 'se-gaps-panel';
+    _gapsPanel.className = 'se-find-replace';
+    _gapsPanel.style.width = '260px';
+    _gapsPanel.innerHTML = _tplGapsPanel;
+    overlay.appendChild(_gapsPanel);
+
+    spawnPanel(_gapsPanel, overlay, '#se-gaps-panel-hdr', 260, 160);
+    makeDraggable(_gapsPanel, _gapsPanel.querySelector('#se-gaps-panel-hdr'));
+    registerPanel(_gapsPanel);
+
+    _gapsPanel.querySelector('#se-gaps-panel-close').addEventListener('click', () => {
+        _gapsPanel?.remove(); _gapsPanel = null;
+    });
+
+    renderGapsPanel();
+}
+
+/**
+ * Render (or re-render) the gap list inside the gaps panel.
+ */
+function renderGapsPanel() {
+    if (!_gapsPanel) return;
+    const list = _gapsPanel.querySelector('#se-gaps-panel-list');
+    if (!list) return;
+
+    const gaps = state.gaps ?? [];
+    if (gaps.length === 0) {
+        list.innerHTML = '<div style="color:var(--se-muted);font-size:0.85em;padding:6px 2px;">No gaps detected &#10003;</div>';
+        return;
+    }
+
+    list.innerHTML = gaps.map(n =>
+        `<div class="se-gaps-panel-row">
+            <span class="se-gaps-panel-num">#${escHtml(String(n))}</span>
+            <button class="se-btn se-btn-sm se-gap-suggest-btn" data-gap-num="${escAttr(String(n))}" title="AI-suggest content for #${escHtml(String(n))}">&#10024; Suggest</button>
+        </div>`
+    ).join('');
+}
+
+// ─────────────────────────────────────────────
 //  Smart Gap Suggest
 // ─────────────────────────────────────────────
 
@@ -1960,9 +2037,12 @@ async function openGapSuggest(num) {
     }
 
     const contextText = nearby.map(e => `#${e.num}: ${e.content}`).join('\n');
-    const prompt = getPrompt('gap-suggest')
+    const basePrompt = getPrompt('gap-suggest')
         .replace('{{context}}', contextText)
         .replace('{{num}}', String(num));
+    const sysPrompt = state.storyContext
+        ? `${basePrompt}\n\n---\nSTORY CONTEXT:\n${state.storyContext}`
+        : basePrompt;
 
     const panel = document.createElement('div');
     panel.id = panelId;
@@ -1977,7 +2057,26 @@ async function openGapSuggest(num) {
 
     try {
         const context = SillyTavern.getContext();
-        const result = await context.generateQuietPrompt?.({ quietPrompt: prompt });
+        const oai = context.chatCompletionSettings;
+        const resp = await fetch('/api/backends/chat-completions/generate', {
+            method: 'POST',
+            headers: context.getRequestHeaders(),
+            body: JSON.stringify({
+                type: 'quiet',
+                chat_completion_source: oai.chat_completion_source,
+                model: context.getChatCompletionModel(),
+                messages: [
+                    { role: 'system', content: sysPrompt },
+                    { role: 'user', content: `Write content for entry #${num}.` },
+                ],
+                max_tokens: oai.openai_max_tokens || 500,
+                temperature: 0.7,
+                stream: false,
+            }),
+        });
+        if (!resp.ok) throw new Error(`API ${resp.status} ${resp.statusText}`);
+        const data = await resp.json();
+        const result = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || (typeof data === 'string' ? data : '');
         const suggestion = (result || '').trim();
 
         document.getElementById(`${panelId}-loading`).style.display = 'none';
@@ -2003,12 +2102,14 @@ async function openGapSuggest(num) {
                     renderTable();
                     renderSelectionBar();
                     updateTabBadges();
+                    renderGapsPanel();
                     pushUndo(`Add suggested entry #${num}`, () => {
                         restoreSnapshot(snapshot);
                         detectGaps();
                         renderTable();
                         renderSelectionBar();
                         updateTabBadges();
+                        renderGapsPanel();
                         persistState();
                     });
                     panel.remove();

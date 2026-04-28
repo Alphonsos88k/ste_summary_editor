@@ -40,6 +40,10 @@ $WorkspaceFile = Join-Path $SourceDir "summary-editor.code-workspace"
 # -- Handle -setPath (writes to workspace file) ------
 
 if ($setPath) {
+    if ($setPath -match '^-') {
+        Write-Host "ERROR: Received '$setPath' as a path - looks like a mistyped flag. Did you mean: .\deploy.ps1 -clean ?" -ForegroundColor Red
+        exit 1
+    }
     $resolvedPath = $setPath.TrimEnd('\').TrimEnd('/')
 
     if (-not (Test-Path $resolvedPath)) {
