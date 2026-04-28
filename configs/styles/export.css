@@ -1105,6 +1105,7 @@
 .se-col-feedback {
     width: var(--se-col-feedback);
     text-align: center;
+    white-space: nowrap;
 }
 .se-fb-chip {
     display: inline-block;
