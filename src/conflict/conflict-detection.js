@@ -23,6 +23,8 @@ registerPrompt('conflict-check', 'Conflict Check', '', { warnJson: true, locatio
 
 registerPrompt('story-context', 'Story Context Generation', '', { location: 'Review › Check Conflicts (auto after full check)' });
 
+registerPrompt('consistency-score', 'Consistency Score', '', { warnJson: true, location: 'Story Context panel › Check Score' });
+
 // ─── Analysis Log ────────────────────────
 
 /** @type {Array<{timestamp: string, scope: string, model: string, results: Array}>} */
@@ -680,6 +682,41 @@ export async function openStoryContextPanel() {
         $saved.show();
         setTimeout(() => $saved.hide(), 1800);
     });
+
+    $storyCtxEl.find('#se-story-ctx-check-score').on('click', async () => {
+        const $btn = $storyCtxEl.find('#se-story-ctx-check-score');
+        const $num = $storyCtxEl.find('#se-story-ctx-score-val');
+        const $bubble = $storyCtxEl.find('#se-story-ctx-score-bubble');
+        const $summary = $storyCtxEl.find('#se-story-ctx-score-summary');
+
+        const entries = resolveTargetEntries() || [...state.entries.values()];
+        if (!entries.length) {
+            $summary.text('No entries loaded.');
+            return;
+        }
+
+        $btn.prop('disabled', true).text('Checking…');
+        $num.text('…');
+        $bubble.css('border-color', '');
+        $summary.text('');
+
+        try {
+            const { score, summary } = await generateConsistencyScore(entries);
+            $num.text(score);
+            $summary.text(summary);
+            let bgColor = '#f92672';
+            if (score >= 80) bgColor = '#3d6e2a';
+            else if (score >= 60) bgColor = '#7a4e10';
+            $bubble.css('background', bgColor);
+        } catch (err) {
+            $num.text('—');
+            $bubble.css('background', '');
+            $summary.text('API error — check console.');
+            console.warn('[SE] generateConsistencyScore failed:', err);
+        } finally {
+            $btn.prop('disabled', false).text('Check Score');
+        }
+    });
 }
 
 /**
@@ -723,6 +760,42 @@ async function generateStoryContext(entries) {
     } catch (err) {
         console.warn('[SE] generateStoryContext failed:', err);
     }
+}
+
+/**
+ * Call the API to score the story's internal consistency from 0–100.
+ * @param {Array<object>} entries - Entries to analyze.
+ * @returns {Promise<{score: number, summary: string}>}
+ */
+async function generateConsistencyScore(entries) {
+    const stContext = SillyTavern.getContext();
+    const oai = stContext.chatCompletionSettings;
+    const { prompt } = buildConflictPrompt(entries);
+
+    const resp = await fetch('/api/backends/chat-completions/generate', {
+        method: 'POST',
+        headers: stContext.getRequestHeaders(),
+        body: JSON.stringify({
+            type: 'quiet',
+            chat_completion_source: oai.chat_completion_source,
+            model: stContext.getChatCompletionModel(),
+            messages: [
+                { role: 'system', content: getPrompt('consistency-score') },
+                { role: 'user', content: prompt },
+            ],
+            max_tokens: 200,
+            temperature: 0.3,
+            stream: false,
+        }),
+    });
+
+    if (!resp.ok) throw new Error(`API ${resp.status} ${resp.statusText}`);
+    const data = await resp.json();
+    const raw = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No JSON in response');
+    const parsed = JSON.parse(match[0]);
+    return { score: Number(parsed.score), summary: String(parsed.summary || '') };
 }
 
 /**
