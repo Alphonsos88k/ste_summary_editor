@@ -653,10 +653,9 @@
 
 /* ---------- Story Context Panel ---------- */
 .se-story-ctx-panel {
-    width: 580px;
+    width: 480px;
     display: flex;
     flex-direction: column;
-    position: relative;
 }
 
 /* Side-by-side body: score col left, context col right */
