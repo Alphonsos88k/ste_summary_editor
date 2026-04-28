@@ -118,12 +118,12 @@ export const TABLE_COLS = Object.freeze({
     check:    '36px',
     num:      '50px',
     act:      '9%',
-    content:  '47%',
+    content:  '43%',
     date:     '8%',
     time:     '9%',
     location: '12%',
     notes:    '10%',
-    feedback: '5%',
+    feedback: '9%',
 });
 
 /**
