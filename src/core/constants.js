@@ -192,4 +192,5 @@ export const TEMPLATES = Object.freeze({
     CD_PROMPT:               'partials/cd-prompt',
     BULK_REFINE_PANEL:       'partials/bulk-refine-panel',
     BULK_REFINE_ENTRY:       'partials/bulk-refine-entry',
+    GAPS_PANEL:              'partials/gaps-panel',
 });
