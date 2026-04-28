@@ -653,66 +653,129 @@
 
 /* ---------- Story Context Panel ---------- */
 .se-story-ctx-panel {
-    width: 460px;
+    width: 580px;
     display: flex;
     flex-direction: column;
+    position: relative;
 }
 
-.se-story-ctx-score-section {
+/* Side-by-side body: score col left, context col right */
+.se-story-ctx-body {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ── Left: score column ── */
+.se-story-ctx-score-col {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 16px 16px 14px;
-    border-bottom: 1px solid var(--se-border);
-    gap: 6px;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 16px 12px;
+    width: 148px;
     flex-shrink: 0;
+    border-right: 1px solid var(--se-border);
 }
 
 .se-story-ctx-score-bubble {
-    width: 110px;
-    height: 84px;
-    border-radius: 16px;
+    width: 82px;
+    height: 82px;
+    border-radius: 50%;
+    border: 2px solid var(--se-border);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--se-border);
-    transition: background 0.5s, box-shadow 0.5s;
-    margin-bottom: 2px;
+    background: transparent;
+    transition: background 0.5s, border-color 0.4s;
+}
+
+.se-story-ctx-score-bubble.se-score-error {
+    border-color: var(--se-pink);
+    animation: se-score-flash 0.45s ease 4;
+}
+
+@keyframes se-score-flash {
+    0%, 100% { border-color: var(--se-pink); }
+    50%       { border-color: transparent; }
 }
 
 .se-story-ctx-score-num {
-    font-size: 2.6em;
+    font-size: 2.2em;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.9);
+    color: rgba(255, 255, 255, 0.85);
     line-height: 1;
 }
 
 .se-story-ctx-score-label {
-    font-size: 0.74em;
+    font-size: 0.72em;
     color: var(--se-muted);
     text-transform: uppercase;
     letter-spacing: 0.07em;
+    margin-top: -2px;
 }
 
 .se-story-ctx-score-summary {
-    font-size: 0.83em;
-    color: var(--se-text);
+    font-size: 0.76em;
+    color: var(--se-muted);
     text-align: center;
-    margin: 2px 0 4px;
-    min-height: 1.1em;
+    margin: 0;
+    line-height: 1.4;
+    min-height: 1em;
+    word-break: break-word;
 }
 
-.se-story-ctx-score-info {
-    font-size: 0.74em;
-    color: var(--se-muted);
-    font-style: italic;
-    text-align: center;
+/* Sleek flush check-score button */
+.se-story-ctx-check-btn {
+    width: 100%;
+    padding: 8px 0;
+    margin-top: 4px;
+    background: rgba(102, 217, 232, 0.07);
+    border: 1px solid rgba(102, 217, 232, 0.28);
+    border-radius: 6px;
+    color: var(--se-cyan);
+    font-family: inherit;
+    font-size: 0.8em;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.se-story-ctx-check-btn:hover {
+    background: rgba(102, 217, 232, 0.15);
+    border-color: rgba(102, 217, 232, 0.55);
+}
+
+.se-story-ctx-check-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.se-story-ctx-check-btn.se-score-error {
+    border-color: var(--se-pink);
+    color: var(--se-pink);
+    background: rgba(249, 38, 114, 0.1);
+}
+
+.se-story-ctx-info-icon {
     margin-top: 2px;
+    font-size: 1.1em;
+}
+
+/* ── Right: context column ── */
+.se-story-ctx-context-col {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
 }
 
 .se-story-ctx-hint {
-    padding: 6px 16px 0;
-    font-size: 0.78em;
+    padding: 8px 14px 0;
+    font-size: 0.77em;
     color: var(--se-muted);
     font-style: italic;
     flex-shrink: 0;
@@ -720,11 +783,9 @@
 
 .se-story-ctx-textarea {
     flex: 1;
-    margin: 10px 16px 10px;
-    width: calc(100% - 32px);
+    margin: 8px 14px 8px;
+    width: calc(100% - 28px);
     min-height: 160px;
-    max-height: 400px;
-    overflow-y: auto;
     box-sizing: border-box;
     background: var(--se-bg);
     color: var(--se-text);
@@ -746,7 +807,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 14px;
+    padding: 8px 14px;
     border-top: 1px solid var(--se-border);
     flex-shrink: 0;
 }
@@ -754,6 +815,29 @@
 .se-story-ctx-saved {
     font-size: 0.82em;
     color: var(--se-green);
+}
+
+/* Auto-close validation toast */
+.se-story-ctx-toast {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 54px;
+    background: rgba(30, 31, 26, 0.97);
+    border: 1px solid var(--se-pink);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.82em;
+    color: var(--se-text);
+    text-align: center;
+    z-index: 20;
+    pointer-events: none;
+    animation: se-toast-slide 0.2s ease;
+}
+
+@keyframes se-toast-slide {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 /* Conflict results footer: space Story Context btn to the left */

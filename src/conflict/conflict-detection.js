@@ -689,6 +689,23 @@ export async function openStoryContextPanel() {
         const $bubble = $storyCtxEl.find('#se-story-ctx-score-bubble');
         const $summary = $storyCtxEl.find('#se-story-ctx-score-summary');
 
+        if (!state.storyContext.trim()) {
+            $btn.addClass('se-score-error');
+            $bubble.addClass('se-score-error');
+            setTimeout(() => {
+                $btn.removeClass('se-score-error');
+                $bubble.removeClass('se-score-error');
+            }, 3500);
+            const $toast = $('<div class="se-story-ctx-toast">' +
+                '<strong>Story context required.</strong><br>' +
+                'Run <em>Check Conflicts</em> on the Review tab to auto-generate one, ' +
+                'or type it manually in the text area to the right.' +
+                '</div>');
+            $storyCtxEl.append($toast);
+            setTimeout(() => $toast.remove(), 2800);
+            return;
+        }
+
         const entries = resolveTargetEntries() || [...state.entries.values()];
         if (!entries.length) {
             $summary.text('No entries loaded.');
@@ -697,7 +714,7 @@ export async function openStoryContextPanel() {
 
         $btn.prop('disabled', true).text('Checking…');
         $num.text('…');
-        $bubble.css('border-color', '');
+        $bubble.css({ background: '', 'border-color': '' });
         $summary.text('');
 
         try {
@@ -707,15 +724,26 @@ export async function openStoryContextPanel() {
             let bgColor = '#f92672';
             if (score >= 80) bgColor = '#3d6e2a';
             else if (score >= 60) bgColor = '#7a4e10';
-            $bubble.css('background', bgColor);
+            $bubble.css({ background: bgColor, 'border-color': bgColor });
         } catch (err) {
             $num.text('—');
-            $bubble.css('background', '');
+            $bubble.css({ background: '', 'border-color': '' });
             $summary.text('API error — check console.');
             console.warn('[SE] generateConsistencyScore failed:', err);
         } finally {
             $btn.prop('disabled', false).text('Check Score');
         }
+    });
+
+    $storyCtxEl.find('#se-story-ctx-info-icon').on('click', () => {
+        showDialog({
+            type: 'alert',
+            title: 'About Consistency Score',
+            body: '<p>Rates how internally consistent your story entries are (0–100), checking for contradictions, timeline issues, and continuity errors. Scores are generous — only clear contradictions are penalised, not timeskips or missing detail.</p>' +
+                '<p><strong>Story context is required</strong> — it gives the LLM background on your story world. Generate it automatically by running <em>Check Conflicts</em> on the Review tab. You can also type it manually in the text area.</p>' +
+                '<p>The score uses your <strong>selected entries</strong> as input. If no entries are selected, all entries are used.</p>',
+            okText: 'Got it',
+        });
     });
 }
 
@@ -772,6 +800,11 @@ async function generateConsistencyScore(entries) {
     const oai = stContext.chatCompletionSettings;
     const { prompt } = buildConflictPrompt(entries);
 
+    const base = getPrompt('consistency-score');
+    const sysPrompt = state.storyContext
+        ? `${base}\n\n---\nSTORY CONTEXT:\n${state.storyContext}`
+        : base;
+
     const resp = await fetch('/api/backends/chat-completions/generate', {
         method: 'POST',
         headers: stContext.getRequestHeaders(),
@@ -780,7 +813,7 @@ async function generateConsistencyScore(entries) {
             chat_completion_source: oai.chat_completion_source,
             model: stContext.getChatCompletionModel(),
             messages: [
-                { role: 'system', content: getPrompt('consistency-score') },
+                { role: 'system', content: sysPrompt },
                 { role: 'user', content: prompt },
             ],
             max_tokens: 200,
