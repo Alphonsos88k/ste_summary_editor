@@ -1,3 +1,15 @@
+# [1.10.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.9.0...v1.10.0) (2026-04-28)
+
+
+### Bug Fixes
+
+* move gaps panel info icon next to title ([5cfd597](https://github.com/Alphonsos88k/ste_summary_editor/commit/5cfd5975a99d53c6f47077b5718d8d2cde60360d))
+
+
+### Features
+
+* gaps panel, gap suggest story context injection, deploy guard clause ([fab887e](https://github.com/Alphonsos88k/ste_summary_editor/commit/fab887eaaa6164c7941a60d1077d87f9bb20a28f))
+
 # [1.9.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.8.0...v1.9.0) (2026-04-28)
 
 
