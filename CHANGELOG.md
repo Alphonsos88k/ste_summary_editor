@@ -1,3 +1,15 @@
+# [1.9.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.8.0...v1.9.0) (2026-04-28)
+
+
+### Bug Fixes
+
+* remove position:relative from story-ctx-panel that broke fixed float, shrink to 480px ([8ba0499](https://github.com/Alphonsos88k/ste_summary_editor/commit/8ba04993709af59b0c1bb2fd589ec7f85ef76370))
+
+
+### Features
+
+* consistency score UI — side layout, circle, sleek button, validation toast, info popup ([1eb1eca](https://github.com/Alphonsos88k/ste_summary_editor/commit/1eb1eca32cc5fa7aa83b499f52ec6b767e6ae57e))
+
 # [1.8.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.7.0...v1.8.0) (2026-04-27)
 
 
