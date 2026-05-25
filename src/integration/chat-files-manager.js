@@ -32,7 +32,7 @@ export async function openChatFilesManager(char) {
     _panel.className = 'se-cfm-panel';
     _panel.innerHTML = html;
 
-    document.getElementById('se-panel-arcs').appendChild(_panel);
+    document.querySelector('#se-panel-arcs .se-acts-content').appendChild(_panel);
     _panel.querySelector('#se-cfm-char-name').textContent = char.name;
 
     _fetchUserHandle();
