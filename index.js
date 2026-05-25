@@ -51,6 +51,7 @@ import { showMoveDialog, showSwapDialog } from './src/table/reorder.js';
 import { showTagBrowser } from './src/table/tags.js';
 import { toggleEntitySidebar, setEntityFilterCallback } from './src/table/entity-sidebar.js';
 import { toggleFilesPanel, refreshFilesPanel, toggleAttentionDialog } from './src/ingest/files-panel.js';
+import { initCharSelect, refreshCharSelect } from './src/integration/char-select.js';
 import { autoDetectTimelineFiles, hasTimelineFiles } from './src/analysis/timeline-analysis.js';
 import { openTimelineEditor, closeTimelineEditor } from './src/analysis/timeline-editor.js';
 import {
@@ -342,6 +343,18 @@ jQuery(async () => {
 
     // Wipe state when switching characters — editor is stateless between characters
     listenForCharacterSwap();
+
+    // Initialize character select and sync Chat Files button visibility
+    initCharSelect();
+    document.addEventListener('se:character-changed', (e) => {
+        const char = e.detail;
+        const $btn = $('#se-btn-chat-files');
+        if (char) {
+            $btn.attr('title', `Chat files for ${char.name}`).show();
+        } else {
+            $btn.attr('title', '').hide();
+        }
+    });
 
     // Auto-inject callback for export.js (avoids circular import)
     globalThis.SummaryEditorAutoInject = () => handleDatabankInject();
@@ -714,6 +727,7 @@ function listenForCharacterSwap() {
             context.eventSource.on(context.event_types.CHAT_CHANGED, () => {
                 resetEditorState();
                 refreshBlockedState();
+                refreshCharSelect();
             });
         }
     } catch (err) {

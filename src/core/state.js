@@ -116,6 +116,13 @@ export const state = {
     /** @type {string} Narrative story context generated after the first full conflict check */
     storyContext: '',
 
+    /**
+     * Character card associated with the ingested files for this session.
+     * Populated by the character-select strip on the Ingest tab.
+     * @type {{ name: string, avatar: string } | null}
+     */
+    associatedCharacter: null,
+
     /** @type {string} Hash of last full-export databank inject (skips re-upload if unchanged) */
     lastInjectHash: '',
 
