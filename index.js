@@ -50,7 +50,7 @@ import { bindTooltipEvents, hideTooltip } from './src/table/tooltip.js';
 import { showMoveDialog, showSwapDialog } from './src/table/reorder.js';
 import { showTagBrowser } from './src/table/tags.js';
 import { toggleEntitySidebar, setEntityFilterCallback } from './src/table/entity-sidebar.js';
-import { toggleFilesPanel, refreshFilesPanel } from './src/ingest/files-panel.js';
+import { toggleFilesPanel, refreshFilesPanel, toggleAttentionDialog } from './src/ingest/files-panel.js';
 import { autoDetectTimelineFiles, hasTimelineFiles } from './src/analysis/timeline-analysis.js';
 import { openTimelineEditor, closeTimelineEditor } from './src/analysis/timeline-editor.js';
 import {
@@ -621,9 +621,12 @@ function bindIngestEvents() {
 
     // Clicking the "Ingested Files" header title opens the assignment panel
     $(document).on('click', '.se-file-drawer-header', function (e) {
-        if ($(e.target).closest('.se-close-circle').length) return; // let × close the drawer
+        if ($(e.target).closest('.se-close-circle').length) return;
+        if ($(e.target).closest('#se-file-drawer-attn').length) return;
         toggleFilesPanel();
     });
+
+    $(document).on('click', '#se-file-drawer-attn', () => toggleAttentionDialog());
 
     // Click problematic file → open or swap ingest split panel
     $(document).on('click', '.se-file-item.problematic', function () {
