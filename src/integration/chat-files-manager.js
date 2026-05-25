@@ -26,7 +26,7 @@ export async function openChatFilesManager(char) {
 
     spawnPanel(_panel, document.getElementById('se-modal-overlay'), '.se-cfm-header');
 
-    document.getElementById('se-cfm-char-name').textContent = char.name;
+    _panel.querySelector('#se-cfm-char-name').textContent = char.name;
 
     _bindPanelEvents();
     bindEditorControls(_panel);
@@ -41,7 +41,7 @@ export function closeChatFilesManager() {
 // ─── File List ───────────────────────────────────────────────
 
 async function _loadFileList() {
-    const listEl = document.getElementById('se-cfm-file-list');
+    const listEl = _panel.querySelector('#se-cfm-file-list');
     if (!listEl) return;
     listEl.innerHTML = '<div class="se-cfm-hint">Loading&hellip;</div>';
 
@@ -61,7 +61,7 @@ async function _loadFileList() {
 }
 
 function _renderFileList(chats) {
-    const listEl = document.getElementById('se-cfm-file-list');
+    const listEl = _panel.querySelector('#se-cfm-file-list');
     if (!listEl) return;
     if (!chats.length) {
         listEl.innerHTML = '<div class="se-cfm-hint">No chats found</div>';
