@@ -135,6 +135,28 @@ export const MONTH_NAMES = Object.freeze([
 ]);
 
 /**
+ * Words and fragments that suggest a folder contains summary/story content.
+ * Used to auto-assign non-entry files from such folders as "Summary Related".
+ */
+export const SUMMARY_FOLDER_THESAURUS = Object.freeze([
+    'summary', 'summaries', 'sum', 'sums', 'synopsis', 'synopses',
+    'recap', 'recaps', 'story', 'stories', 'narrative', 'narratives',
+    'lore', 'notes', 'entries', 'entry', 'logs', 'log',
+    'archive', 'archives', 'history', 'histories', 'chronicle', 'chronicles',
+]);
+
+/**
+ * Returns true if the given folder name resembles a summary/story content folder.
+ * Matches exact words or folder names that contain a thesaurus term.
+ * @param {string} folderName
+ * @returns {boolean}
+ */
+export function isSummaryFolder(folderName) {
+    const lower = folderName.toLowerCase().replace(/[-_\s]/g, '');
+    return SUMMARY_FOLDER_THESAURUS.some(w => lower === w.replace(/[-_\s]/g, '') || lower.includes(w));
+}
+
+/**
  * Template path keys for all loadTemplate() calls.
  * Values are the path strings passed to loadTemplate().
  */
@@ -193,4 +215,5 @@ export const TEMPLATES = Object.freeze({
     BULK_REFINE_PANEL:       'partials/bulk-refine-panel',
     BULK_REFINE_ENTRY:       'partials/bulk-refine-entry',
     GAPS_PANEL:              'partials/gaps-panel',
+    FILES_ATTENTION_DIALOG:  'partials/files-attention-dialog',
 });

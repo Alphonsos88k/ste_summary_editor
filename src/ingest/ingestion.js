@@ -19,7 +19,7 @@
  * - Part-based entries are numbered starting after the highest existing entry
  */
 
-import { ENTRY_PATTERNS, BRACKET_PATTERN } from '../core/constants.js';
+import { ENTRY_PATTERNS, BRACKET_PATTERN, isSummaryFolder } from '../core/constants.js';
 
 /**
  * A line is a Part header if it contains the word "part" (any casing, with or
@@ -330,7 +330,7 @@ function processFile(text, fileName, validFiles, invalidFiles, duplicates) {
     }
 
     if (text.trim().length === 0) {
-        invalidFiles.push({ name: fileName, reason: 'File is empty \u2014 no content to parse', rawContent: '' });
+        invalidFiles.push({ name: fileName, reason: 'File is empty \u2014 no content to parse', rawContent: '', isEmpty: true });
         return;
     }
 
@@ -424,6 +424,12 @@ export async function handleFileInput(event) {
     const invalidFiles = [];
     const validFiles = [];
 
+    // Detect if this is a folder load and whether the folder name is summary-like
+    const firstFile = newFiles[0];
+    const folderPath = firstFile?.webkitRelativePath ?? '';
+    const folderName = folderPath ? folderPath.split('/')[0] : '';
+    const fromSummaryFolder = folderName ? isSummaryFolder(folderName) : false;
+
     for (const file of newFiles) {
         const text = await file.text();
         processFile(text, file.name, validFiles, invalidFiles, duplicates);
@@ -442,8 +448,27 @@ export async function handleFileInput(event) {
             name: f.name, entryCount: f.count, valid: true,
             mode: f.mode, problematic: f.problematic || false,
         })),
-        ...invalidFiles.map(f => ({ name: f.name, entryCount: 0, valid: false, problematic: false, rejectReason: f.reason, isSupplementaryCandidate: f.isSupplementaryCandidate || false })),
+        ...invalidFiles.map(f => ({
+            name: f.name, entryCount: 0, valid: false, problematic: false,
+            rejectReason: f.reason,
+            isSupplementaryCandidate: f.isSupplementaryCandidate || false,
+            isEmpty: f.isEmpty || false,
+        })),
     ];
+
+    // Auto-assign supplementary candidates from summary-named folders
+    if (fromSummaryFolder) {
+        for (const inv of invalidFiles) {
+            if (!inv.isSupplementaryCandidate || inv.isEmpty) continue;
+            if (state.supplementaryFiles.has(inv.name)) continue;
+            const raw = state.fileRawContent.get(inv.name) || '';
+            state.supplementaryFiles.set(inv.name, {
+                name: inv.name, category: 'summary-related',
+                content: raw, editedContent: raw,
+                date: '', time: '', location: '', notes: '',
+            });
+        }
+    }
 
     detectGaps();
 

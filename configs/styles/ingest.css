@@ -382,6 +382,165 @@
     cursor: pointer;
 }
 
+/* Files panel header actions (! button + close) */
+.se-fp-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Circular ! button in files panel header */
+.se-fp-attention-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: var(--se-orange);
+    color: #272822;
+    font-size: 0.72em;
+    font-weight: 800;
+    border: none;
+    cursor: pointer;
+    line-height: 1;
+    white-space: nowrap;
+}
+.se-fp-attention-btn:hover { background: #ffa94d; }
+
+/* Per-file urgency ! badge */
+.se-fp-urgency {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--se-orange);
+    color: #272822;
+    font-size: 0.68em;
+    font-weight: 800;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+/* Empty file yellow badge */
+.se-fp-empty-badge {
+    font-size: 0.7em;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: #e6db74;
+    color: #272822;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Assigned category label shown inline in file-info */
+.se-fp-assigned-label {
+    font-size: 0.72em;
+    color: var(--se-cyan);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Unified assignment select */
+.se-fp-assign-wrap {
+    margin-top: 5px;
+}
+.se-fp-assign-select {
+    width: 100%;
+    background: var(--se-bg-mid);
+    color: var(--se-text);
+    border: 1px solid var(--se-border);
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 0.8em;
+    cursor: pointer;
+}
+.se-fp-assign-select:focus {
+    outline: none;
+    border-color: var(--se-cyan);
+}
+
+/* Attention dialog */
+.se-fp-attention-dialog {
+    position: absolute;
+    width: 320px;
+    background: var(--se-bg);
+    border: 1px solid var(--se-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+    z-index: 1200;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.se-fp-attn-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    background: rgba(0,0,0,0.25);
+    cursor: grab;
+    border-bottom: 1px solid var(--se-border);
+    user-select: none;
+    flex-shrink: 0;
+}
+.se-fp-attn-header:active { cursor: grabbing; }
+
+.se-fp-attn-title {
+    font-weight: 600;
+    color: var(--se-orange);
+    font-size: 0.88em;
+    white-space: nowrap;
+}
+
+.se-fp-attn-body {
+    overflow-y: auto;
+    max-height: 300px;
+    padding: 8px 0;
+}
+
+.se-fp-attn-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82em;
+}
+.se-fp-attn-table th {
+    padding: 4px 10px;
+    text-align: left;
+    color: var(--se-muted);
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 700;
+    border-bottom: 1px solid var(--se-border);
+}
+.se-fp-attn-th-status { width: 28px; }
+.se-fp-attn-table td { padding: 5px 10px; }
+
+.se-fp-attn-row-pending { background: rgba(253,151,31,0.05); }
+.se-fp-attn-row-done    { opacity: 0.55; }
+
+.se-fp-attn-status { text-align: center; }
+.se-fp-attn-check  { color: var(--se-green); font-size: 1em; }
+.se-fp-attn-bang   { color: var(--se-orange); font-weight: 800; }
+
+.se-fp-attn-name {
+    color: var(--se-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 160px;
+}
+.se-fp-attn-label { color: var(--se-cyan); }
+.se-fp-attn-unset { color: var(--se-orange); }
+.se-fp-attn-none  { padding: 12px 10px; color: var(--se-muted); text-align: center; }
+
 /* Ingest summary bar — sits below drop zone, inline with action buttons */
 .se-ingest-summary {
     margin-top: 18px;
