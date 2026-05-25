@@ -1,3 +1,11 @@
+# [1.11.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.10.0...v1.11.0) (2026-05-25)
+
+
+### Features
+
+* auto-balance v2 — phase 2 size shifting, phase 3 new file prompt, orphan detection, ? tooltip ([14f9747](https://github.com/Alphonsos88k/ste_summary_editor/commit/14f9747f0fb7dcb2dafc3d1d36e075d51533a803))
+* entry [#1](https://github.com/Alphonsos88k/ste_summary_editor/issues/1) prelude context — supplementary files + leniency prompt injected when entry 1 in conflict check scope ([a83bf46](https://github.com/Alphonsos88k/ste_summary_editor/commit/a83bf462a4118e7712d06aaaefbd768be9c81501))
+
 # [1.10.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.9.0...v1.10.0) (2026-04-28)
 
 
