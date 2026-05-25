@@ -102,16 +102,17 @@
     </div>
     <div class="se-cfm-an-right">
         <div class="se-cfm-an-toolbar">
-            <button class="se-cfm-an-tb-btn" id="se-cfm-an-fit"    title="Fit all nodes to viewport">Fit</button>
-            <button class="se-cfm-an-tb-btn" id="se-cfm-an-origin" title="Reset viewport to origin">Origin</button>
-            <button class="se-cfm-an-tb-btn" id="se-cfm-an-gather" title="Gather scattered nodes">Gather</button>
-            <button class="se-cfm-an-tb-btn" id="se-cfm-an-layout" title="Auto-arrange nodes">Layout</button>
-            <button class="se-cfm-an-tb-btn" id="se-cfm-an-clear"  title="Remove all nodes">Clear</button>
-            <button class="se-cfm-an-tb-btn se-cfm-an-tb-help" id="se-cfm-an-help" title="Help — how to use the node editor">?</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-fit"    data-tip="Zoom and pan to fit all nodes on screen">Fit</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-origin" data-tip="Reset view to origin at 100% zoom">Origin</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-gather" data-tip="Snap scattered nodes into a compact grid">Gather</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-layout" data-tip="Auto-arrange all nodes then fit">Layout</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-clear"  data-tip="Remove every node and connection">Clear</button>
+            <button class="se-cfm-an-tb-btn se-cfm-an-tb-run" id="se-cfm-an-run" data-tip="Run analysis pipeline on connected nodes" disabled>&#9654;&ensp;Run</button>
+            <button class="se-cfm-an-tb-btn se-cfm-an-tb-help" id="se-cfm-an-help" data-tip="Help — how to use the node editor">?</button>
             <span class="se-cfm-an-tb-sep"></span>
             <span class="se-cfm-meta">Drag port to connect &bull; Right-click to remove</span>
             <div style="flex:1;"></div>
-            <button class="se-cfm-an-tb-btn" id="se-cfm-an-prompts" title="Edit system prompts for Analyse">&#9881; Prompts</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-prompts" data-tip="Edit LLM system prompts for this pipeline">&#9881;&ensp;Prompts</button>
         </div>
         <div class="se-cfm-an-canvas" id="se-cfm-an-canvas">
             <div class="se-cfm-an-zoom-ctrl" id="se-cfm-an-zoom-ctrl">

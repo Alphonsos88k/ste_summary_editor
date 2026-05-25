@@ -256,7 +256,7 @@ function _bindPanelEvents() {
 
             if (target === 'analyse') {
                 if (_analyserReady) refreshEntries();
-                else { _analyserReady = true; initAnalyser(_panel, _files); }
+                else { _analyserReady = true; initAnalyser(_panel, _files, _currentChar); }
             }
         });
     });
