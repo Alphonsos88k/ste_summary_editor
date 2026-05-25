@@ -118,12 +118,15 @@ function _bindPanelEvents() {
         if (val) navigator.clipboard.writeText(val).catch(() => {});
     });
 
+    const folder = _currentChar?.avatar.replace(/\.[^.]+$/, '') ?? '';
+    const folderPath = `public/chats/${folder}/`;
+    const folderInput = _panel.querySelector('#se-cfm-folder-input');
+    if (folderInput) folderInput.value = folderPath;
+
     _panel.querySelector('#se-cfm-folder-btn')?.addEventListener('click', function () {
-        const folder = _currentChar?.avatar.replace(/\.[^.]+$/, '') ?? '';
-        const path = `public/chats/${folder}/`;
-        navigator.clipboard.writeText(path).catch(() => {});
-        const prev = this.textContent;
-        this.textContent = 'Copied!';
-        setTimeout(() => { this.textContent = prev; }, 1500);
+        navigator.clipboard.writeText(folderPath).catch(() => {});
+        const prev = this.innerHTML;
+        this.innerHTML = '&#x2713;';
+        setTimeout(() => { this.innerHTML = prev; }, 1500);
     });
 }
