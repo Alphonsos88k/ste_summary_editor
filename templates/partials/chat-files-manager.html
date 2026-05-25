@@ -99,18 +99,21 @@
     <div class="se-cfm-an-right">
         <div class="se-cfm-an-toolbar">
             <button class="se-cfm-tb-btn" id="se-cfm-an-fit" title="Fit all nodes to viewport">Fit</button>
+            <button class="se-cfm-tb-btn" id="se-cfm-an-origin" title="Reset viewport to origin (0,0)">Origin</button>
+            <button class="se-cfm-tb-btn" id="se-cfm-an-gather" title="Gather scattered nodes back to centre">Gather</button>
             <button class="se-cfm-tb-btn" id="se-cfm-an-layout" title="Auto-arrange nodes">Layout</button>
             <button class="se-cfm-tb-btn" id="se-cfm-an-clear" title="Remove all nodes">Clear</button>
-            <span class="se-cfm-tb-sep"></span>
-            <button class="se-cfm-tb-btn" id="se-cfm-an-zoom-out" title="Zoom out">&#8722;</button>
-            <input class="se-cfm-an-zoom-slider" id="se-cfm-an-zoom" type="range" min="15" max="300" value="100" title="Zoom level">
-            <button class="se-cfm-tb-btn" id="se-cfm-an-zoom-in" title="Zoom in">+</button>
-            <span class="se-cfm-an-zoom-label" id="se-cfm-an-zoom-label">100%</span>
             <span class="se-cfm-tb-sep"></span>
             <span class="se-cfm-meta">Drag handle to connect &bull; Right-click or &#x00D7; to remove</span>
             <div style="flex:1;"></div>
             <button class="se-cfm-tb-btn" id="se-cfm-an-prompts" title="Edit system prompts for Analyse">&#9881; Prompts</button>
         </div>
-        <div class="se-cfm-an-canvas" id="se-cfm-an-canvas"></div>
+        <div class="se-cfm-an-canvas" id="se-cfm-an-canvas">
+            <div class="se-cfm-an-zoom-ctrl" id="se-cfm-an-zoom-ctrl">
+                <button class="se-cfm-an-zoom-step" id="se-cfm-an-zoom-out" title="Zoom out">&#8722;</button>
+                <button class="se-cfm-an-zoom-pct" id="se-cfm-an-zoom-label" title="Reset zoom to 100%">100%</button>
+                <button class="se-cfm-an-zoom-step" id="se-cfm-an-zoom-in" title="Zoom in">+</button>
+            </div>
+        </div>
     </div>
 </div>

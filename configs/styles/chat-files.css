@@ -356,7 +356,7 @@
 }
 
 .se-cfm-an-file-list  { flex: 1; overflow-y: auto; min-height: 60px; }
-.se-cfm-an-entry-list { flex: 2; overflow-y: auto; min-height: 80px; border-top: 1px solid var(--se-border); }
+.se-cfm-an-entry-list { flex: 1; overflow-y: auto; min-height: 80px; border-top: 1px solid var(--se-border); }
 
 .se-cfm-an-node-item {
     display: flex;
@@ -457,21 +457,59 @@
 }
 .se-cfm-an-pop-btn:hover { color: var(--se-green); }
 
-/* ─── Zoom slider ────────────────────────────────────────────────────────── */
+/* ─── Floating zoom pill ─────────────────────────────────────────────────── */
 
-.se-cfm-an-zoom-slider {
-    width: 80px;
-    accent-color: var(--se-green);
+.se-cfm-an-zoom-ctrl {
+    position: absolute;
+    bottom: 12px;
+    right: 14px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: #252520;
+    border: 1px solid #3a3a30;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    z-index: 10;
+    pointer-events: all;
+}
+
+.se-cfm-an-zoom-step {
+    background: transparent;
+    border: none;
+    color: #aaa;
+    font-size: 14px;
+    font-weight: 600;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    align-self: center;
+    line-height: 1;
+    transition: background 0.1s, color 0.1s;
 }
+.se-cfm-an-zoom-step:hover { background: #3a3a2e; color: #f8f8f2; }
 
-.se-cfm-an-zoom-label {
+.se-cfm-an-zoom-pct {
+    background: transparent;
+    border: none;
+    border-left: 1px solid #3a3a30;
+    border-right: 1px solid #3a3a30;
+    color: #888;
     font-size: 10px;
-    color: #75715e;
-    min-width: 34px;
-    text-align: right;
+    font-family: monospace;
+    min-width: 38px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0 4px;
+    transition: color 0.1s, background 0.1s;
 }
+.se-cfm-an-zoom-pct:hover { background: #3a3a2e; color: #a6e22e; }
 
 /* ─── Node remove overlay button ─────────────────────────────────────────── */
 
