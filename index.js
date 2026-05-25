@@ -334,6 +334,7 @@ jQuery(async () => {
             persistState();
             renderTable();
             renderSelectionBar();
+            document.dispatchEvent(new CustomEvent('se:entries-changed'));
             pushUndo('Delete Entry', restoreSnapshot);
         },
     });
@@ -1596,13 +1597,19 @@ function bindActsEvents() {
     $('#se-btn-new-act').on('click', () => {
         showEntrySelector();
     });
-    $('#se-btn-minimap').on('click', toggleMinimap);
+    $('#se-btn-minimap').on('click', () => {
+        const willOpen = !$('#se-minimap-overlay').hasClass('open');
+        if (willOpen) closeChatFilesManager();
+        toggleMinimap();
+    });
     $('#se-btn-minimap-close').on('click', toggleMinimap);
     $('#se-btn-story-context').on('click', openStoryContextPanel);
     $('#se-btn-entry-analytics').on('click', openAnalyticsPanel);
     $('#se-btn-conflict-review').on('click', openConflictReview);
     $('#se-btn-chat-files').on('click', () => {
-        if (state.associatedCharacter) openChatFilesManager(state.associatedCharacter);
+        if (!state.associatedCharacter) return;
+        if ($('#se-minimap-overlay').hasClass('open')) toggleMinimap();
+        openChatFilesManager(state.associatedCharacter);
     });
 
     // ── View toggle: Timeline ↔ Location Bubbles ───────────────

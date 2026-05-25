@@ -284,6 +284,7 @@ async function doSplit(num, entry) {
     persistState();
     renderTable();
     renderSelectionBar();
+    document.dispatchEvent(new CustomEvent('se:entries-changed'));
     closeSplitDialog();
 }
 
