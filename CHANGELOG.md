@@ -1,3 +1,21 @@
+# [1.13.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.12.3...v1.13.0) (2026-05-25)
+
+
+### Bug Fixes
+
+* append panel to overlay before spawnPanel (was never added to DOM) ([1b45e63](https://github.com/Alphonsos88k/ste_summary_editor/commit/1b45e63d4e7922c2ce250ba0cda098a67e79d43b))
+* Chat Files click binding, toolbar grouping, move Folder into panel ([cd36173](https://github.com/Alphonsos88k/ste_summary_editor/commit/cd36173399ed452625f8ce7296723c3c744ded47))
+* fire se:character-changed on initCharSelect so Chat Files button syncs on open ([d318a28](https://github.com/Alphonsos88k/ste_summary_editor/commit/d318a281a1c51fe072aa2de82fa7dd4ee226c91b))
+* folder copy as icon-only button with brief toast confirmation ([8a5c282](https://github.com/Alphonsos88k/ste_summary_editor/commit/8a5c28246b6d1ae78216ea15980c323bb4a369d6))
+* folder path as input+copy button group, rename to Copy folder path ([9cc5da0](https://github.com/Alphonsos88k/ste_summary_editor/commit/9cc5da000706e47d0fb130ddbe5b1027c34db2d8))
+* scope getElementById to _panel.querySelector to prevent null crash on open ([3a84922](https://github.com/Alphonsos88k/ste_summary_editor/commit/3a849222e95704c45468d42b169a5e51313610ea))
+
+
+### Features
+
+* character card association strip + Chat Files button placeholder ([fbd9fdb](https://github.com/Alphonsos88k/ste_summary_editor/commit/fbd9fdbb6054149f4015cb2b0c4687dc276c5170))
+* Chat Files Manager panel with JSONL/Plain/YAML/Form views ([3dfb058](https://github.com/Alphonsos88k/ste_summary_editor/commit/3dfb05857e37078b98e2420fd5a5b521a972095e))
+
 ## [1.12.3](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.12.2...v1.12.3) (2026-05-25)
 
 
