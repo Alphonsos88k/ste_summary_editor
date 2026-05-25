@@ -711,7 +711,14 @@ function _showDigestReviewDialog(initialDigest) {
             `</div>` +
             `<div class="se-cfm-an-run-foot">` +
             `<button class="se-cfm-an-run-cancel-btn se-cfm-an-digest-cancel">Cancel</button>` +
-            (hasRefine ? `<button class="se-cfm-an-digest-refine-btn">&#8634;&ensp;Refine</button>` : '') +
+            (hasRefine
+                ? `<span class="se-cfm-an-digest-refine-wrap">` +
+                  `<button class="se-cfm-an-digest-refine-btn">&#8634;&ensp;Refine</button>` +
+                  `<span class="se-cfm-an-help-pip" tabindex="0" aria-label="What is Refine?">?` +
+                  `<span class="se-cfm-an-pip-tip">Sends the digest back to the LLM with your feedback to improve it ` +
+                  `(fill in missing context, fix inaccuracies, etc.) before Pass 2 runs. ` +
+                  `You can refine as many times as you like.</span></span></span>`
+                : '') +
             `<button class="se-cfm-an-run-go-btn se-cfm-an-digest-proceed">Pass 2 &rsaquo;</button>` +
             `</div>`;
 
@@ -756,6 +763,89 @@ function _showDigestReviewDialog(initialDigest) {
 
 // ─── Results dialog — card-based (Stage 3) ────────────────────
 
+const _RC_PER_PAGE = 3;
+
+function _parseAction(raw) {
+    try {
+        const m = raw.match(/\{[\s\S]*\}/);
+        if (m) {
+            const obj = JSON.parse(m[0]);
+            const a = (obj.action ?? '').toUpperCase();
+            if (['REWRITE','SPLIT','MERGE','NO_CHANGE'].includes(a)) return obj;
+        }
+    } catch { /* not JSON */ }
+    for (const a of ['SPLIT','MERGE','REWRITE','NO_CHANGE']) {
+        if (raw.toUpperCase().includes(a)) return { action: a };
+    }
+    return null;
+}
+
+function _actionClass(action) {
+    return ({ REWRITE:'rewrite', SPLIT:'split', MERGE:'merge', NO_CHANGE:'no-change' })[action] ?? 'pending';
+}
+
+function _makePlanNote(parsed, num) {
+    if (!parsed) return '';
+    const a = parsed.action;
+    if (a === 'SPLIT') {
+        const into = parsed.into ?? parsed.parts ?? parsed.count ?? '?';
+        return `<div class="se-cfm-an-rc-plan">` +
+            `<span class="se-cfm-an-rc-plan-icon">&#x2702;</span>` +
+            `Split into ${into} entries &mdash; entries #${num + 1}+ shift down` +
+            `</div>`;
+    }
+    if (a === 'MERGE') {
+        const with_ = parsed.with ?? parsed.target ?? (num + 1);
+        return `<div class="se-cfm-an-rc-plan">` +
+            `<span class="se-cfm-an-rc-plan-icon">&#x29EB;</span>` +
+            `Merge with entry #${with_} &mdash; entries above #${with_} shift up` +
+            `</div>`;
+    }
+    return '';
+}
+
+function _buildShiftBanner(entryNums, resultsByNum) {
+    const ops = [];
+    for (const num of entryNums) {
+        const raw = resultsByNum[num] ?? '';
+        const p = _parseAction(raw);
+        if (!p) continue;
+        if (p.action === 'SPLIT') ops.push({ type: 'split', num, into: p.into ?? p.parts ?? p.count ?? '?' });
+        if (p.action === 'MERGE') ops.push({ type: 'merge', num, with_: p.with ?? p.target ?? (num + 1) });
+    }
+    if (!ops.length) return '';
+    const lines = ops.map(o =>
+        o.type === 'split'
+            ? `Entry #${o.num} → split into ${o.into} entries`
+            : `Entry #${o.num} → merge with #${o.with_}`
+    ).join(' · ');
+    return `<div class="se-cfm-an-shift-banner">` +
+        `<span class="se-cfm-an-shift-icon">&#9432;</span>` +
+        `<span><strong>Planned structural changes:</strong> ${escHtml(lines)}. ` +
+        `Affected entries below will renumber when applied.</span>` +
+        `</div>`;
+}
+
+function _cardHtml(num, snippet) {
+    return `<div class="se-cfm-an-rc" id="se-cfm-an-rc-${num}">` +
+        `<div class="se-cfm-an-rc-num">#${num}</div>` +
+        `<div class="se-cfm-an-rc-entry">` +
+        `<div class="se-cfm-an-rc-entry-lbl">Entry</div>` +
+        `<pre class="se-cfm-an-rc-snippet">${escHtml(snippet)}</pre>` +
+        `</div>` +
+        `<div class="se-cfm-an-rc-right">` +
+        `<div class="se-cfm-an-rc-status-row">` +
+        `<div class="se-cfm-an-rc-status pending" id="se-cfm-an-rc-s-${num}">&#8987; Waiting</div>` +
+        `<button class="se-cfm-an-rc-popout" data-rc-pop="${num}" title="Open full view" disabled>&#x2922;</button>` +
+        `</div>` +
+        `<textarea class="se-cfm-an-rc-result" id="se-cfm-an-rc-r-${num}" spellcheck="false" disabled placeholder="Analysis output…"></textarea>` +
+        `<div id="se-cfm-an-rc-plan-${num}"></div>` +
+        `<div class="se-cfm-an-rc-fb-row">` +
+        `<textarea class="se-cfm-an-rc-fb" id="se-cfm-an-rc-f-${num}" placeholder="Feedback to re-run…" spellcheck="false" disabled></textarea>` +
+        `<button class="se-cfm-an-rc-rerun" data-rc-num="${num}" disabled title="Re-run with feedback">&#8634;</button>` +
+        `</div></div></div>`;
+}
+
 function _createResultsDialog(fileName, digest, entryNodes) {
     document.getElementById('se-cfm-an-results-dlg')?.remove();
 
@@ -763,76 +853,235 @@ function _createResultsDialog(fileName, digest, entryNodes) {
     dlg.id = 'se-cfm-an-results-dlg';
     dlg.className = 'se-cfm-an-results-dlg';
 
-    const cards = entryNodes.map(eNode => {
-        const num     = eNode.properties?.num;
+    const nums = entryNodes.map(n => n.properties?.num);
+    const resultsByNum = {};
+
+    // Build card HTML for all entries (hidden by pagination)
+    const allCardsHtml = nums.map(num => {
         const entry   = state.entries?.get(num);
-        const snippet = entry ? String(entry.content ?? '').slice(0, 220) : '';
-        return `<div class="se-cfm-an-rc" id="se-cfm-an-rc-${num}">` +
-            `<div class="se-cfm-an-rc-num">#${num}</div>` +
-            `<div class="se-cfm-an-rc-entry"><pre class="se-cfm-an-rc-snippet">${escHtml(snippet)}${snippet.length >= 220 ? '…' : ''}</pre></div>` +
-            `<div class="se-cfm-an-rc-right">` +
-            `<div class="se-cfm-an-rc-status" id="se-cfm-an-rc-s-${num}">&#8987; Waiting…</div>` +
-            `<textarea class="se-cfm-an-rc-result" id="se-cfm-an-rc-r-${num}" spellcheck="false" disabled></textarea>` +
-            `<div class="se-cfm-an-rc-fb-row">` +
-            `<textarea class="se-cfm-an-rc-fb" id="se-cfm-an-rc-f-${num}" placeholder="Feedback to re-run…" spellcheck="false" disabled></textarea>` +
-            `<button class="se-cfm-an-rc-rerun" data-rc-num="${num}" disabled title="Re-run with feedback">&#8634;</button>` +
-            `</div></div></div>`;
+        const snippet = entry ? String(entry.content ?? '').slice(0, 280) : '';
+        return _cardHtml(num, snippet + (snippet.length >= 280 ? '…' : ''));
     }).join('');
+
+    let page = 0;
+    const totalPages = Math.ceil(nums.length / _RC_PER_PAGE);
 
     dlg.innerHTML =
         `<div class="se-cfm-an-run-hdr">` +
         `<span>Analysis Results &mdash; ${escHtml(fileName)}</span>` +
         `<button class="se-close-circle se-cfm-an-results-close">&times;</button></div>` +
-        `<div class="se-cfm-an-results-cards">${cards}</div>`;
+        `<div id="se-cfm-an-shift-wrap"></div>` +
+        `<div class="se-cfm-an-results-cards" id="se-cfm-an-rc-list">${allCardsHtml}</div>` +
+        (totalPages > 1
+            ? `<div class="se-cfm-an-rc-pager">` +
+              `<button class="se-cfm-an-rc-page-btn" id="se-cfm-an-rc-prev" disabled>&#8249; Prev</button>` +
+              `<span class="se-cfm-an-rc-page-lbl" id="se-cfm-an-rc-page-lbl">1 / ${totalPages}</span>` +
+              `<button class="se-cfm-an-rc-page-btn" id="se-cfm-an-rc-next">Next &#8250;</button>` +
+              `</div>`
+            : '');
 
     document.body.appendChild(dlg);
     _centerDialog(dlg);
     _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
+
+    // ── Pagination ────────────────────────────────────────────────
+    const showPage = p => {
+        page = p;
+        const start = p * _RC_PER_PAGE;
+        dlg.querySelectorAll('.se-cfm-an-rc').forEach((card, i) => {
+            card.style.display = (i >= start && i < start + _RC_PER_PAGE) ? '' : 'none';
+        });
+        const lbl = dlg.querySelector('#se-cfm-an-rc-page-lbl');
+        if (lbl) lbl.textContent = `${p + 1} / ${totalPages}`;
+        const prev = dlg.querySelector('#se-cfm-an-rc-prev');
+        const next = dlg.querySelector('#se-cfm-an-rc-next');
+        if (prev) prev.disabled = p === 0;
+        if (next) next.disabled = p >= totalPages - 1;
+    };
+
+    if (totalPages > 1) {
+        showPage(0);
+        dlg.querySelector('#se-cfm-an-rc-prev')?.addEventListener('click', () => showPage(page - 1));
+        dlg.querySelector('#se-cfm-an-rc-next')?.addEventListener('click', () => showPage(page + 1));
+    }
+
     dlg.querySelector('.se-cfm-an-results-close').addEventListener('click', () => dlg.remove());
 
-    dlg.querySelectorAll('[data-rc-num]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const num    = Number(btn.dataset.rcNum);
-            const entry  = state.entries?.get(num);
-            if (!entry) return;
-            const result = dlg.querySelector(`#se-cfm-an-rc-r-${num}`);
-            const fb     = dlg.querySelector(`#se-cfm-an-rc-f-${num}`);
-            const status = dlg.querySelector(`#se-cfm-an-rc-s-${num}`);
-            const feedback = fb?.value.trim() ?? '';
+    // ── Re-run buttons ────────────────────────────────────────────
+    const _doRerun = async (num, feedbackVal) => {
+        const entry  = state.entries?.get(num);
+        if (!entry) return;
+        const result = dlg.querySelector(`#se-cfm-an-rc-r-${num}`);
+        const fb     = dlg.querySelector(`#se-cfm-an-rc-f-${num}`);
+        const status = dlg.querySelector(`#se-cfm-an-rc-s-${num}`);
+        const rerun  = dlg.querySelector(`[data-rc-num="${num}"]`);
+        const popout = dlg.querySelector(`[data-rc-pop="${num}"]`);
 
-            btn.disabled = true;
-            if (result) result.disabled = true;
-            if (fb) fb.disabled = true;
-            if (status) status.textContent = '⟳ Re-running…';
-            try {
-                let userMsg = `Chat digest:\n${digest}\n\n---\nEntry #${num}:\n${entry.content}`;
-                if (feedback) userMsg += `\n\n---\nFeedback on previous analysis:\n${feedback}`;
-                const raw = await _callLLM(getPrompt('entry-analysis'), userMsg);
-                if (result) result.value = raw;
-                if (fb) { fb.value = ''; fb.disabled = false; }
-                if (status) status.textContent = '✓ Updated';
-            } catch (err) {
-                if (status) status.textContent = `Error: ${err.message}`;
-                if (fb) fb.disabled = false;
-            } finally {
-                btn.disabled = false;
-                if (result) result.disabled = false;
-            }
+        if (rerun) rerun.disabled = true;
+        if (popout) popout.disabled = true;
+        if (result) result.disabled = true;
+        if (fb) fb.disabled = true;
+        if (status) { status.textContent = '⟳ Running…'; status.className = 'se-cfm-an-rc-status pending'; }
+
+        try {
+            let userMsg = `Chat digest:\n${digest}\n\n---\nEntry #${num}:\n${entry.content}`;
+            if (feedbackVal) userMsg += `\n\n---\nFeedback on previous analysis:\n${feedbackVal}`;
+            const raw = await _callLLM(getPrompt('entry-analysis'), userMsg);
+            _applyResult(num, raw);
+            if (fb) { fb.value = ''; fb.disabled = false; }
+        } catch (err) {
+            if (status) { status.textContent = `Error: ${err.message}`; status.className = 'se-cfm-an-rc-status rewrite'; }
+            if (fb) fb.disabled = false;
+        } finally {
+            if (rerun) rerun.disabled = false;
+            if (popout) popout.disabled = false;
+            if (result) result.disabled = false;
+        }
+    };
+
+    dlg.querySelectorAll('[data-rc-num]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const num = Number(btn.dataset.rcNum);
+            const fb  = dlg.querySelector(`#se-cfm-an-rc-f-${num}`);
+            _doRerun(num, fb?.value.trim() ?? '');
         });
     });
 
-    const updateEntry = (num, raw) => {
+    // ── Pop-out per-entry detail ──────────────────────────────────
+    dlg.querySelectorAll('[data-rc-pop]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const num = Number(btn.dataset.rcPop);
+            _openEntryDetail(num, digest, resultsByNum, dlg);
+        });
+    });
+
+    // ── Apply result to card + plan note + shift banner ───────────
+    const _applyResult = (num, raw) => {
+        resultsByNum[num] = raw;
         const result = dlg.querySelector(`#se-cfm-an-rc-r-${num}`);
         const status = dlg.querySelector(`#se-cfm-an-rc-s-${num}`);
-        const fb     = dlg.querySelector(`#se-cfm-an-rc-f-${num}`);
         const rerun  = dlg.querySelector(`[data-rc-num="${num}"]`);
+        const popout = dlg.querySelector(`[data-rc-pop="${num}"]`);
+        const planEl = dlg.querySelector(`#se-cfm-an-rc-plan-${num}`);
+
         if (result) { result.value = raw; result.disabled = false; }
-        if (status) status.textContent = raw ? '✓ Done' : '— skipped';
-        if (fb)     fb.disabled = false;
         if (rerun)  rerun.disabled = false;
+        if (popout) popout.disabled = false;
+
+        const parsed = _parseAction(raw);
+        const action = parsed?.action ?? null;
+        if (status) {
+            const labels = { REWRITE:'↺ Rewrite', SPLIT:'✂ Split', MERGE:'⬡ Merge', NO_CHANGE:'✓ No change' };
+            status.textContent = labels[action] ?? '✓ Done';
+            status.className = `se-cfm-an-rc-status ${_actionClass(action)}`;
+        }
+        if (planEl) planEl.innerHTML = _makePlanNote(parsed, num);
+
+        // refresh shift banner
+        const shiftWrap = dlg.querySelector('#se-cfm-an-shift-wrap');
+        if (shiftWrap) shiftWrap.innerHTML = _buildShiftBanner(nums, resultsByNum);
+    };
+
+    const updateEntry = (num, raw) => {
+        const fb = dlg.querySelector(`#se-cfm-an-rc-f-${num}`);
+        if (fb) fb.disabled = false;
+        _applyResult(num, raw ?? '');
     };
 
     return { updateEntry };
+}
+
+// ─── Entry detail pop-out ─────────────────────────────────────
+
+function _openEntryDetail(num, digest, resultsByNum, parentDlg) {
+    const existId = `se-cfm-an-entry-det-${num}`;
+    document.getElementById(existId)?.remove();
+
+    const entry   = state.entries?.get(num);
+    const raw     = resultsByNum[num] ?? '';
+    const fb      = parentDlg?.querySelector(`#se-cfm-an-rc-f-${num}`)?.value ?? '';
+
+    const det = document.createElement('div');
+    det.id = existId;
+    det.className = 'se-cfm-an-entry-det';
+    det.innerHTML =
+        `<div class="se-cfm-an-run-hdr">` +
+        `<span>Entry #${num} &mdash; Full View</span>` +
+        `<button class="se-close-circle se-cfm-an-det-close">&times;</button></div>` +
+        `<div class="se-cfm-an-det-body">` +
+        `<div class="se-cfm-an-det-col">` +
+        `<div class="se-cfm-an-digest-lbl">Entry content</div>` +
+        `<pre class="se-cfm-an-det-pre">${escHtml(String(entry?.content ?? ''))}</pre>` +
+        `</div>` +
+        `<div class="se-cfm-an-det-col">` +
+        `<div class="se-cfm-an-digest-lbl">Analysis output</div>` +
+        `<textarea class="se-cfm-an-det-ta" id="se-cfm-an-det-ta-${num}" spellcheck="false">${escHtml(raw)}</textarea>` +
+        `<div class="se-cfm-an-digest-lbl" style="margin-top:8px;">Feedback</div>` +
+        `<textarea class="se-cfm-an-det-fb" id="se-cfm-an-det-fb-${num}" placeholder="Write feedback here…" spellcheck="false">${escHtml(fb)}</textarea>` +
+        `<div class="se-cfm-an-det-foot">` +
+        `<span class="se-cfm-an-det-status" id="se-cfm-an-det-st-${num}"></span>` +
+        `<button class="se-cfm-an-rc-rerun se-cfm-an-det-rerun" data-det-num="${num}">&#8634;&ensp;Re-run</button>` +
+        `<button class="se-cfm-an-digest-proceed-btn se-cfm-an-det-confirm" data-det-num="${num}">&#10003;&ensp;Confirm</button>` +
+        `</div></div></div>`;
+
+    document.body.appendChild(det);
+    _centerDialog(det);
+    _makeDraggable(det, det.querySelector('.se-cfm-an-run-hdr'));
+    det.querySelector('.se-cfm-an-det-close').addEventListener('click', () => det.remove());
+
+    det.querySelector('.se-cfm-an-det-confirm').addEventListener('click', () => {
+        const taVal = det.querySelector(`#se-cfm-an-det-ta-${num}`)?.value ?? '';
+        const fbVal = det.querySelector(`#se-cfm-an-det-fb-${num}`)?.value ?? '';
+        const cardFb = parentDlg?.querySelector(`#se-cfm-an-rc-f-${num}`);
+        const cardRl = parentDlg?.querySelector(`#se-cfm-an-rc-r-${num}`);
+        const cardBadge = parentDlg?.querySelector(`#se-cfm-an-rc-s-${num}`);
+        if (cardRl) { cardRl.value = taVal; resultsByNum[num] = taVal; }
+        if (cardFb) { cardFb.value = fbVal; cardFb.disabled = false; }
+        // mark feedback added
+        const st = det.querySelector(`#se-cfm-an-det-st-${num}`);
+        if (st) { st.textContent = '✓ Confirmed'; st.style.color = '#a6e22e'; }
+        if (cardBadge) cardBadge.dataset.fbSet = '1';
+        const badge = parentDlg?.querySelector(`#se-cfm-an-rc-fb-badge-${num}`);
+        if (badge) badge.style.display = '';
+        else {
+            const statusRow = parentDlg?.querySelector(`[id="se-cfm-an-rc-s-${num}"]`)?.parentElement;
+            if (statusRow) {
+                const b = document.createElement('span');
+                b.id = `se-cfm-an-rc-fb-badge-${num}`;
+                b.className = 'se-cfm-an-rc-fb-badge';
+                b.title = 'Feedback set from detail view';
+                b.textContent = '✓ fb';
+                statusRow.appendChild(b);
+            }
+        }
+        det.remove();
+    });
+
+    det.querySelector('.se-cfm-an-det-rerun').addEventListener('click', async () => {
+        const entry2 = state.entries?.get(num);
+        if (!entry2) return;
+        const fbVal  = det.querySelector(`#se-cfm-an-det-fb-${num}`)?.value.trim() ?? '';
+        const taEl   = det.querySelector(`#se-cfm-an-det-ta-${num}`);
+        const stEl   = det.querySelector(`#se-cfm-an-det-st-${num}`);
+        const rerunB = det.querySelector('.se-cfm-an-det-rerun');
+        const confB  = det.querySelector('.se-cfm-an-det-confirm');
+        rerunB.disabled = confB.disabled = true;
+        if (taEl) taEl.disabled = true;
+        if (stEl) { stEl.textContent = '⟳ Running…'; stEl.style.color = '#75715e'; }
+        try {
+            let userMsg = `Chat digest:\n${digest}\n\n---\nEntry #${num}:\n${entry2.content}`;
+            if (fbVal) userMsg += `\n\n---\nFeedback:\n${fbVal}`;
+            const newRaw = await _callLLM(getPrompt('entry-analysis'), userMsg);
+            if (taEl) taEl.value = newRaw;
+            resultsByNum[num] = newRaw;
+            if (stEl) { stEl.textContent = '✓ Done'; stEl.style.color = '#a6e22e'; }
+        } catch (err) {
+            if (stEl) { stEl.textContent = `Error: ${err.message}`; stEl.style.color = '#f92672'; }
+        } finally {
+            rerunB.disabled = confB.disabled = false;
+            if (taEl) taEl.disabled = false;
+        }
+    });
 }
 
 function _showRunError(msg) {
