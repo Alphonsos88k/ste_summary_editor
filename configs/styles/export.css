@@ -1465,6 +1465,24 @@
     border-color: var(--se-pink);
 }
 
+/* Filled orange circle for per-row urgency indicators — no hover effect */
+.se-urgency-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--se-orange);
+    color: #272822;
+    font-size: 0.7em;
+    font-weight: 800;
+    border: none;
+    flex-shrink: 0;
+    line-height: 1;
+    vertical-align: middle;
+}
+
 /* Attention badge — oval, orange outline, transparent bg; white fill on hover */
 .se-attn-circle {
     display: inline-flex;

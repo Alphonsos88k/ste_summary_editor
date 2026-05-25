@@ -230,7 +230,7 @@ function _buildFileRow(file) {
 
     const needsLabel = file.isSupplementaryCandidate && !isAssigned;
     const urgencyBadge = needsLabel
-        ? '<span class="se-attn-circle" title="Needs category assignment">!</span>' : '';
+        ? '<span class="se-urgency-dot" title="Needs category assignment">!</span>' : '';
 
     const assignedLabel = isAssigned
         ? `<span class="se-fp-assigned-label">${escHtml(_suppLabel(suppEntry.category))}</span>` : '';
@@ -304,7 +304,7 @@ function _renderAttentionDialog() {
         const isAssigned = !!suppEntry?.category;
         const statusIcon = isAssigned
             ? '<span class="se-fp-attn-check">&#10003;</span>'
-            : '<span class="se-fp-attn-bang">!</span>';
+            : '<span class="se-urgency-dot">!</span>';
         const label = isAssigned ? escHtml(_suppLabel(suppEntry.category)) : '<span class="se-fp-attn-unset">unassigned</span>';
         return `<tr class="${isAssigned ? 'se-fp-attn-row-done' : 'se-fp-attn-row-pending'}">
             <td class="se-fp-attn-status">${statusIcon}</td>
