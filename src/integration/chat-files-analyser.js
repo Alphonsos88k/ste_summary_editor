@@ -165,6 +165,7 @@ function _initCanvas(container) {
     _lgc   = new LG.LGraphCanvas(_lgCanvas, _graph);
     _lgc.pixel_ratio           = window.devicePixelRatio || 1;
     _lgc.show_info             = false;
+    _lgc.node_title_color      = '#f0f0e8';
 
     _lgc.background_color      = '#181812';
     _lgc.clear_background      = true;
@@ -254,8 +255,8 @@ function _registerNodeTypes() {
             super();
             this.addOutput('chats', 'se_chat');
             this.title   = 'Chat File';
-            this.color   = '#2d6030';
-            this.bgcolor = '#141f12';
+            this.color   = '#2e6632';
+            this.bgcolor = '#181f14';
             this.size    = [220, 58];
             this.properties = { fileName: '' };
         }
@@ -273,8 +274,8 @@ function _registerNodeTypes() {
             const name    = this.properties.fileName.replace(/\.jsonl$/, '');
             ctx.fillText(_canvasEllipsis(ctx, name, this.size[0] - 16), 8, this.size[1] - 10);
             // border
-            ctx.strokeStyle = '#3a6a3a';
-            ctx.lineWidth   = 1;
+            ctx.strokeStyle = '#58b058';
+            ctx.lineWidth   = 1.5;
             ctx.strokeRect(0.5, 0.5, this.size[0] - 1, this.size[1] - 1);
         }
     }
@@ -288,8 +289,8 @@ function _registerNodeTypes() {
             this.addInput('from', '*');
             this.addOutput('ref', 'se_entry');
             this.title   = 'Entry';
-            this.color   = '#1a3d50';
-            this.bgcolor = '#0e1e28';
+            this.color   = '#1e4a60';
+            this.bgcolor = '#111d28';
             this.size    = [214, 74];
             this.properties = { num: 0, snippet: '' };
         }
@@ -307,8 +308,8 @@ function _registerNodeTypes() {
             ctx.font      = '10px monospace';
             ctx.fillText(_canvasEllipsis(ctx, snippet, this.size[0] - 16), 8, this.size[1] - 10);
             // border
-            ctx.strokeStyle = '#1e5068';
-            ctx.lineWidth   = 1;
+            ctx.strokeStyle = '#2a80b0';
+            ctx.lineWidth   = 1.5;
             ctx.strokeRect(0.5, 0.5, this.size[0] - 1, this.size[1] - 1);
         }
     }
@@ -327,8 +328,10 @@ function _renderFileListInto(container) {
     container.innerHTML = _files.map(f => {
         const name     = f.file_name ?? '';
         const label    = name.replace(/\.jsonl$/, '');
+        const date     = _anRelDate(f.last_mes);
         const onCanvas = _activeFile === name;
         return `<div class="se-cfm-an-node-item">` +
+            `<span class="se-cfm-an-node-date">${escHtml(date)}</span>` +
             `<span class="se-cfm-an-node-label" title="${escHtml(name)}">${escHtml(label)}</span>` +
             `<button class="se-cfm-an-add-btn${onCanvas ? ' added' : ''}" data-an-add-file="${escHtml(name)}">${onCanvas ? '×' : '+'}</button>` +
             `</div>`;
@@ -477,12 +480,12 @@ function _bindToolbar() {
     p?.querySelector('#se-cfm-an-gather')?.addEventListener('click', _gatherNodes);
     p?.querySelector('#se-cfm-an-layout')?.addEventListener('click', () => {
         if (!_graph) return;
-        const nodes = _graph._nodes;
-        if (!nodes.length) return;
-        const COLS = Math.ceil(Math.sqrt(nodes.length));
-        nodes.forEach((node, i) => {
-            node.pos = [(i % COLS) * 270 + 40, Math.floor(i / COLS) * 130 + 40];
-        });
+        const allNodes = _graph._nodes;
+        if (!allNodes.length) return;
+        const fileNodes  = allNodes.filter(n => n.type === 'se/chat_file');
+        const entryNodes = allNodes.filter(n => n.type === 'se/entry');
+        fileNodes.forEach((n, i)  => { n.pos = [40,  i * 130 + 40]; });
+        entryNodes.forEach((n, i) => { n.pos = [310, i * 130 + 40]; });
         _lgc.setDirty(true, true);
         _fitView();
     });
@@ -593,41 +596,44 @@ function _openRunConfirm() {
     });
 }
 
+// ─── LLM helper ──────────────────────────────────────────────
+
+async function _callLLM(sysPrompt, userMsg) {
+    const ctx = SillyTavern.getContext();
+    const oai = ctx.chatCompletionSettings;
+    const r   = await fetch('/api/backends/chat-completions/generate', {
+        method: 'POST',
+        headers: ctx.getRequestHeaders(),
+        body: JSON.stringify({
+            type: 'quiet',
+            chat_completion_source: oai.chat_completion_source,
+            model: ctx.getChatCompletionModel(),
+            messages: [
+                { role: 'system', content: sysPrompt },
+                { role: 'user',   content: userMsg   },
+            ],
+            max_tokens: oai.openai_max_tokens || 2000,
+            temperature: 0.3,
+            stream: false,
+        }),
+    });
+    if (!r.ok) throw new Error(`API ${r.status}`);
+    const d = await r.json();
+    return d?.choices?.[0]?.message?.content || d?.choices?.[0]?.text || '';
+}
+
 // ─── Analysis pipeline ────────────────────────────────────────
 
 async function _runAnalysis(fileNode, entryNodes) {
-    const runBtn = _panel?.querySelector('#se-cfm-an-run');
+    const runBtn  = _panel?.querySelector('#se-cfm-an-run');
     const setLabel = msg => { if (runBtn) { runBtn.textContent = msg; runBtn.disabled = true; } };
 
     try {
-        const ctx = SillyTavern.getContext();
-        const oai = ctx.chatCompletionSettings;
-
-        const callLLM = async (sysPrompt, userMsg) => {
-            const r = await fetch('/api/backends/chat-completions/generate', {
-                method: 'POST',
-                headers: ctx.getRequestHeaders(),
-                body: JSON.stringify({
-                    type: 'quiet',
-                    chat_completion_source: oai.chat_completion_source,
-                    model: ctx.getChatCompletionModel(),
-                    messages: [
-                        { role: 'system', content: sysPrompt },
-                        { role: 'user',   content: userMsg   },
-                    ],
-                    max_tokens: oai.openai_max_tokens || 2000,
-                    temperature: 0.3,
-                    stream: false,
-                }),
-            });
-            if (!r.ok) throw new Error(`API ${r.status}`);
-            const d = await r.json();
-            return d?.choices?.[0]?.message?.content || d?.choices?.[0]?.text || '';
-        };
+        const ctx      = SillyTavern.getContext();
+        const fileName = fileNode.properties?.fileName ?? '';
 
         // ── Pass 1: Chat digest ──────────────────────────────────
         setLabel('⟳ Pass 1…');
-        const fileName = fileNode.properties?.fileName ?? '';
         const chatResp = await fetch('/getchat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...ctx.getRequestHeaders() },
@@ -646,69 +652,187 @@ async function _runAnalysis(fileNode, entryNodes) {
             .join('\n\n');
         if (!chatText) throw new Error('Chat file is empty or could not be read.');
 
-        let digest = await callLLM(getPrompt('chat-digest'), `Chat history:\n${chatText}`);
+        const digestP1 = await _callLLM(getPrompt('chat-digest'), `Chat history:\n${chatText}`);
 
-        // ── Pass 1.5: Digest refinement (optional, up to 3 rounds) ──
-        const refinePrompt = getPrompt('digest-refine');
-        if (refinePrompt) {
-            for (let round = 0; round < 3; round++) {
-                setLabel(`⟳ Refine ${round + 1}/3…`);
-                const refined = await callLLM(refinePrompt, `Current digest:\n${digest}`);
-                if (!refined || refined.trim() === digest.trim()) break;
-                digest = refined;
-            }
-        }
+        // ── Stage 2: Digest review + optional user-driven refinement ──
+        setLabel('✓ Pass 1');
+        const { proceed, digest } = await _showDigestReviewDialog(digestP1);
+        if (!proceed) { _refreshRunBtn(); return; }
 
-        // ── Pass 2: Entry analysis ───────────────────────────────
-        const results = [];
+        // ── Pass 2: Entry analysis — results dialog updates in real-time ──
+        const { updateEntry } = _createResultsDialog(fileName, digest, entryNodes);
+
         for (let i = 0; i < entryNodes.length; i++) {
             const eNode = entryNodes[i];
             const num   = eNode.properties?.num;
             const entry = state.entries?.get(num);
-            if (!entry) continue;
+            if (!entry) { updateEntry(num, ''); continue; }
             setLabel(`⟳ Entry #${num} (${i + 1}/${entryNodes.length})…`);
             const userMsg = `Chat digest:\n${digest}\n\n---\nEntry #${num}:\n${entry.content}`;
-            const raw     = await callLLM(getPrompt('entry-analysis'), userMsg);
-            results.push({ num, raw });
+            const raw     = await _callLLM(getPrompt('entry-analysis'), userMsg);
+            updateEntry(num, raw);
         }
 
-        _showRunResults(fileName, digest, results);
+        setLabel('✓ Done');
+        setTimeout(() => _refreshRunBtn(), 1200);
 
     } catch (err) {
         console.error('[SE] Analysis error:', err);
         _showRunError(err.message);
-    } finally {
         _refreshRunBtn();
     }
 }
 
-function _showRunResults(fileName, digest, results) {
+// ─── Digest review dialog (Stage 2) ──────────────────────────
+
+function _showDigestReviewDialog(initialDigest) {
+    return new Promise(resolve => {
+        document.getElementById('se-cfm-an-digest-dlg')?.remove();
+        const hasRefine = !!getPrompt('digest-refine');
+
+        const dlg = document.createElement('div');
+        dlg.id = 'se-cfm-an-digest-dlg';
+        dlg.className = 'se-cfm-an-digest-dlg';
+        dlg.innerHTML =
+            `<div class="se-cfm-an-run-hdr">` +
+            `<span>Pass 1 &mdash; Digest Review</span>` +
+            `<button class="se-close-circle se-cfm-an-digest-x">&times;</button></div>` +
+            `<div class="se-cfm-an-digest-body">` +
+            `<div class="se-cfm-an-digest-sec">` +
+            `<div class="se-cfm-an-results-dlbl">Generated digest <em class="se-cfm-an-digest-status"></em></div>` +
+            `<textarea class="se-cfm-an-digest-ta" spellcheck="false"></textarea>` +
+            `</div>` +
+            (hasRefine
+                ? `<div class="se-cfm-an-digest-sec">` +
+                  `<div class="se-cfm-an-results-dlbl">Refinement feedback <span style="color:#444;font-weight:400;">(optional)</span></div>` +
+                  `<textarea class="se-cfm-an-digest-fb" placeholder="Describe what to improve…" spellcheck="false"></textarea>` +
+                  `</div>`
+                : '') +
+            `</div>` +
+            `<div class="se-cfm-an-run-foot">` +
+            `<button class="se-cfm-an-run-cancel-btn se-cfm-an-digest-cancel">Cancel</button>` +
+            (hasRefine ? `<button class="se-cfm-an-digest-refine-btn">&#8634;&ensp;Refine</button>` : '') +
+            `<button class="se-cfm-an-run-go-btn se-cfm-an-digest-proceed">Pass 2 &rsaquo;</button>` +
+            `</div>`;
+
+        document.body.appendChild(dlg);
+        _centerDialog(dlg);
+        _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
+
+        const ta     = dlg.querySelector('.se-cfm-an-digest-ta');
+        const fb     = dlg.querySelector('.se-cfm-an-digest-fb');
+        const status = dlg.querySelector('.se-cfm-an-digest-status');
+        ta.value = initialDigest;
+
+        const lock = msg => {
+            dlg.querySelectorAll('button, textarea').forEach(el => { el.disabled = true; });
+            if (status) status.textContent = ` — ${msg}`;
+        };
+        const unlock = () => {
+            dlg.querySelectorAll('button, textarea').forEach(el => { el.disabled = false; });
+            if (status) status.textContent = '';
+        };
+        const close = proceed => { dlg.remove(); resolve({ proceed, digest: ta?.value ?? initialDigest }); };
+
+        dlg.querySelector('.se-cfm-an-digest-x').addEventListener('click',      () => close(false));
+        dlg.querySelector('.se-cfm-an-digest-cancel').addEventListener('click',  () => close(false));
+        dlg.querySelector('.se-cfm-an-digest-proceed').addEventListener('click', () => close(true));
+
+        dlg.querySelector('.se-cfm-an-digest-refine-btn')?.addEventListener('click', async () => {
+            const feedback = fb?.value.trim() ?? '';
+            const current  = ta.value;
+            lock('Refining…');
+            try {
+                const userMsg = `Current digest:\n${current}` + (feedback ? `\n\nUser feedback:\n${feedback}` : '');
+                const refined = await _callLLM(getPrompt('digest-refine'), userMsg);
+                if (refined) { ta.value = refined; if (fb) fb.value = ''; }
+            } catch (err) {
+                if (status) status.textContent = ` — Error: ${err.message}`;
+            }
+            unlock();
+        });
+    });
+}
+
+// ─── Results dialog — card-based (Stage 3) ────────────────────
+
+function _createResultsDialog(fileName, digest, entryNodes) {
     document.getElementById('se-cfm-an-results-dlg')?.remove();
 
     const dlg = document.createElement('div');
     dlg.id = 'se-cfm-an-results-dlg';
     dlg.className = 'se-cfm-an-results-dlg';
+
+    const cards = entryNodes.map(eNode => {
+        const num     = eNode.properties?.num;
+        const entry   = state.entries?.get(num);
+        const snippet = entry ? String(entry.content ?? '').slice(0, 220) : '';
+        return `<div class="se-cfm-an-rc" id="se-cfm-an-rc-${num}">` +
+            `<div class="se-cfm-an-rc-num">#${num}</div>` +
+            `<div class="se-cfm-an-rc-entry"><pre class="se-cfm-an-rc-snippet">${escHtml(snippet)}${snippet.length >= 220 ? '…' : ''}</pre></div>` +
+            `<div class="se-cfm-an-rc-right">` +
+            `<div class="se-cfm-an-rc-status" id="se-cfm-an-rc-s-${num}">&#8987; Waiting…</div>` +
+            `<textarea class="se-cfm-an-rc-result" id="se-cfm-an-rc-r-${num}" spellcheck="false" disabled></textarea>` +
+            `<div class="se-cfm-an-rc-fb-row">` +
+            `<textarea class="se-cfm-an-rc-fb" id="se-cfm-an-rc-f-${num}" placeholder="Feedback to re-run…" spellcheck="false" disabled></textarea>` +
+            `<button class="se-cfm-an-rc-rerun" data-rc-num="${num}" disabled title="Re-run with feedback">&#8634;</button>` +
+            `</div></div></div>`;
+    }).join('');
+
     dlg.innerHTML =
         `<div class="se-cfm-an-run-hdr">` +
-        `<span>Analysis Results — ${escHtml(fileName)}</span>` +
+        `<span>Analysis Results &mdash; ${escHtml(fileName)}</span>` +
         `<button class="se-close-circle se-cfm-an-results-close">&times;</button></div>` +
-        `<div class="se-cfm-an-results-digest">` +
-        `<div class="se-cfm-an-results-dlbl">Chat Digest</div>` +
-        `<pre class="se-cfm-an-results-pre">${escHtml(digest)}</pre></div>` +
-        `<div class="se-cfm-an-results-entries">` +
-        (results.length
-            ? results.map(r =>
-                `<div class="se-cfm-an-result-item">` +
-                `<div class="se-cfm-an-result-num">#${r.num}</div>` +
-                `<pre class="se-cfm-an-results-pre">${escHtml(r.raw)}</pre></div>`
-              ).join('')
-            : '<div class="se-cfm-hint">No entries analysed.</div>') +
-        `</div>`;
+        `<div class="se-cfm-an-results-cards">${cards}</div>`;
 
     document.body.appendChild(dlg);
     _centerDialog(dlg);
     _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
     dlg.querySelector('.se-cfm-an-results-close').addEventListener('click', () => dlg.remove());
+
+    dlg.querySelectorAll('[data-rc-num]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const num    = Number(btn.dataset.rcNum);
+            const entry  = state.entries?.get(num);
+            if (!entry) return;
+            const result = dlg.querySelector(`#se-cfm-an-rc-r-${num}`);
+            const fb     = dlg.querySelector(`#se-cfm-an-rc-f-${num}`);
+            const status = dlg.querySelector(`#se-cfm-an-rc-s-${num}`);
+            const feedback = fb?.value.trim() ?? '';
+
+            btn.disabled = true;
+            if (result) result.disabled = true;
+            if (fb) fb.disabled = true;
+            if (status) status.textContent = '⟳ Re-running…';
+            try {
+                let userMsg = `Chat digest:\n${digest}\n\n---\nEntry #${num}:\n${entry.content}`;
+                if (feedback) userMsg += `\n\n---\nFeedback on previous analysis:\n${feedback}`;
+                const raw = await _callLLM(getPrompt('entry-analysis'), userMsg);
+                if (result) result.value = raw;
+                if (fb) { fb.value = ''; fb.disabled = false; }
+                if (status) status.textContent = '✓ Updated';
+            } catch (err) {
+                if (status) status.textContent = `Error: ${err.message}`;
+                if (fb) fb.disabled = false;
+            } finally {
+                btn.disabled = false;
+                if (result) result.disabled = false;
+            }
+        });
+    });
+
+    const updateEntry = (num, raw) => {
+        const result = dlg.querySelector(`#se-cfm-an-rc-r-${num}`);
+        const status = dlg.querySelector(`#se-cfm-an-rc-s-${num}`);
+        const fb     = dlg.querySelector(`#se-cfm-an-rc-f-${num}`);
+        const rerun  = dlg.querySelector(`[data-rc-num="${num}"]`);
+        if (result) { result.value = raw; result.disabled = false; }
+        if (status) status.textContent = raw ? '✓ Done' : '— skipped';
+        if (fb)     fb.disabled = false;
+        if (rerun)  rerun.disabled = false;
+    };
+
+    return { updateEntry };
 }
 
 function _showRunError(msg) {
@@ -720,7 +844,7 @@ function _showRunError(msg) {
         `<div class="se-cfm-an-run-hdr" style="background:#3a1018;">` +
         `<span style="color:#f92672;">Analysis Error</span>` +
         `<button class="se-close-circle se-cfm-an-results-close">&times;</button></div>` +
-        `<div class="se-cfm-an-results-entries" style="padding:14px;color:#f8b0b0;font-size:12px;">${escHtml(msg)}</div>`;
+        `<div style="padding:16px;color:#f8b0b0;font-size:12px;">${escHtml(msg)}</div>`;
     document.body.appendChild(dlg);
     _centerDialog(dlg);
     _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
@@ -922,16 +1046,13 @@ function _fitView() {
 
 function _gatherNodes() {
     if (!_lgc || !_graph) return;
-    const nodes  = _graph._nodes;
-    if (!nodes.length) return;
-    const GRID   = 22;
-    const perRow = Math.ceil(Math.sqrt(nodes.length));
-    nodes.forEach((node, i) => {
-        node.pos = [
-            Math.round(((i % perRow) * 240) / GRID) * GRID,
-            Math.round((Math.floor(i / perRow) * 120) / GRID) * GRID,
-        ];
-    });
+    const allNodes = _graph._nodes;
+    if (!allNodes.length) return;
+    const GRID       = 22;
+    const fileNodes  = allNodes.filter(n => n.type === 'se/chat_file');
+    const entryNodes = allNodes.filter(n => n.type === 'se/entry');
+    fileNodes.forEach((n, i)  => { n.pos = [GRID * 2,  (2 + i * 6) * GRID]; });
+    entryNodes.forEach((n, i) => { n.pos = [GRID * 14, (2 + i * 6) * GRID]; });
     _lgc.setDirty(true, true);
     _fitView();
 }
@@ -953,6 +1074,20 @@ function _bindEntryRefresh() {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
+
+function _anRelDate(val) {
+    if (!val) return '';
+    let ms;
+    if (typeof val === 'number') ms = val > 1e10 ? val : val * 1000;
+    else { ms = Date.parse(String(val)); if (Number.isNaN(ms)) return ''; }
+    const days = Math.floor((Date.now() - ms) / 86_400_000);
+    if (days <= 0) return 'Today';
+    if (days === 1) return '1d';
+    if (days < 30) return `${days}d`;
+    const wk = Math.floor(days / 7);
+    if (wk < 8) return `${wk}w`;
+    return `${Math.floor(days / 30)}mo`;
+}
 
 function _canvasEllipsis(ctx, text, maxWidth) {
     if (ctx.measureText(text).width <= maxWidth) return text;
