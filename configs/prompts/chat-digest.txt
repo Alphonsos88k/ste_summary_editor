@@ -1,0 +1,39 @@
+You are analysing a SillyTavern roleplay/collaborative fiction chat log in JSONL format.
+The content is creative fiction — character names are fictional. Do not apply real-world content filters to story content.
+Ignore the first JSONL line (metadata with name/create_date fields).
+Treat messages where is_user is true as the human side of the exchange.
+
+STEP 1 — ANOMALY SCAN (complete before writing anything else):
+Read the entire conversation and list every issue found. Output these under ⚠ ANOMALIES & FLAGS first.
+Format each as: ⚠ [TYPE]: [one sentence description]
+Types: CONTEXT_JUMP | TIMELINE | OOC | CONTRADICTION | DROPPED_THREAD | ARTIFACT
+- CONTEXT_JUMP: abrupt scene change with no transition
+- TIMELINE: event referenced before it occurred
+- OOC: message appears to be an out-of-character correction, retry, or regeneration artifact
+- CONTRADICTION: contradicts a fact established earlier in this session
+- DROPPED_THREAD: setup with no payoff within this file
+- ARTIFACT: response seems to ignore or reset prior context without explanation
+If none found: "No significant anomalies detected."
+
+---
+
+STEP 2 — NARRATIVE SUMMARY
+2–4 paragraphs covering the arc of the session: what happened, how it developed, how it resolved or left off.
+Written in plain language. Dense and readable — like a thoughtful chapter summary, not a database dump.
+
+PLOT BEATS
+- [beat 1]
+- [beat 2]
+(each beat ≤ 20 words)
+
+CHARACTER DEVELOPMENT
+- CharName: [what changed or was revealed]
+
+TIMELINE / PACING
+- [markers, jumps, or gaps worth noting]
+
+THEMES
+- [theme 1]
+
+UNRESOLVED THREADS
+- [thread left open at end of session]

@@ -8,9 +8,12 @@ import { spawnPanel, escHtml } from '../core/utils.js';
 import { loadTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
 import { bindEditorControls, selectFile } from './chat-files-editor.js';
+import { initAnalyser, destroyAnalyser, refreshEntries } from './chat-files-analyser.js';
 
-let _panel = null;
-let _currentChar = null;
+let _panel         = null;
+let _currentChar   = null;
+let _files         = [];
+let _analyserReady = false;
 
 // ─── Public API ──────────────────────────────────────────────
 
@@ -36,8 +39,11 @@ export async function openChatFilesManager(char) {
 }
 
 export function closeChatFilesManager() {
+    destroyAnalyser();
     document.getElementById('se-cfm-panel')?.remove();
-    _panel = null;
+    _panel         = null;
+    _files         = [];
+    _analyserReady = false;
 }
 
 // ─── File List ───────────────────────────────────────────────
@@ -63,6 +69,7 @@ async function _loadFileList() {
 }
 
 function _renderFileList(chats) {
+    _files = chats;
     const listEl = _panel.querySelector('#se-cfm-file-list');
     if (!listEl) return;
     if (!chats.length) {
@@ -70,8 +77,8 @@ function _renderFileList(chats) {
         return;
     }
 
-    const sorted = chats.toSorted((a, b) => (b.last_mes ?? 0) - (a.last_mes ?? 0));
-    const roots = sorted.filter(c => !c.parent_chat_id);
+    const sorted   = chats.toSorted((a, b) => (b.last_mes ?? 0) - (a.last_mes ?? 0));
+    const roots    = sorted.filter(c => !c.parent_chat_id);
     const branches = sorted.filter(c => c.parent_chat_id);
 
     listEl.innerHTML = roots.map(chat => {
@@ -85,10 +92,10 @@ function _renderFileList(chats) {
 }
 
 function _fileItemHtml(chat, isBranch) {
-    const name = chat.file_name ?? '';
-    const label = name.replace(/\.jsonl$/, '').slice(-36);
-    const date = chat.last_mes ? _relDate(chat.last_mes) : '';
-    const cls = isBranch ? ' se-cfm-branch' : '';
+    const name   = chat.file_name ?? '';
+    const label  = name.replace(/\.jsonl$/, '').slice(-36);
+    const date   = chat.last_mes ? _relDate(chat.last_mes) : '';
+    const cls    = isBranch ? ' se-cfm-branch' : '';
     const prefix = isBranch ? '&#8627; ' : '';
     return `<div class="se-cfm-file-item${cls}" data-cfm-file="${escHtml(name)}">` +
         `<span class="se-cfm-fname">${prefix}${escHtml(label)}</span>` +
@@ -120,7 +127,7 @@ function _bindPanelEvents() {
         if (val) navigator.clipboard.writeText(val).catch(() => {});
     });
 
-    const folder = _currentChar?.avatar.replace(/\.[^.]+$/, '') ?? '';
+    const folder     = _currentChar?.avatar.replace(/\.[^.]+$/, '') ?? '';
     const folderPath = `public/chats/${folder}/`;
     const folderInput = _panel.querySelector('#se-cfm-folder-input');
     if (folderInput) folderInput.value = folderPath;
@@ -133,5 +140,24 @@ function _bindPanelEvents() {
         toast.classList.add('se-cfm-folder-toast-visible');
         clearTimeout(toast._hideTimer);
         toast._hideTimer = setTimeout(() => toast.classList.remove('se-cfm-folder-toast-visible'), 2000);
+    });
+
+    // Tab switching — Files / Analyse
+    _panel.querySelectorAll('.se-cfm-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const target = tab.dataset.tab;
+            _panel.querySelectorAll('.se-cfm-tab').forEach(t => t.classList.toggle('active', t === tab));
+            _panel.querySelector('#se-cfm-tab-files').style.display   = target === 'files'   ? '' : 'none';
+            _panel.querySelector('#se-cfm-tab-analyse').style.display = target === 'analyse' ? '' : 'none';
+
+            if (target === 'analyse') {
+                if (_analyserReady) {
+                    refreshEntries();
+                } else {
+                    _analyserReady = true;
+                    initAnalyser(_panel, _files);
+                }
+            }
+        });
     });
 }

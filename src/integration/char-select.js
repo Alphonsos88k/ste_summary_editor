@@ -80,23 +80,32 @@ export function refreshCharSelect() {
 
 function _handleChange(e) {
     const avatar = e.target.value;
-    if (!avatar) {
-        state.associatedCharacter = null;
-    } else {
+    if (avatar) {
         const ctx  = SillyTavern.getContext();
         const char = (ctx.characters ?? []).find(c => c.avatar === avatar);
         state.associatedCharacter = char ? { name: char.name, avatar: char.avatar } : null;
+    } else {
+        state.associatedCharacter = null;
     }
     _updateStrip(e.target);
     document.dispatchEvent(new CustomEvent('se:character-changed', { detail: state.associatedCharacter }));
 }
 
 function _updateStrip(sel) {
-    const strip = document.getElementById('se-char-select-strip');
+    const strip   = document.getElementById('se-char-select-strip');
+    const portrait = document.getElementById('se-char-portrait');
     if (!strip) return;
     if (state.associatedCharacter) {
         strip.classList.add('se-char-strip-assigned');
+        if (portrait) {
+            portrait.src = `/characters/${state.associatedCharacter.avatar}`;
+            portrait.classList.add('visible');
+        }
     } else {
         strip.classList.remove('se-char-strip-assigned');
+        if (portrait) {
+            portrait.src = '';
+            portrait.classList.remove('visible');
+        }
     }
 }

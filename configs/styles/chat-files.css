@@ -293,5 +293,267 @@
     flex-shrink: 0;
 }
 
-.se-cfm-meta { font-size: 10px; color: #75715e; white-space: nowrap; }
+.se-cfm-meta       { font-size: 10px; color: #75715e; white-space: nowrap; }
+.se-cfm-disclaimer { font-size: 10px; color: #75715e; font-style: italic; white-space: nowrap; }
 
+/* ─── Tab bar ────────────────────────────────────────────────────────────── */
+
+.se-cfm-tab-bar {
+    display: flex;
+    align-items: stretch;
+    background: #1a1a14;
+    border-bottom: 1px solid var(--se-border);
+    flex-shrink: 0;
+}
+
+.se-cfm-tab {
+    padding: 7px 20px;
+    font-size: 12px;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #666;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    letter-spacing: 0.02em;
+    margin-bottom: -1px;
+}
+.se-cfm-tab:hover { color: #aaa; }
+.se-cfm-tab.active { color: var(--se-green); border-bottom-color: var(--se-green); }
+
+/* ─── Analyse tab layout ─────────────────────────────────────────────────── */
+
+.se-cfm-analyse-wrap {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.se-cfm-an-sidebar {
+    width: 210px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--se-border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.se-cfm-an-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    font-weight: 600;
+    color: #75715e;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    padding: 5px 6px 5px 10px;
+    background: #1c1c16;
+    border-bottom: 1px solid var(--se-border);
+    flex-shrink: 0;
+}
+
+.se-cfm-an-file-list  { flex: 1; overflow-y: auto; min-height: 60px; }
+.se-cfm-an-entry-list { flex: 2; overflow-y: auto; min-height: 80px; border-top: 1px solid var(--se-border); }
+
+.se-cfm-an-node-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px 5px 10px;
+    font-size: 11px;
+    color: #ccc;
+    border-bottom: 1px solid rgba(58,58,48,0.4);
+    transition: background 0.1s;
+}
+.se-cfm-an-node-item:hover { background: #2a2a20; }
+
+.se-cfm-an-node-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.se-cfm-an-add-btn {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid #444;
+    border-radius: 3px;
+    color: var(--se-green);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+.se-cfm-an-add-btn:hover { background: #3a3a2e; border-color: var(--se-green); }
+.se-cfm-an-add-btn.added { color: #f92672; border-color: #f92672; }
+.se-cfm-an-add-btn.added:hover { background: #3a1e1e; }
+
+/* ─── Canvas area ────────────────────────────────────────────────────────── */
+
+.se-cfm-an-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.se-cfm-an-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 6px;
+    background: #252520;
+    border-bottom: 1px solid var(--se-border);
+    flex-shrink: 0;
+    min-height: 32px;
+    flex-wrap: wrap;
+}
+
+.se-cfm-an-canvas {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    /* dot grid */
+    background-color: #181812;
+    background-image: radial-gradient(circle, #3a3a2c 1px, transparent 1px);
+    background-size: 22px 22px;
+    overflow: hidden;
+}
+
+.se-cfm-an-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #75715e;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* ─── Section head pop-out button ────────────────────────────────────────── */
+
+.se-cfm-an-pop-btn {
+    background: transparent;
+    border: none;
+    color: #555;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0 6px;
+    line-height: 1;
+    transition: color 0.1s;
+}
+.se-cfm-an-pop-btn:hover { color: var(--se-green); }
+
+/* ─── Zoom slider ────────────────────────────────────────────────────────── */
+
+.se-cfm-an-zoom-slider {
+    width: 80px;
+    accent-color: var(--se-green);
+    cursor: pointer;
+    align-self: center;
+}
+
+.se-cfm-an-zoom-label {
+    font-size: 10px;
+    color: #75715e;
+    min-width: 34px;
+    text-align: right;
+}
+
+/* ─── Node remove overlay button ─────────────────────────────────────────── */
+
+.se-cfm-an-node-remove {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #f92672;
+    border: none;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    padding: 0;
+    pointer-events: all;
+    transition: background 0.1s;
+}
+.se-cfm-an-node-remove:hover { background: #ff4a7e; }
+
+/* ─── Single-file lock: grey non-active file buttons ─────────────────────── */
+
+.se-cfm-an-file-list.has-active-file .se-cfm-an-add-btn:not(.added) {
+    opacity: 0.25;
+    cursor: not-allowed;
+    pointer-events: none;
+    color: #555;
+    border-color: #333;
+}
+
+/* ─── Pop-out floating panels ────────────────────────────────────────────── */
+
+.se-cfm-an-pop-panel {
+    position: fixed;
+    width: 230px;
+    height: 300px;
+    background: var(--se-bg-dark, #272822);
+    border: 1px solid var(--se-border, #3a3a2e);
+    border-radius: 8px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+    z-index: 10030;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.se-cfm-an-pop-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px 6px 12px;
+    background: #1c1c16;
+    border-bottom: 1px solid var(--se-border, #3a3a2e);
+    cursor: grab;
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--se-green, #a6e22e);
+    user-select: none;
+}
+.se-cfm-an-pop-hdr:active { cursor: grabbing; }
+
+.se-cfm-an-pop-close {
+    background: transparent;
+    border: none;
+    color: #666;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+    transition: color 0.1s;
+}
+.se-cfm-an-pop-close:hover { color: #f8f8f2; }
+
+.se-cfm-an-pop-body {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}

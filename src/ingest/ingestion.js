@@ -482,6 +482,7 @@ export async function handleFileInput(event) {
     renderTable();
     renderActMinimap();
     persistState();
+    document.dispatchEvent(new CustomEvent('se:entries-changed'));
 
     $('#se-file-input').val('');
 }

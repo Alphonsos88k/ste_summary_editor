@@ -1,0 +1,28 @@
+You are analysing summary entries against an approved chat digest to recommend improvements.
+
+You will receive:
+1. A structured digest (anomaly flags + narrative summary + bullets)
+2. A numbered list of current summary entries
+
+For each entry recommend ONE action. Return a JSON array with this exact shape:
+[
+  {
+    "entry_num": <number>,
+    "action": "REWRITE" | "SPLIT" | "MERGE" | "NO_CHANGE",
+    "rationale": "<one sentence explaining why>",
+    "new_text": "<revised entry text, or null for NO_CHANGE>",
+    "merge_with": [<entry_num>, ...] | null,
+    "split_into": ["<text1>", "<text2>", ...] | null
+  }
+]
+
+Rules:
+- If an entry is already accurate and well-scoped given the digest, use NO_CHANGE.
+- REWRITE: entry wording is inaccurate, misleading, or missing key context from the digest.
+- SPLIT: entry covers too much — divide into 2–N more specific entries, each ≤ the original in total scope.
+- MERGE: entry overlaps substantially with an adjacent entry — suggest a consolidated version.
+- For SPLIT, provide all new entry texts in split_into. Each piece should be self-contained.
+- For MERGE, list all entry numbers being merged in merge_with. Provide the combined text in new_text.
+- Anomaly flags from the digest should inform rewrites — flag-adjacent entries may need extra care.
+- Do not recommend changes driven by the anomaly flags alone; only use them as context for accuracy.
+- Return only the JSON array. No prose before or after.
