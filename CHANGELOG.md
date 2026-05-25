@@ -1,3 +1,15 @@
+# [1.12.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.11.1...v1.12.0) (2026-05-25)
+
+
+### Bug Fixes
+
+* move attention badge to sidebar drawer, shared se-attn-circle style ([6071557](https://github.com/Alphonsos88k/ste_summary_editor/commit/6071557ebae308a867f8af67d6c6871ee55e5b3b)), closes [#se-file-drawer-attn](https://github.com/Alphonsos88k/ste_summary_editor/issues/se-file-drawer-attn) [#se-fp-attention-btn](https://github.com/Alphonsos88k/ste_summary_editor/issues/se-fp-attention-btn)
+
+
+### Features
+
+* file categorization v2 — folder auto-assign, empty badge, unified select, attention dialog ([3d97782](https://github.com/Alphonsos88k/ste_summary_editor/commit/3d97782cc13bf511b484e6b04ed12912839c76e9))
+
 ## [1.11.1](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.11.0...v1.11.1) (2026-05-25)
 
 
