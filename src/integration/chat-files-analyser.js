@@ -210,6 +210,19 @@ function _initCanvas(container) {
     _lgc.resize();
 
     new ResizeObserver(() => _lgc?.resize()).observe(container);
+
+    // XY coordinate display — bottom-left of canvas
+    _lgCanvas.addEventListener('mousemove', e => {
+        const xy = _panel?.querySelector('#se-cfm-an-xy');
+        if (!xy || !_lgc?.ds) return;
+        const x = Math.round((e.offsetX - _lgc.ds.offset[0]) / _lgc.ds.scale);
+        const y = Math.round((e.offsetY - _lgc.ds.offset[1]) / _lgc.ds.scale);
+        xy.textContent = `${x}, ${y}`;
+    });
+    _lgCanvas.addEventListener('mouseleave', () => {
+        const xy = _panel?.querySelector('#se-cfm-an-xy');
+        if (xy) xy.textContent = '';
+    });
 }
 
 // ─── Node type registration ───────────────────────────────────
@@ -262,7 +275,7 @@ function _registerNodeTypes() {
     class SEEntryNode extends LG.LGraphNode {
         constructor() {
             super();
-            this.addInput('from', 'se_chat');
+            this.addInput('from', '*');
             this.addOutput('ref', 'se_entry');
             this.title   = 'Entry';
             this.color   = '#1a3d50';

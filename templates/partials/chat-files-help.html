@@ -38,20 +38,28 @@
         <div class="se-cfm-an-help-sec" data-sec="ports" hidden>
             <div class="se-cfm-an-help-page">
                 <h3>Ports</h3>
-                <p>Ports are the small circles on the edges of each node. They are typed — only compatible ports can connect.</p>
+                <p>Ports are the small circles on the edges of each node.</p>
                 <ul>
-                    <li><b>Output ports</b> are on the right side of a node.</li>
-                    <li><b>Input ports</b> are on the left side.</li>
-                    <li><b>Chat File</b> exposes one output: <em class="se-cfm-an-help-tag green">chats</em> — sends the file reference downstream.</li>
-                    <li><b>Entry</b> exposes one input: <em class="se-cfm-an-help-tag cyan">from</em> — receives from a chat file. And one output: <em class="se-cfm-an-help-tag purple">ref</em> — for chaining to future analysis nodes.</li>
+                    <li><b>Output ports</b> are on the right side; <b>input ports</b> on the left.</li>
+                    <li><b>Chat File</b> — one output: <em class="se-cfm-an-help-tag green">chats</em> — sends the file reference downstream.</li>
+                    <li><b>Entry</b> — one input: <em class="se-cfm-an-help-tag cyan">from</em> — receives from a Chat File <b>or</b> another Entry's <em class="se-cfm-an-help-tag purple">ref</em> port.</li>
+                    <li><b>Entry</b> — one output: <em class="se-cfm-an-help-tag purple">ref</em> — passes context forward; connect it to another Entry's <em class="se-cfm-an-help-tag cyan">from</em> to chain entries.</li>
+                </ul>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>Connection Rules</h3>
+                <ul>
+                    <li><b>One Chat File at a time</b> — only one Chat File node can be on the canvas. Its <em class="se-cfm-an-help-tag green">chats</em> output can connect to <em>any number</em> of Entry nodes.</li>
+                    <li><b>Entry chaining</b> — an Entry's <em class="se-cfm-an-help-tag purple">ref</em> output can connect to another Entry's <em class="se-cfm-an-help-tag cyan">from</em> input, expressing that two entries are related or sequential.</li>
+                    <li><b>Multiple parents</b> — an Entry can receive from both a Chat File and another Entry simultaneously, modelling shared context.</li>
+                    <li>Links are colour-coded per connection for easy tracing.</li>
                 </ul>
             </div>
             <div class="se-cfm-an-help-page" hidden>
                 <h3>Connecting &amp; Disconnecting</h3>
                 <ul>
-                    <li><b>Connect</b> — hover over an output port until it highlights, then drag to a compatible input port on another node. Release to create the link.</li>
-                    <li>Links are colour-coded — each chat file gets a unique colour shared by all its connections.</li>
-                    <li><b>Disconnect</b> — right-click the link line and choose <em>Delete</em>, or right-click the node → <em>Remove</em> to remove it and all its links.</li>
+                    <li><b>Connect</b> — hover over an output port until it highlights, then drag to an input port on another node and release.</li>
+                    <li><b>Disconnect</b> — right-click the link line → <em>Delete</em>, or right-click the node → <em>Remove</em> to drop the node and all its links.</li>
                 </ul>
             </div>
         </div>
