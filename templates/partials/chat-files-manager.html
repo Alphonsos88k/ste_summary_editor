@@ -1,7 +1,10 @@
-<div class="se-cfm-header se-float-panel-header">
-    <span class="se-float-panel-title">&#x1F4AC; Chat Files &mdash; <span id="se-cfm-char-name"></span></span>
-    <input class="se-cfm-search" id="se-cfm-search" type="text" placeholder="Search files&hellip;" autocomplete="off" />
-    <button class="se-close-circle se-cfm-close" title="Close">&times;</button>
+<div class="se-cfm-header">
+    <span class="se-cfm-title">&#x1F4AC; Chat Files &mdash; <span id="se-cfm-char-name"></span></span>
+    <div class="se-cfm-header-btns">
+        <button class="se-close-circle se-cfm-btn-popout" id="se-cfm-btn-popout" title="Pop out to floating panel">&#x29C9;</button>
+        <button class="se-close-circle se-cfm-btn-fullscreen" id="se-cfm-btn-fullscreen" title="Fullscreen">&#x26F6;</button>
+        <button class="se-close-circle se-cfm-close" title="Close">&times;</button>
+    </div>
 </div>
 <div class="se-cfm-tab-bar">
     <button class="se-cfm-tab active" data-tab="files">Files</button>
@@ -9,69 +12,70 @@
 </div>
 <div class="se-cfm-body" id="se-cfm-tab-files">
     <div class="se-cfm-sidebar">
+        <div class="se-cfm-search-wrap">
+            <input class="se-cfm-search" id="se-cfm-search" type="text" placeholder="Search files&hellip;" autocomplete="off" />
+        </div>
         <div class="se-cfm-file-list" id="se-cfm-file-list">
             <div class="se-cfm-hint">Loading&hellip;</div>
         </div>
     </div>
     <div class="se-cfm-right">
-        <div class="se-cfm-format-bar">
-            <div class="se-cfm-fmt-group">
-                <button class="se-cfm-fmt-btn active" data-align="left" title="Align left">&#8676;</button>
-                <button class="se-cfm-fmt-btn" data-align="center" title="Center">&#8677;</button>
-                <button class="se-cfm-fmt-btn" data-align="right" title="Align right">&#8678;</button>
+        <div class="se-cfm-toolbar">
+            <div class="se-cfm-tb-group">
+                <button class="se-cfm-tb-btn active" data-align="left"   title="Left align">L</button>
+                <button class="se-cfm-tb-btn"        data-align="center" title="Center">C</button>
+                <button class="se-cfm-tb-btn"        data-align="right"  title="Right align">R</button>
             </div>
-            <span class="se-cfm-fmt-sep"></span>
-            <div class="se-cfm-fmt-group">
-                <button class="se-cfm-fmt-btn active" data-font="mono" title="Monospace">Mono</button>
-                <button class="se-cfm-fmt-btn" data-font="sans" title="Sans-serif">Sans</button>
-                <button class="se-cfm-fmt-btn" data-font="serif" title="Serif">Serif</button>
+            <span class="se-cfm-tb-sep"></span>
+            <div class="se-cfm-tb-group">
+                <button class="se-cfm-tb-btn active" data-font="mono"  title="Monospace">Mono</button>
+                <button class="se-cfm-tb-btn"        data-font="sans"  title="Sans-serif">Sans</button>
+                <button class="se-cfm-tb-btn"        data-font="serif" title="Serif">Serif</button>
             </div>
-            <span class="se-cfm-fmt-sep"></span>
-            <div class="se-cfm-fmt-group">
-                <button class="se-cfm-fmt-btn active" data-theme="monokai" title="Monokai dark">MK</button>
-                <button class="se-cfm-fmt-btn" data-theme="light" title="Light">Lt</button>
-                <button class="se-cfm-fmt-btn" data-theme="contrast" title="High contrast">HC</button>
+            <span class="se-cfm-tb-sep"></span>
+            <div class="se-cfm-tb-group">
+                <button class="se-cfm-tb-btn active" data-theme="monokai" title="Monokai">Monokai</button>
+                <button class="se-cfm-tb-btn"        data-theme="dracula" title="Dracula">Dracula</button>
+                <button class="se-cfm-tb-btn"        data-theme="tokyo"   title="Tokyo Night">Tokyo</button>
             </div>
-            <span class="se-cfm-fmt-sep"></span>
-            <div class="se-cfm-fmt-group">
-                <button class="se-cfm-fmt-btn active" data-size="sm" title="Small">S</button>
-                <button class="se-cfm-fmt-btn" data-size="md" title="Medium">M</button>
-                <button class="se-cfm-fmt-btn" data-size="lg" title="Large">L</button>
+            <span class="se-cfm-tb-sep"></span>
+            <div class="se-cfm-tb-group">
+                <button class="se-cfm-tb-btn active" data-size="sm" title="Small">S</button>
+                <button class="se-cfm-tb-btn"        data-size="md" title="Medium">M</button>
+                <button class="se-cfm-tb-btn"        data-size="lg" title="Large">L</button>
             </div>
-            <span class="se-cfm-fmt-sep"></span>
-            <button class="se-cfm-fmt-btn" id="se-cfm-spacing-btn" title="Toggle loose line spacing">&#8597; Spacing</button>
-            <span class="se-cfm-fmt-sep"></span>
-            <div class="se-cfm-folder-group">
-                <button class="se-cfm-fmt-btn" id="se-cfm-folder-btn" title="Copy folder path to clipboard">&#x1F4CB;</button>
-                <span class="se-cfm-folder-toast" id="se-cfm-folder-toast"></span>
-            </div>
+            <span class="se-cfm-tb-sep"></span>
+            <button class="se-cfm-tb-btn" id="se-cfm-spacing-btn" title="Toggle line spacing">&#8597;</button>
+            <button class="se-cfm-tb-btn" id="se-cfm-wrap-btn"    title="Toggle word wrap">&#x21B5;&thinsp;Wrap</button>
+            <span class="se-cfm-tb-sep"></span>
+            <button class="se-cfm-tb-btn" id="se-cfm-folder-btn"  title="Copy folder path">&#x1F4CB;</button>
+            <span class="se-cfm-folder-toast" id="se-cfm-folder-toast"></span>
             <div style="flex:1;"></div>
             <span class="se-cfm-autosave-status" id="se-cfm-autosave-status"></span>
-            <button class="se-btn se-btn-sm se-btn-primary" id="se-cfm-save-btn" disabled>&#x1F4BE; Save</button>
+            <button class="se-cfm-save-btn" id="se-cfm-save-btn" disabled>&#x1F4BE;&ensp;Save</button>
         </div>
         <div class="se-cfm-editor-area">
             <div class="se-cfm-empty-state" id="se-cfm-empty-state">Select a chat file from the sidebar</div>
-            <textarea class="se-cfm-textarea" id="se-cfm-textarea" style="display:none;" spellcheck="false"></textarea>
+            <div class="se-cfm-textarea-wrap" id="se-cfm-textarea-wrap" style="display:none;">
+                <pre class="se-cfm-highlight-pre" id="se-cfm-highlight-pre" aria-hidden="true"></pre>
+                <textarea class="se-cfm-textarea" id="se-cfm-textarea" spellcheck="false"></textarea>
+            </div>
             <div class="se-cfm-form-view" id="se-cfm-form-view" style="display:none;"></div>
         </div>
-        <div class="se-cfm-status-bar">
-            <div class="se-cfm-path-row">
-                <input class="se-cfm-path-input" id="se-cfm-path-input" type="text" readonly placeholder="No file selected" />
-                <button class="se-cfm-path-copy" id="se-cfm-path-copy" title="Copy path to clipboard">&#x1F4CB;</button>
+        <div class="se-cfm-statusbar">
+            <div class="se-cfm-seg-group">
+                <button class="se-cfm-seg active" data-view="jsonl" title="Raw JSONL — editable">JSONL</button>
+                <button class="se-cfm-seg"        data-view="plain" title="Plain text — editable">Plain</button>
+                <button class="se-cfm-seg"        data-view="yaml"  title="YAML — read only">YAML</button>
+                <button class="se-cfm-seg"        data-view="form"  title="Form view — edit messages">Form</button>
             </div>
-            <div class="se-cfm-status-right">
-                <div class="se-cfm-view-group">
-                    <button class="se-cfm-view-btn active" data-view="jsonl" title="Raw JSONL &mdash; editable">JSONL</button>
-                    <button class="se-cfm-view-btn" data-view="plain" title="Plain text &mdash; read only">Plain</button>
-                    <button class="se-cfm-view-btn" data-view="yaml" title="YAML view &mdash; read only">YAML</button>
-                    <button class="se-cfm-view-btn" data-view="form" title="Form view &mdash; edit messages">Form</button>
-                </div>
-                <span class="se-cfm-status-divider"></span>
-                <span class="se-cfm-meta" id="se-cfm-tokens"></span>
-                <span class="se-cfm-meta" id="se-cfm-modified-date"></span>
-                <span class="se-cfm-status-divider"></span>
-                <button class="se-cfm-fmt-btn" id="se-cfm-wrap-btn" title="Toggle word wrap">&#x21B5; Wrap</button>
-            </div>
+            <span class="se-cfm-disclaimer" id="se-cfm-disclaimer"></span>
+            <div style="flex:1;"></div>
+            <span class="se-cfm-meta" id="se-cfm-tokens"></span>
+            <span class="se-cfm-meta" id="se-cfm-modified-date"></span>
+            <span class="se-cfm-sb-sep"></span>
+            <input class="se-cfm-path-input" id="se-cfm-path-input" type="text" readonly placeholder="No file selected" />
+            <button class="se-cfm-tb-btn" id="se-cfm-path-copy" title="Copy path to clipboard">&#x1F4CB;</button>
         </div>
     </div>
 </div>
@@ -98,21 +102,21 @@
     </div>
     <div class="se-cfm-an-right">
         <div class="se-cfm-an-toolbar">
-            <button class="se-cfm-tb-btn" id="se-cfm-an-fit" title="Fit all nodes to viewport">Fit</button>
-            <button class="se-cfm-tb-btn" id="se-cfm-an-origin" title="Reset viewport to origin (0,0)">Origin</button>
-            <button class="se-cfm-tb-btn" id="se-cfm-an-gather" title="Gather scattered nodes back to centre">Gather</button>
-            <button class="se-cfm-tb-btn" id="se-cfm-an-layout" title="Auto-arrange nodes">Layout</button>
-            <button class="se-cfm-tb-btn" id="se-cfm-an-clear" title="Remove all nodes">Clear</button>
-            <span class="se-cfm-tb-sep"></span>
-            <span class="se-cfm-meta">Drag handle to connect &bull; Right-click or &#x00D7; to remove</span>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-fit"    title="Fit all nodes to viewport">Fit</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-origin" title="Reset viewport to origin">Origin</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-gather" title="Gather scattered nodes">Gather</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-layout" title="Auto-arrange nodes">Layout</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-clear"  title="Remove all nodes">Clear</button>
+            <span class="se-cfm-an-tb-sep"></span>
+            <span class="se-cfm-meta">Drag port to connect &bull; Right-click to remove</span>
             <div style="flex:1;"></div>
-            <button class="se-cfm-tb-btn" id="se-cfm-an-prompts" title="Edit system prompts for Analyse">&#9881; Prompts</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-prompts" title="Edit system prompts for Analyse">&#9881; Prompts</button>
         </div>
         <div class="se-cfm-an-canvas" id="se-cfm-an-canvas">
             <div class="se-cfm-an-zoom-ctrl" id="se-cfm-an-zoom-ctrl">
                 <button class="se-cfm-an-zoom-step" id="se-cfm-an-zoom-out" title="Zoom out">&#8722;</button>
-                <button class="se-cfm-an-zoom-pct" id="se-cfm-an-zoom-label" title="Reset zoom to 100%">100%</button>
-                <button class="se-cfm-an-zoom-step" id="se-cfm-an-zoom-in" title="Zoom in">+</button>
+                <button class="se-cfm-an-zoom-pct"  id="se-cfm-an-zoom-label" title="Reset zoom to 100%">100%</button>
+                <button class="se-cfm-an-zoom-step" id="se-cfm-an-zoom-in"  title="Zoom in">+</button>
             </div>
         </div>
     </div>
