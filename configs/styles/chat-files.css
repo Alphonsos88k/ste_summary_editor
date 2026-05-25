@@ -559,21 +559,34 @@
 
 /* Analyse toolbar buttons — separate class to avoid Files toolbar style conflict */
 .se-cfm-an-tb-btn {
-    background: #2c2c24;
-    border: 1px solid #3a3a30;
+    background: transparent;
+    border: 1px solid transparent;
     border-radius: 4px;
-    color: #aaa;
+    color: #888;
     font-size: 11px;
     font-family: inherit;
-    padding: 3px 10px;
+    padding: 3px 9px;
     cursor: pointer;
     line-height: 1.6;
     white-space: nowrap;
     flex-shrink: 0;
-    transition: background 0.1s, color 0.1s, border-color 0.1s;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    letter-spacing: 0.01em;
 }
-.se-cfm-an-tb-btn:hover  { background: #3a3a2e; color: #f8f8f2; border-color: #555; }
-.se-cfm-an-tb-btn:active { background: #4a4a38; }
+.se-cfm-an-tb-btn:hover  { background: #2e2e26; color: #d8d8c8; border-color: #3a3a30; }
+.se-cfm-an-tb-btn:active { background: #3a3a2e; color: #f8f8f2; }
+
+.se-cfm-an-tb-help {
+    width: 22px;
+    padding: 2px 0;
+    text-align: center;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 12px;
+    color: #66d9e8;
+    margin-left: 2px;
+}
+.se-cfm-an-tb-help:hover { background: #1a2c33; border-color: #66d9e8; color: #a0f0ff; }
 
 .se-cfm-an-tb-sep {
     width: 1px;
@@ -766,14 +779,25 @@
     border: 1px solid #3a3a30;
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.65);
-    width: 400px;
+    width: 420px;
     max-height: 72vh;
-    overflow-y: auto;
-    padding: 14px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    overflow: hidden;
 }
+
+.se-cfm-an-pdlg-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px 8px 14px;
+    background: #181812;
+    border-bottom: 1px solid #3a3a30;
+    flex-shrink: 0;
+    cursor: grab;
+    user-select: none;
+}
+.se-cfm-an-pdlg-hdr:active { cursor: grabbing; }
 
 .se-cfm-an-pdlg-title {
     font-size: 11px;
@@ -781,6 +805,16 @@
     color: var(--se-green, #a6e22e);
     text-transform: uppercase;
     letter-spacing: 0.08em;
+}
+
+.se-cfm-an-prompts-dlg > .se-cfm-an-pdlg-item,
+.se-cfm-an-prompts-dlg-body {
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
 }
 
 .se-cfm-an-pdlg-item { display: flex; flex-direction: column; gap: 5px; }
@@ -809,17 +843,60 @@
 }
 .se-cfm-an-pdlg-ta:focus { border-color: var(--se-green, #a6e22e); }
 
-.se-cfm-an-pdlg-footer { display: flex; justify-content: flex-end; margin-top: 2px; }
+/* ─── Node editor help dialog ────────────────────────────────────────────── */
 
-.se-cfm-an-pdlg-close {
-    background: #2c2c24;
+.se-cfm-an-help-dlg {
+    position: fixed;
+    z-index: 10050;
+    background: #1e1e18;
     border: 1px solid #3a3a30;
-    border-radius: 4px;
-    color: #aaa;
-    font-size: 11px;
-    font-family: inherit;
-    padding: 4px 16px;
-    cursor: pointer;
-    transition: background 0.1s, color 0.1s;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.65);
+    width: 400px;
+    max-height: 72vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
+
+.se-cfm-an-help-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px 8px 14px;
+    background: #181812;
+    border-bottom: 1px solid #3a3a30;
+    flex-shrink: 0;
+    cursor: grab;
+    user-select: none;
+    font-size: 11px;
+    font-weight: 700;
+    color: #66d9e8;
+    letter-spacing: 0.04em;
+}
+.se-cfm-an-help-hdr:active { cursor: grabbing; }
+
+.se-cfm-an-help-body {
+    overflow-y: auto;
+    padding: 14px 16px;
+    flex: 1;
+    font-size: 12px;
+    color: #c8c8b8;
+    line-height: 1.6;
+}
+
+.se-cfm-an-help-body ul { margin: 4px 0 10px 0; padding-left: 18px; }
+.se-cfm-an-help-body li { margin-bottom: 5px; }
+.se-cfm-an-help-body b  { color: #f8f8f2; }
+.se-cfm-an-help-body em { color: #e6db74; font-style: normal; }
+
+.se-cfm-an-help-section {
+    font-size: 10px;
+    font-weight: 700;
+    color: #75715e;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 10px 0 4px 0;
+}
+.se-cfm-an-help-body .se-cfm-an-help-section:first-child { margin-top: 0; }
 .se-cfm-an-pdlg-close:hover { background: #3a3a2e; color: #f8f8f2; }

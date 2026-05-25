@@ -1,0 +1,49 @@
+<div class="se-cfm-an-help-hdr">
+    <span>&#x2139; Node Editor — Guide</span>
+    <button class="se-close-circle se-cfm-an-help-close">&times;</button>
+</div>
+<div class="se-cfm-an-help-body">
+
+    <p class="se-cfm-an-help-section">Nodes</p>
+    <ul>
+        <li><b>Chat File node</b> — represents one <code>.jsonl</code> chat file. Add it by clicking <b>+</b> next to a file in the Files sidebar. Only one chat file can be on the canvas at a time (single-file lock).</li>
+        <li><b>Entry node</b> — represents one summary entry from the Review table. Add it by clicking <b>+</b> in the Entries sidebar. Multiple entries can be on the canvas simultaneously.</li>
+    </ul>
+
+    <p class="se-cfm-an-help-section">Ports &amp; Connections</p>
+    <ul>
+        <li>Each node exposes circular ports on its edges. <b>Output ports</b> (right side) send data; <b>Input ports</b> (left side) receive it.</li>
+        <li><b>Chat File</b> has one output port <em>chats</em> (green) — drag from it to an Entry's input to link them.</li>
+        <li><b>Entry</b> has one input port <em>from</em> (cyan) and one output port <em>ref</em> — the output can chain to future analysis nodes.</li>
+        <li>Drag from any output port circle to any compatible input port circle to create a connection. Connections are colour-coded per chat file.</li>
+        <li>To remove a connection: right-click the link line, or right-click the node and choose <em>Remove</em>.</li>
+    </ul>
+
+    <p class="se-cfm-an-help-section">Canvas Navigation</p>
+    <ul>
+        <li><b>Pan</b> — click and drag on empty canvas space.</li>
+        <li><b>Zoom</b> — scroll wheel, or use the <b>+</b> / <b>−</b> zoom pill (bottom-right). Click the <b>%</b> label to reset to 100%.</li>
+        <li>Right-click a node for context actions (Remove, Clone, etc.).</li>
+    </ul>
+
+    <p class="se-cfm-an-help-section">Toolbar</p>
+    <ul>
+        <li><b>Fit</b> — zoom and pan to fit all nodes in the visible area.</li>
+        <li><b>Origin</b> — reset view to canvas origin (0, 0) at 100% zoom.</li>
+        <li><b>Gather</b> — snap all scattered nodes back to a tidy grid near the centre.</li>
+        <li><b>Layout</b> — auto-arrange all nodes into a grid, then fit to view.</li>
+        <li><b>Clear</b> — remove every node and connection from the canvas.</li>
+        <li><b>&#9881; Prompts</b> — edit the LLM system prompts used for digest generation (Pass 1) and entry analysis (Pass 2).</li>
+    </ul>
+
+    <p class="se-cfm-an-help-section">Pop-out Panels</p>
+    <ul>
+        <li>The <b>Files</b> and <b>Entries</b> sidebar sections each have a <b>&#x29C9;</b> pop-out button — click it to detach that list into a draggable floating panel so you can reposition it freely while working on the canvas.</li>
+    </ul>
+
+    <p class="se-cfm-an-help-section">Updating This Guide</p>
+    <ul>
+        <li>Content lives in <code>templates/partials/chat-files-help.html</code>. Update it whenever a new node type, port, or major canvas feature is added.</li>
+    </ul>
+
+</div>

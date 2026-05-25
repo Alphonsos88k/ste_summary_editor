@@ -217,4 +217,5 @@ export const TEMPLATES = Object.freeze({
     GAPS_PANEL:              'partials/gaps-panel',
     FILES_ATTENTION_DIALOG:  'partials/files-attention-dialog',
     CHAT_FILES_MANAGER:      'partials/chat-files-manager',
+    CHAT_FILES_HELP:         'partials/chat-files-help',
 });
