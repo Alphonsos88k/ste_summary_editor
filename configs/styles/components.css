@@ -1531,16 +1531,19 @@
 }
 .se-ks-row span { color: #a5a098; margin-left: 4px; }
 kbd {
-    background: var(--se-bg-mid);
-    border: 1px solid var(--se-border);
-    border-bottom-width: 2px;
-    border-radius: 4px;
-    padding: 1px 6px;
-    font-family: 'Fira Code', 'Consolas', monospace;
-    font-size: 0.88em;
-    color: var(--se-text);
+    background: #2c2c20;
+    border: none;
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-family: 'Source Code Pro', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #e2e0d5;
     white-space: nowrap;
     flex-shrink: 0;
+    box-shadow: 0 3px 0 #111008, inset 0 1px 0 rgba(255,255,255,0.08);
+    letter-spacing: 0.02em;
+    line-height: 1.6;
 }
 .se-ks-hint {
     font-size: 0.74em;

@@ -124,7 +124,7 @@
     border: 1px solid var(--se-border);
     border-radius: 8px;
     width: 95vw;
-    max-width: 1400px;
+    max-width: clamp(1400px, 64vw, 1638px);
     height: 90vh;
     display: flex;
     flex-direction: column;
