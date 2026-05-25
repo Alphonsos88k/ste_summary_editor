@@ -997,9 +997,17 @@ function _openEntryDetail(num, digest, resultsByNum, parentDlg) {
     const existId = `se-cfm-an-entry-det-${num}`;
     document.getElementById(existId)?.remove();
 
-    const entry   = state.entries?.get(num);
-    const raw     = resultsByNum[num] ?? '';
-    const fb      = parentDlg?.querySelector(`#se-cfm-an-rc-f-${num}`)?.value ?? '';
+    const entry          = state.entries?.get(num);
+    const originalContent = String(entry?.content ?? '');
+    const raw            = resultsByNum[num] ?? '';
+    const fbInit         = parentDlg?.querySelector(`#se-cfm-an-rc-f-${num}`)?.value ?? '';
+
+    // All entries for the reference browser
+    const allEntries = [...(state.entries?.values() ?? [])].toSorted((a, b) => a.num - b.num);
+    const selOptions = allEntries.map(e => {
+        const preview = String(e.content ?? '').slice(0, 44).replaceAll('\n', ' ');
+        return `<option value="${e.num}" ${e.num === num ? 'selected' : ''}>#${e.num} — ${escHtml(preview)}…</option>`;
+    }).join('');
 
     const det = document.createElement('div');
     det.id = existId;
@@ -1009,15 +1017,21 @@ function _openEntryDetail(num, digest, resultsByNum, parentDlg) {
         `<span>Entry #${num} &mdash; Full View</span>` +
         `<button class="se-close-circle se-cfm-an-det-close">&times;</button></div>` +
         `<div class="se-cfm-an-det-body">` +
+        // ── Left col: entry browser + content ──
         `<div class="se-cfm-an-det-col">` +
-        `<div class="se-cfm-an-digest-lbl">Entry content</div>` +
-        `<pre class="se-cfm-an-det-pre">${escHtml(String(entry?.content ?? ''))}</pre>` +
+        `<div class="se-cfm-an-det-entry-nav">` +
+        `<select class="se-cfm-an-det-entry-sel" title="Browse all entries for reference">${selOptions}</select>` +
+        `<button class="se-cfm-an-det-orig-tog" hidden title="Toggle between proposed and original ingested content">ORIG</button>` +
         `</div>` +
+        `<div class="se-cfm-an-digest-lbl se-cfm-an-det-entry-lbl">Entry #${num}</div>` +
+        `<pre class="se-cfm-an-det-pre" id="se-cfm-an-det-pre-${num}">${escHtml(originalContent)}</pre>` +
+        `</div>` +
+        // ── Right col: analysis + feedback ──
         `<div class="se-cfm-an-det-col">` +
         `<div class="se-cfm-an-digest-lbl">Analysis output</div>` +
         `<textarea class="se-cfm-an-det-ta" id="se-cfm-an-det-ta-${num}" spellcheck="false">${escHtml(raw)}</textarea>` +
         `<div class="se-cfm-an-digest-lbl" style="margin-top:8px;">Feedback</div>` +
-        `<textarea class="se-cfm-an-det-fb" id="se-cfm-an-det-fb-${num}" placeholder="Write feedback here…" spellcheck="false">${escHtml(fb)}</textarea>` +
+        `<textarea class="se-cfm-an-det-fb" id="se-cfm-an-det-fb-${num}" placeholder="e.g. Entry #4 should swap with #7; align tone with #3…" spellcheck="false">${escHtml(fbInit)}</textarea>` +
         `<div class="se-cfm-an-det-foot">` +
         `<span class="se-cfm-an-det-status" id="se-cfm-an-det-st-${num}"></span>` +
         `<button class="se-cfm-an-rc-rerun se-cfm-an-det-rerun" data-det-num="${num}">&#8634;&ensp;Re-run</button>` +
@@ -1027,36 +1041,74 @@ function _openEntryDetail(num, digest, resultsByNum, parentDlg) {
     document.body.appendChild(det);
     _centerDialog(det);
     _makeDraggable(det, det.querySelector('.se-cfm-an-run-hdr'));
+
+    const preEl   = det.querySelector(`#se-cfm-an-det-pre-${num}`);
+    const lblEl   = det.querySelector('.se-cfm-an-det-entry-lbl');
+    const selEl   = det.querySelector('.se-cfm-an-det-entry-sel');
+    const origTog = det.querySelector('.se-cfm-an-det-orig-tog');
+
+    let proposedContent  = null;
+    let showingProposed  = false;
+    let refEntryNum      = num;   // which entry the left pane is currently showing
+
+    // ── Entry browser selector ────────────────────────────────────
+    const showEntry = n => {
+        refEntryNum = n;
+        const e = state.entries?.get(n);
+        preEl.textContent = String(e?.content ?? '');
+        const isCurrent = n === num;
+        lblEl.textContent = isCurrent ? `Entry #${num}` : `Entry #${n} (reference)`;
+        // Only show proposed toggle when viewing the current entry and a proposal exists
+        origTog.hidden = !(isCurrent && proposedContent !== null);
+        if (!isCurrent && showingProposed) {
+            showingProposed = false;
+            origTog.textContent = 'ORIG';
+        }
+    };
+
+    selEl.addEventListener('change', () => showEntry(Number(selEl.value)));
+
+    // ── Proposed/Original toggle ──────────────────────────────────
+    origTog.addEventListener('click', () => {
+        showingProposed = !showingProposed;
+        preEl.textContent = showingProposed ? (proposedContent ?? originalContent) : originalContent;
+        origTog.textContent = showingProposed ? 'ORIG' : 'PROPOSED';
+        origTog.title = showingProposed
+            ? 'Switch back to original ingested content'
+            : 'Switch to LLM-proposed rewrite';
+        lblEl.textContent = showingProposed ? `Entry #${num} — proposed` : `Entry #${num}`;
+    });
+
+    // ── Close ─────────────────────────────────────────────────────
     det.querySelector('.se-cfm-an-det-close').addEventListener('click', () => det.remove());
 
+    // ── Confirm: write back to card ───────────────────────────────
     det.querySelector('.se-cfm-an-det-confirm').addEventListener('click', () => {
-        const taVal = det.querySelector(`#se-cfm-an-det-ta-${num}`)?.value ?? '';
-        const fbVal = det.querySelector(`#se-cfm-an-det-fb-${num}`)?.value ?? '';
+        const taVal  = det.querySelector(`#se-cfm-an-det-ta-${num}`)?.value ?? '';
+        const fbVal  = det.querySelector(`#se-cfm-an-det-fb-${num}`)?.value ?? '';
         const cardFb = parentDlg?.querySelector(`#se-cfm-an-rc-f-${num}`);
         const cardRl = parentDlg?.querySelector(`#se-cfm-an-rc-r-${num}`);
-        const cardBadge = parentDlg?.querySelector(`#se-cfm-an-rc-s-${num}`);
         if (cardRl) { cardRl.value = taVal; resultsByNum[num] = taVal; }
         if (cardFb) { cardFb.value = fbVal; cardFb.disabled = false; }
-        // mark feedback added
         const st = det.querySelector(`#se-cfm-an-det-st-${num}`);
         if (st) { st.textContent = '✓ Confirmed'; st.style.color = '#a6e22e'; }
-        if (cardBadge) cardBadge.dataset.fbSet = '1';
-        const badge = parentDlg?.querySelector(`#se-cfm-an-rc-fb-badge-${num}`);
-        if (badge) badge.style.display = '';
-        else {
-            const statusRow = parentDlg?.querySelector(`[id="se-cfm-an-rc-s-${num}"]`)?.parentElement;
+        // ✓ fb badge on card
+        let badge = parentDlg?.querySelector(`#se-cfm-an-rc-fb-badge-${num}`);
+        if (!badge) {
+            const statusRow = parentDlg?.querySelector(`#se-cfm-an-rc-s-${num}`)?.parentElement;
             if (statusRow) {
-                const b = document.createElement('span');
-                b.id = `se-cfm-an-rc-fb-badge-${num}`;
-                b.className = 'se-cfm-an-rc-fb-badge';
-                b.title = 'Feedback set from detail view';
-                b.textContent = '✓ fb';
-                statusRow.appendChild(b);
+                badge = document.createElement('span');
+                badge.id = `se-cfm-an-rc-fb-badge-${num}`;
+                badge.className = 'se-cfm-an-rc-fb-badge';
+                badge.title = 'Feedback confirmed from detail view';
+                badge.textContent = '✓ fb';
+                statusRow.appendChild(badge);
             }
         }
         det.remove();
     });
 
+    // ── Re-run ────────────────────────────────────────────────────
     det.querySelector('.se-cfm-an-det-rerun').addEventListener('click', async () => {
         const entry2 = state.entries?.get(num);
         if (!entry2) return;
@@ -1074,6 +1126,22 @@ function _openEntryDetail(num, digest, resultsByNum, parentDlg) {
             const newRaw = await _callLLM(getPrompt('entry-analysis'), userMsg);
             if (taEl) taEl.value = newRaw;
             resultsByNum[num] = newRaw;
+
+            // If the result contains a proposed rewrite, show it on the left
+            const parsed = _parseAction(newRaw);
+            const proposal = parsed?.proposed ?? parsed?.rewritten ?? parsed?.suggestion ?? null;
+            if (proposal) {
+                proposedContent = proposal;
+                showingProposed = true;
+                if (refEntryNum === num) {
+                    preEl.textContent = proposedContent;
+                    lblEl.textContent = `Entry #${num} — proposed`;
+                    origTog.textContent = 'ORIG';
+                    origTog.title = 'Switch back to original ingested content';
+                    origTog.hidden = false;
+                }
+            }
+
             if (stEl) { stEl.textContent = '✓ Done'; stEl.style.color = '#a6e22e'; }
         } catch (err) {
             if (stEl) { stEl.textContent = `Error: ${err.message}`; stEl.style.color = '#f92672'; }
