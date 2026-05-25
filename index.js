@@ -2155,7 +2155,7 @@ function renderIngestSummary() {
             cls  = isAssigned ? ' supp-assigned' : ' supp-candidate';
             icon = isAssigned
                 ? '&#10003;'
-                : '<span class="se-attn-circle se-file-urgency" title="Needs category assignment">!</span>';
+                : '<span class="se-urgency-dot" title="Needs category assignment">!</span>';
         } else if (!file.valid) {
             cls  = ' invalid';
             icon = '&#9432;';

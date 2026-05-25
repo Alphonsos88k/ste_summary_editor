@@ -389,13 +389,6 @@
     gap: 6px;
 }
 
-/* Compact variant of se-attn-circle used inside file list rows */
-.se-file-urgency {
-    min-width: 20px;
-    height: 20px;
-    padding: 0 5px;
-    font-size: 0.7em;
-}
 
 /* Empty file yellow badge */
 .se-fp-empty-badge {
@@ -500,7 +493,7 @@
 
 .se-fp-attn-status { text-align: center; }
 .se-fp-attn-check  { color: var(--se-green); font-size: 1em; }
-.se-fp-attn-bang   { color: var(--se-orange); font-weight: 800; }
+.se-fp-attn-bang   { /* replaced by se-urgency-dot */ }
 
 .se-fp-attn-name {
     color: var(--se-text);
