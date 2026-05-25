@@ -506,6 +506,51 @@
 .se-fp-attn-unset { color: var(--se-orange); }
 .se-fp-attn-none  { padding: 12px 10px; color: var(--se-muted); text-align: center; }
 
+/* ─── Character association strip ────────────────────────────────────────── */
+.se-char-select-strip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 7px 16px;
+    width: 100%;
+    max-width: 700px;
+    border: 1.5px dashed rgba(166, 226, 46, 0.3);
+    border-radius: 8px;
+    background: transparent;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+.se-char-select-strip:hover,
+.se-char-select-strip:focus-within {
+    border-color: var(--se-green);
+    box-shadow: 0 0 0 3px rgba(166, 226, 46, 0.12);
+}
+.se-char-strip-assigned {
+    border-color: rgba(166, 226, 46, 0.55);
+    background: rgba(166, 226, 46, 0.04);
+}
+.se-char-select-icon {
+    font-size: 1em;
+    flex-shrink: 0;
+    color: var(--se-muted);
+    pointer-events: none;
+}
+.se-char-select-dropdown {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--se-text);
+    font-size: 0.84em;
+    cursor: pointer;
+    outline: none;
+    font-family: inherit;
+}
+.se-char-select-dropdown option:disabled {
+    color: #555;
+    font-style: italic;
+}
+
 /* Ingest summary bar — sits below drop zone, inline with action buttons */
 .se-ingest-summary {
     margin-top: 18px;
