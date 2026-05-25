@@ -123,10 +123,13 @@ function _bindPanelEvents() {
     const folderInput = _panel.querySelector('#se-cfm-folder-input');
     if (folderInput) folderInput.value = folderPath;
 
-    _panel.querySelector('#se-cfm-folder-btn')?.addEventListener('click', function () {
+    _panel.querySelector('#se-cfm-folder-btn')?.addEventListener('click', () => {
         navigator.clipboard.writeText(folderPath).catch(() => {});
-        const prev = this.innerHTML;
-        this.innerHTML = '&#x2713;';
-        setTimeout(() => { this.innerHTML = prev; }, 1500);
+        const toast = _panel.querySelector('#se-cfm-folder-toast');
+        if (!toast) return;
+        toast.textContent = 'Folder path copied!';
+        toast.classList.add('se-cfm-folder-toast-visible');
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(() => toast.classList.remove('se-cfm-folder-toast-visible'), 2000);
     });
 }
