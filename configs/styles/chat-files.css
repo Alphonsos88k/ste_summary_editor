@@ -142,15 +142,6 @@
     padding-left: 8px;
 }
 
-.se-cfm-file-item.se-cfm-branch {
-    padding: 3px 8px 3px 20px;
-    background: #1c1c16;
-    border-bottom-color: rgba(40,40,32,0.6);
-    opacity: 0.85;
-}
-.se-cfm-file-item.se-cfm-branch:hover { background: #2a2a20; opacity: 1; }
-.se-cfm-file-item.se-cfm-branch .se-cfm-fname { font-size: 10px; }
-.se-cfm-file-item.se-cfm-branch .se-cfm-fdate { font-size: 9px; }
 
 .se-cfm-fname {
     font-size: 11px;
