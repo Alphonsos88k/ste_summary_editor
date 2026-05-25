@@ -412,33 +412,24 @@ async function _autoBalance() {
     // Phase 2: Size-based shifting — move overflow from over-limit files to the smallest
     // available file that comes AFTER the source file in part order
     let changed = true;
+    // Only shift to the immediately next file — preserves cross-file entry order
     let guard = 0;
     while (changed && guard++ < 200) {
         changed = false;
         const keys = [...state.fileRanges.keys()];
         for (let i = 0; i < keys.length - 1; i++) {
-            const src = state.fileRanges.get(keys[i]);
+            const src  = state.fileRanges.get(keys[i]);
+            const dest = state.fileRanges.get(keys[i + 1]);
             if (estimateRangeSizeKB(src.entryNums) <= FILE_SIZE_LIMIT_KB) continue;
 
-            // Candidate destinations: all files AFTER this one, sorted by current size (smallest first)
-            const dests = keys.slice(i + 1)
-                .map(k => ({ k, r: state.fileRanges.get(k) }))
-                .sort((a, b) => estimateRangeSizeKB(a.r.entryNums) - estimateRangeSizeKB(b.r.entryNums));
-
-            for (const { r: dest } of dests) {
-                const sorted = [...src.entryNums].sort((a, b) => a - b);
-                let movedAny = false;
-                // Move trailing entries one at a time until src is under limit or dest would exceed it
-                while (estimateRangeSizeKB(src.entryNums) > FILE_SIZE_LIMIT_KB) {
-                    const last = sorted[sorted.length - 1];
-                    if (estimateRangeSizeKB([last, ...dest.entryNums]) > FILE_SIZE_LIMIT_KB) break;
-                    sorted.pop();
-                    src.entryNums = [...sorted];
-                    dest.entryNums = [...dest.entryNums, last].sort((a, b) => a - b);
-                    movedAny = true;
-                    changed = true;
-                }
-                if (movedAny) break;
+            const sorted = [...src.entryNums].sort((a, b) => a - b);
+            while (estimateRangeSizeKB(src.entryNums) > FILE_SIZE_LIMIT_KB) {
+                const last = sorted[sorted.length - 1];
+                if (estimateRangeSizeKB([last, ...dest.entryNums]) > FILE_SIZE_LIMIT_KB) break;
+                sorted.pop();
+                src.entryNums  = [...sorted];
+                dest.entryNums = [...dest.entryNums, last].sort((a, b) => a - b);
+                changed = true;
             }
         }
     }
