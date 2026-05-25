@@ -76,6 +76,7 @@ export function toggleFilesPanel() {
 
 export function refreshFilesPanel() {
     if (_panel) _renderRows();
+    else _updateAttentionBadge(); // keep drawer badge in sync even when popup is closed
 }
 
 /**
@@ -139,17 +140,17 @@ function _handleAssignChange(sel) {
 }
 
 function _renderRows() {
+    _updateAttentionBadge(); // always run — drawer badge must update even when popup is closed
+
     const body = document.getElementById('se-fp-body');
     if (!body) return;
 
     if (state.files.length === 0) {
         body.innerHTML = '<div class="se-fp-empty">No files ingested yet.</div>';
-        _updateAttentionBadge();
         return;
     }
 
     body.innerHTML = state.files.map(file => _buildFileRow(file)).join('');
-    _updateAttentionBadge();
 }
 
 function _unassignedCount() {
