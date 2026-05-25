@@ -890,6 +890,9 @@ export function toggleMinimap() {
     $overlay.toggleClass('open');
     if ($overlay.hasClass('open')) {
         buildMinimapOverlay();
+    } else {
+        $overlay.removeClass('se-minimap-fullscreen');
+        $('#se-btn-minimap-fullscreen').html('&#x26F6;').attr('title', 'Fullscreen');
     }
     closeAllPopovers();
 }
