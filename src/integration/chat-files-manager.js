@@ -223,13 +223,15 @@ function _bindPanelEvents() {
         else _detachDrag();
     });
 
-    _panel.querySelector('#se-cfm-btn-fullscreen')?.addEventListener('click', () => {
+    _panel.querySelector('#se-cfm-btn-fullscreen')?.addEventListener('click', function () {
         const isFull = _panel.classList.toggle('se-cfm-fullscreen');
         if (isFull) {
             _panel.classList.remove('se-cfm-popped');
             _detachDrag();
             _popped = false;
         }
+        this.innerHTML = isFull ? '&#x2922;' : '&#x26F6;';
+        this.title     = isFull ? 'Exit fullscreen' : 'Fullscreen';
     });
 
     const folder     = _currentChar?.avatar.replace(/\.[^.]+$/, '') ?? '';
