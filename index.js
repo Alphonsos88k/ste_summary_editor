@@ -345,45 +345,18 @@ jQuery(async () => {
     // Wipe state when switching characters — editor is stateless between characters
     listenForCharacterSwap();
 
-    // Initialize character select and sync Chat Files / Open Folder button visibility
+    // Initialize character select and sync Chat Files button visibility
     initCharSelect();
     document.addEventListener('se:character-changed', (e) => {
         const char = e.detail;
         if (char) {
             $('#se-btn-chat-files').attr('title', `Chat files for ${char.name}`).show();
-            $('#se-btn-open-folder').attr('title', `Open chat folder for ${char.name}`).show();
         } else {
             $('#se-btn-chat-files').attr('title', '').hide();
-            $('#se-btn-open-folder').attr('title', '').hide();
             closeChatFilesManager();
         }
     });
 
-    $('#se-btn-chat-files').on('click', () => {
-        if (state.associatedCharacter) openChatFilesManager(state.associatedCharacter);
-    });
-
-    $('#se-btn-open-folder').on('click', () => {
-        const char = state.associatedCharacter;
-        if (!char) return;
-        const folder = char.avatar.replace(/\.[^.]+$/, '');
-        const path = `public/chats/${folder}/`;
-        const existing = document.getElementById('se-open-folder-popup');
-        if (existing) { existing.remove(); return; }
-        const popup = document.createElement('div');
-        popup.id = 'se-open-folder-popup';
-        popup.className = 'se-open-folder-popup';
-        popup.innerHTML =
-            `<span class="se-open-folder-label">Chat folder</span>` +
-            `<input class="se-open-folder-input" id="se-ofp-path" type="text" readonly value="${path}" />` +
-            `<button class="se-open-folder-copy" id="se-ofp-copy" title="Copy path">&#x1F4CB;</button>` +
-            `<button class="se-close-circle se-open-folder-close" id="se-ofp-close">&times;</button>`;
-        document.getElementById('se-panel-arcs')?.appendChild(popup);
-        document.getElementById('se-ofp-copy')?.addEventListener('click', () => {
-            navigator.clipboard.writeText(path).catch(() => {});
-        });
-        document.getElementById('se-ofp-close')?.addEventListener('click', () => popup.remove());
-    });
 
     // Auto-inject callback for export.js (avoids circular import)
     globalThis.SummaryEditorAutoInject = () => handleDatabankInject();
@@ -1628,6 +1601,9 @@ function bindActsEvents() {
     $('#se-btn-story-context').on('click', openStoryContextPanel);
     $('#se-btn-entry-analytics').on('click', openAnalyticsPanel);
     $('#se-btn-conflict-review').on('click', openConflictReview);
+    $('#se-btn-chat-files').on('click', () => {
+        if (state.associatedCharacter) openChatFilesManager(state.associatedCharacter);
+    });
 
     // ── View toggle: Timeline ↔ Location Bubbles ───────────────
     let currentTlView = 'timeline';
