@@ -1,3 +1,10 @@
+## [1.12.3](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.12.2...v1.12.3) (2026-05-25)
+
+
+### Bug Fixes
+
+* split urgency indicators into two distinct styles ([e58fa6a](https://github.com/Alphonsos88k/ste_summary_editor/commit/e58fa6ac64fc1d3cb4ea7fb9d744d642b2f0f8c2))
+
 ## [1.12.2](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.12.1...v1.12.2) (2026-05-25)
 
 
