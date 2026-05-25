@@ -609,6 +609,19 @@
     overflow: hidden;
 }
 
+.se-cfm-an-xy {
+    position: absolute;
+    bottom: 10px;
+    left: 12px;
+    font-size: 10px;
+    font-family: monospace;
+    color: #444;
+    pointer-events: none;
+    z-index: 10;
+    line-height: 1;
+    min-width: 60px;
+}
+
 .se-cfm-an-loading {
     position: absolute;
     inset: 0;
