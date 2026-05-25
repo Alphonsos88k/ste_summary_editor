@@ -128,22 +128,15 @@ async function _loadFileList() {
 }
 
 function _renderFileList(chats) {
-    _files = chats;
+    _files = chats.toSorted((a, b) => _toMs(b.last_mes) - _toMs(a.last_mes));
     const listEl = _panel.querySelector('#se-cfm-file-list');
     if (!listEl) return;
-    if (!chats.length) {
+    if (!_files.length) {
         listEl.innerHTML = '<div class="se-cfm-hint">No chats found</div>';
         return;
     }
 
-    const sorted   = chats.toSorted((a, b) => _toMs(b.last_mes) - _toMs(a.last_mes));
-    const roots    = sorted.filter(c => !c.parent_chat_id);
-    const branches = sorted.filter(c => c.parent_chat_id);
-
-    listEl.innerHTML = roots.map(chat => {
-        const subs = branches.filter(b => b.parent_chat_id === chat.file_name);
-        return _fileItemHtml(chat, false) + subs.map(b => _fileItemHtml(b, true)).join('');
-    }).join('');
+    listEl.innerHTML = _files.map(chat => _fileItemHtml(chat)).join('');
 
     listEl.querySelectorAll('[data-cfm-file]').forEach(el => {
         el.addEventListener('click', () => selectFile(el.dataset.cfmFile, _currentChar));
@@ -153,15 +146,13 @@ function _renderFileList(chats) {
 
 const _LABEL_MAX = 52;
 
-function _fileItemHtml(chat, isBranch) {
+function _fileItemHtml(chat) {
     const name  = chat.file_name ?? '';
     const base  = name.replace(/\.jsonl$/, '');
     const label = base.length > _LABEL_MAX ? `${base.slice(0, _LABEL_MAX)}…` : base;
     const date  = _relDate(chat.last_mes);
-    const cls   = isBranch ? ' se-cfm-branch' : '';
-    const pfx   = isBranch ? '&#8627;&nbsp;' : '';
-    return `<div class="se-cfm-file-item${cls}" data-cfm-file="${escHtml(name)}" title="${escHtml(name)}">` +
-        `<span class="se-cfm-fname"><span class="se-cfm-fname-text">${pfx}${escHtml(label)}</span></span>` +
+    return `<div class="se-cfm-file-item" data-cfm-file="${escHtml(name)}" title="${escHtml(name)}">` +
+        `<span class="se-cfm-fname"><span class="se-cfm-fname-text">${escHtml(label)}</span></span>` +
         `<span class="se-cfm-fdate">${date}</span>` +
         '</div>';
 }
