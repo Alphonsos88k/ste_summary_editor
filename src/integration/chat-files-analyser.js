@@ -8,6 +8,8 @@
 import { state } from '../core/state.js';
 import { escHtml } from '../core/utils.js';
 import { registerPrompt, getRegisteredPrompts, getPrompt, setPrompt } from '../core/system-prompts.js';
+import { loadTemplate } from '../core/template-loader.js';
+import { TEMPLATES } from '../core/constants.js';
 
 // ─── Prompt registration ──────────────────────────────────────
 
@@ -155,6 +157,7 @@ function _initCanvas(container) {
 
     _graph = new LG.LGraph();
     _lgc   = new LG.LGraphCanvas(_lgCanvas, _graph);
+    _lgc.pixel_ratio           = window.devicePixelRatio || 1;
 
     _lgc.background_color      = '#181812';
     _lgc.clear_background      = true;
@@ -241,9 +244,9 @@ function _registerNodeTypes() {
 
         onDrawForeground(ctx) {
             if (!this.properties?.fileName) return;
-            ctx.fillStyle   = '#75715e';
-            ctx.font        = '9px monospace';
-            ctx.fillText('📄 ' + this.properties.fileName.replace(/\.jsonl$/, '').slice(-32), 8, this.size[1] - 10);
+            ctx.fillStyle   = '#a6e22e99';
+            ctx.font        = '10px monospace';
+            ctx.fillText(this.properties.fileName.replace(/\.jsonl$/, '').slice(-32), 8, this.size[1] - 10);
         }
     }
     SEChatFileNode.title = 'Chat File';
@@ -271,8 +274,8 @@ function _registerNodeTypes() {
         onDrawForeground(ctx) {
             const snippet = String(this.properties?.snippet ?? '').slice(0, 50);
             if (!snippet) return;
-            ctx.fillStyle = '#888';
-            ctx.font      = '9px monospace';
+            ctx.fillStyle = '#66d9e899';
+            ctx.font      = '10px monospace';
             ctx.fillText(snippet, 8, this.size[1] - 10);
         }
     }
@@ -428,11 +431,13 @@ function _attachPopDrag(pop, hdrSelector) {
 function _bindToolbar() {
     const p = _panel;
     p?.querySelector('#se-cfm-an-fit')?.addEventListener('click', _fitView);
+    p?.querySelector('#se-cfm-an-help')?.addEventListener('click', _openHelpDialog);
     p?.querySelector('#se-cfm-an-origin')?.addEventListener('click', () => {
         if (!_lgc) return;
         _lgc.ds.scale  = 1;
         _lgc.ds.offset = [0, 0];
         _lgc.setDirty(true, true);
+        _updateZoomLabel();
     });
     p?.querySelector('#se-cfm-an-gather')?.addEventListener('click', _gatherNodes);
     p?.querySelector('#se-cfm-an-layout')?.addEventListener('click', () => {
@@ -447,7 +452,7 @@ function _bindToolbar() {
         _fitView();
     });
     p?.querySelector('#se-cfm-an-clear')?.addEventListener('click', _clearCanvas);
-    p?.querySelector('#se-cfm-an-prompts')?.addEventListener('click', e => _openAnalysePrompts(e.currentTarget));
+    p?.querySelector('#se-cfm-an-prompts')?.addEventListener('click', _openAnalysePrompts);
 
     // Floating zoom pill
     const label = p?.querySelector('#se-cfm-an-zoom-label');
@@ -458,10 +463,11 @@ function _bindToolbar() {
         _lgc.ds.scale  = 1;
         _lgc.ds.offset = [_lgCanvas.offsetWidth / 2, _lgCanvas.offsetHeight / 2];
         _lgc.setDirty(true, true);
+        _updateZoomLabel();
     });
 }
 
-function _openAnalysePrompts(btn) {
+function _openAnalysePrompts() {
     const existing = document.getElementById('se-cfm-an-prompts-dlg');
     if (existing) { existing.remove(); return; }
 
@@ -472,31 +478,77 @@ function _openAnalysePrompts(btn) {
     dlg.id = 'se-cfm-an-prompts-dlg';
     dlg.className = 'se-cfm-an-prompts-dlg';
     dlg.innerHTML =
-        `<div class="se-cfm-an-pdlg-title">Analyse Prompts</div>` +
+        `<div class="se-cfm-an-pdlg-hdr">` +
+        `<span class="se-cfm-an-pdlg-title">Analyse Prompts</span>` +
+        `<button class="se-cfm-an-pdlg-close se-close-circle">&times;</button>` +
+        `</div>` +
+        `<div class="se-cfm-an-prompts-dlg-body">` +
         prompts.map(p =>
             `<div class="se-cfm-an-pdlg-item">` +
             `<label class="se-cfm-an-pdlg-label">${escHtml(p.label)}</label>` +
             `<textarea class="se-cfm-an-pdlg-ta" data-pk="${escHtml(p.key)}" rows="5" spellcheck="false">${escHtml(getPrompt(p.key))}</textarea>` +
             `</div>`
         ).join('') +
-        `<div class="se-cfm-an-pdlg-footer"><button class="se-cfm-an-pdlg-close">Close</button></div>`;
+        `</div>`;
 
-    const rect = btn?.getBoundingClientRect();
-    if (rect) {
-        dlg.style.bottom = `${window.innerHeight - rect.top + 6}px`;
-        dlg.style.right  = `${window.innerWidth - rect.right}px`;
-    }
     document.body.appendChild(dlg);
+    _centerDialog(dlg);
+    _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-pdlg-hdr'));
 
     dlg.querySelectorAll('[data-pk]').forEach(ta => {
         ta.addEventListener('input', () => setPrompt(ta.dataset.pk, ta.value));
     });
     dlg.querySelector('.se-cfm-an-pdlg-close').addEventListener('click', () => dlg.remove());
+}
 
-    const onOutside = e => {
-        if (!dlg.contains(e.target) && e.target !== btn) { dlg.remove(); document.removeEventListener('mousedown', onOutside); }
-    };
-    setTimeout(() => document.addEventListener('mousedown', onOutside), 0);
+async function _openHelpDialog() {
+    const existing = document.getElementById('se-cfm-an-help-dlg');
+    if (existing) { existing.remove(); return; }
+
+    const dlg = document.createElement('div');
+    dlg.id = 'se-cfm-an-help-dlg';
+    dlg.className = 'se-cfm-an-help-dlg';
+    dlg.innerHTML = await loadTemplate(TEMPLATES.CHAT_FILES_HELP);
+
+    document.body.appendChild(dlg);
+    _centerDialog(dlg);
+    _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-help-hdr'));
+
+    dlg.querySelector('.se-cfm-an-help-close').addEventListener('click', () => dlg.remove());
+}
+
+function _centerDialog(dlg) {
+    requestAnimationFrame(() => {
+        const w = dlg.offsetWidth  || 420;
+        const h = dlg.offsetHeight || 400;
+        dlg.style.left = `${Math.max(8, (window.innerWidth  - w) / 2)}px`;
+        dlg.style.top  = `${Math.max(8, (window.innerHeight - h) / 2)}px`;
+    });
+}
+
+function _makeDraggable(el, handle) {
+    if (!handle) return;
+    handle.style.cursor = 'grab';
+    let sx, sy, sl, st;
+    handle.addEventListener('pointerdown', e => {
+        if (e.target.closest('button')) return;
+        sx = e.clientX; sy = e.clientY;
+        const r = el.getBoundingClientRect();
+        sl = r.left; st = r.top;
+        handle.setPointerCapture(e.pointerId);
+        handle.style.cursor = 'grabbing';
+    });
+    handle.addEventListener('pointermove', e => {
+        if (!handle.hasPointerCapture(e.pointerId)) return;
+        el.style.left = `${Math.max(0, sl + e.clientX - sx)}px`;
+        el.style.top  = `${Math.max(0, st + e.clientY - sy)}px`;
+    });
+    handle.addEventListener('pointerup', e => {
+        if (handle.hasPointerCapture(e.pointerId)) {
+            handle.releasePointerCapture(e.pointerId);
+            handle.style.cursor = 'grab';
+        }
+    });
 }
 
 function _stepZoom(delta) {
@@ -504,6 +556,12 @@ function _stepZoom(delta) {
     const next = Math.min(3, Math.max(0.15, (_lgc.ds?.scale ?? 1) + delta));
     _lgc.ds.changeScale(next, [_lgCanvas.offsetWidth / 2, _lgCanvas.offsetHeight / 2]);
     _lgc.setDirty(true, true);
+    _updateZoomLabel();
+}
+
+function _updateZoomLabel() {
+    const label = _panel?.querySelector('#se-cfm-an-zoom-label');
+    if (label) label.textContent = `${Math.round((_lgc?.ds?.scale ?? 1) * 100)}%`;
 }
 
 function _fitView() {
@@ -528,6 +586,7 @@ function _fitView() {
     _lgc.ds.scale  = scale;
     _lgc.ds.offset = [w / 2 - ((minX + maxX) / 2) * scale, h / 2 - ((minY + maxY) / 2) * scale];
     _lgc.setDirty(true, true);
+    _updateZoomLabel();
 }
 
 function _gatherNodes() {
