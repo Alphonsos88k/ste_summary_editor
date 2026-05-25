@@ -1,3 +1,10 @@
+## [1.11.1](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.11.0...v1.11.1) (2026-05-25)
+
+
+### Bug Fixes
+
+* phase 2 shift only to next sequential file to preserve cross-file entry order ([97ca342](https://github.com/Alphonsos88k/ste_summary_editor/commit/97ca342f226687a56d5e0b43ea0fba6d54656ca2))
+
 # [1.11.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.10.0...v1.11.0) (2026-05-25)
 
 
