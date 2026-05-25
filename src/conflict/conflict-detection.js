@@ -25,6 +25,8 @@ registerPrompt('story-context', 'Story Context Generation', '', { location: 'Rev
 
 registerPrompt('consistency-score', 'Consistency Score', '', { warnJson: true, location: 'Story Context panel › Check Score' });
 
+registerPrompt('entry-1-context', 'Entry #1 Opening Leniency', '', { location: 'Review › Check Conflicts (injected when entry #1 is in scope)' });
+
 // ─── Analysis Log ────────────────────────
 
 /** @type {Array<{timestamp: string, scope: string, model: string, results: Array}>} */
@@ -152,19 +154,44 @@ function resolveTargetEntries() {
 }
 
 /**
+ * Build an additional context block from supplementary files (world notes, character notes, etc.)
+ * for use when entry #1 is being analyzed.
+ * @returns {string} Formatted context block, or empty string if none.
+ */
+function buildSupplementaryContext() {
+    if (!state.supplementaryFiles?.size) return '';
+    const parts = [];
+    for (const [, sf] of state.supplementaryFiles) {
+        if (!sf.category || sf.category === 'timeline-notes') continue;
+        const text = (sf.editedContent || sf.content || '').trim();
+        if (!text) continue;
+        parts.push(`[${sf.name}]\n${text}`);
+    }
+    return parts.length ? parts.join('\n\n') : '';
+}
+
+/**
  * Send entries to ST's chat-completions backend for analysis.
  * @param {string} prompt - The assembled entry text.
  * @param {string} [systemContext] - Optional story context to prepend to the system prompt.
+ * @param {boolean} [includesEntry1] - Whether entry #1 is in the batch (injects leniency + supplementary context).
  * @returns {Promise<string>} Raw model response text.
  */
-async function callConflictAPI(prompt, systemContext = '') {
+async function callConflictAPI(prompt, systemContext = '', includesEntry1 = false) {
     const context = SillyTavern.getContext();
     const oai = context.chatCompletionSettings;
 
     const base = getPrompt('conflict-check');
-    const sysPrompt = systemContext
+    let sysPrompt = systemContext
         ? `${base}\n\n---\nSTORY CONTEXT (summary of prior analysis):\n${systemContext}`
         : base;
+
+    if (includesEntry1) {
+        const entry1Hint = getPrompt('entry-1-context');
+        if (entry1Hint) sysPrompt += `\n\n---\nNOTE ON ENTRY #1:\n${entry1Hint}`;
+        const suppCtx = buildSupplementaryContext();
+        if (suppCtx) sysPrompt += `\n\n---\nSUPPLEMENTARY STORY FILES (world/character context):\n${suppCtx}`;
+    }
 
     const resp = await fetch('/api/backends/chat-completions/generate', {
         method: 'POST',
@@ -567,7 +594,8 @@ export async function runConflictCheck() {
     const interval = setInterval(() => { pct += 5; $fill.css('width', Math.min(pct, 95) + '%'); }, 200);
 
     try {
-        const responseText = await callConflictAPI(prompt, state.storyContext || '');
+        const hasEntry1 = targetEntries.some(e => e.num === 1);
+        const responseText = await callConflictAPI(prompt, state.storyContext || '', hasEntry1);
         clearInterval(interval);
         $fill.css('width', '100%');
 
@@ -859,7 +887,7 @@ export async function reCheckEntry(num, contentOverride) {
 
     const { prompt } = buildConflictPrompt(entries);
     try {
-        const raw = await callConflictAPI(prompt, state.storyContext || '');
+        const raw = await callConflictAPI(prompt, state.storyContext || '', entries.some(e => e.num === 1));
         const rawResults = extractJsonArray(raw);
         if (!rawResults) return null;
         const results = rawResults.map(normalizeResultItem);
