@@ -1,3 +1,10 @@
+## [1.12.2](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.12.1...v1.12.2) (2026-05-25)
+
+
+### Bug Fixes
+
+* attn badge always visible + oval outline style ([27505bf](https://github.com/Alphonsos88k/ste_summary_editor/commit/27505bfb03702b8480441ef96200f45a634a6b49))
+
 ## [1.12.1](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.12.0...v1.12.1) (2026-05-25)
 
 
