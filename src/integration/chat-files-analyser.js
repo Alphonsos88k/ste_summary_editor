@@ -668,7 +668,7 @@ async function _runAnalysis(fileNode, entryNodes) {
             const entry = state.entries?.get(num);
             if (!entry) { updateEntry(num, ''); continue; }
             setLabel(`⟳ Entry #${num} (${i + 1}/${entryNodes.length})…`);
-            const userMsg = `Chat digest:\n${digest}\n\n---\nEntry #${num}:\n${entry.content}`;
+            const userMsg = `Chat digest:\n${digest}\n\n---\nAll entries:\n${_buildEntryContext()}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
             const raw     = await _callLLM(getPrompt('entry-analysis'), userMsg);
             updateEntry(num, raw);
         }
@@ -924,7 +924,7 @@ function _createResultsDialog(fileName, digest, entryNodes) {
         if (status) { status.textContent = '⟳ Running…'; status.className = 'se-cfm-an-rc-status pending'; }
 
         try {
-            let userMsg = `Chat digest:\n${digest}\n\n---\nEntry #${num}:\n${entry.content}`;
+            let userMsg = `Chat digest:\n${digest}\n\n---\nAll entries:\n${_buildEntryContext()}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
             if (feedbackVal) userMsg += `\n\n---\nFeedback on previous analysis:\n${feedbackVal}`;
             const raw = await _callLLM(getPrompt('entry-analysis'), userMsg);
             _applyResult(num, raw);
@@ -1121,7 +1121,7 @@ function _openEntryDetail(num, digest, resultsByNum, parentDlg) {
         if (taEl) taEl.disabled = true;
         if (stEl) { stEl.textContent = '⟳ Running…'; stEl.style.color = '#75715e'; }
         try {
-            let userMsg = `Chat digest:\n${digest}\n\n---\nEntry #${num}:\n${entry2.content}`;
+            let userMsg = `Chat digest:\n${digest}\n\n---\nAll entries:\n${_buildEntryContext()}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry2.content}`;
             if (fbVal) userMsg += `\n\n---\nFeedback:\n${fbVal}`;
             const newRaw = await _callLLM(getPrompt('entry-analysis'), userMsg);
             if (taEl) taEl.value = newRaw;
@@ -1391,6 +1391,12 @@ function _bindEntryRefresh() {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
+
+function _buildEntryContext() {
+    const entries = [...(state.entries?.values() ?? [])].toSorted((a, b) => a.num - b.num);
+    if (!entries.length) return '';
+    return entries.map(e => `Entry #${e.num}:\n${e.content}`).join('\n\n---\n');
+}
 
 function _anRelDate(val) {
     if (!val) return '';
