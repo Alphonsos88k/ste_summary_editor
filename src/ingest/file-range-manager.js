@@ -159,7 +159,7 @@ function _bindEvents() {
     if (balBtn) balBtn.onclick = _autoBalance;
 
     const newBtn = _panel.querySelector('#se-frm-new-file');
-    if (newBtn) newBtn.onclick = _showNewFileForm;
+    if (newBtn) newBtn.onclick = () => _showInlineNewFileForm().then(() => { _sortRanges(); persistState(); _render(); });
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -292,20 +292,38 @@ function _deleteRange(key) {
     _render();
 }
 
-// ─── New File form ────────────────────────────────────────────────────────────
+// ─── Orphan detection ─────────────────────────────────────────────────────────
 
-function _showNewFileForm() {
+function _findOrphanEntries() {
+    const ranged = new Set([...state.fileRanges.values()].flatMap(r => r.entryNums));
+    return [...state.entries.keys()].filter(n => !ranged.has(n)).sort((a, b) => a - b);
+}
+
+// ─── Inline new-file form (shared by + New File and Auto-balance Part 3) ──────
+
+/**
+ * Append an inline form row to the table allowing the user to name a new file.
+ * Resolves with the confirmed key name, or null if cancelled.
+ * If `overflow` is provided, the new range is pre-populated with those entry nums.
+ *
+ * @param {object} [opts]
+ * @param {number[]} [opts.overflow] - Entry nums to assign to the new range on confirm.
+ * @param {string}  [opts.label]     - Optional label hint shown in the form.
+ * @returns {Promise<string|null>}
+ */
+function _showInlineNewFileForm({ overflow = [], label = '' } = {}) {
     _panel.querySelectorAll('.se-frm-new-form').forEach(el => el.remove());
     _panel.querySelectorAll('.se-frm-split-form').forEach(el => el.remove());
 
     const suggested = suggestNextFilename([...state.fileRanges.keys()]);
+    const hint = label ? ` <span style="color:#75715e;font-size:0.8em;">(${escHtml(label)})</span>` : '';
 
     const formRow = document.createElement('tr');
     formRow.className = 'se-frm-new-form';
     formRow.innerHTML = `
         <td colspan="5" class="se-frm-split-td">
             <div class="se-frm-split-inner">
-                <label class="se-frm-split-lbl">New file name:</label>
+                <label class="se-frm-split-lbl">New file name:${hint}</label>
                 <input class="se-frm-new-name-input" value="${escHtml(suggested)}" spellcheck="false" />
                 <span class="se-frm-new-err" style="display:none;"></span>
                 <div class="se-frm-split-actions">
@@ -315,7 +333,6 @@ function _showNewFileForm() {
             </div>
         </td>`;
 
-    // Append after the last data row (before any gap rows)
     const tbody = _panel.querySelector('#se-frm-rows');
     tbody.appendChild(formRow);
 
@@ -324,47 +341,143 @@ function _showNewFileForm() {
     nameInput.focus();
     nameInput.select();
 
-    formRow.querySelector('.se-frm-new-confirm').onclick = () => {
-        const name = nameInput.value.trim();
-        if (!name) return;
-        if (state.fileRanges.has(name)) {
-            errSpan.textContent = `"${name}" already exists`;
-            errSpan.style.display = 'inline';
-            return;
-        }
-        state.fileRanges.set(name, { color: nextRangeColor(), entryNums: [], label: name });
-        _sortRanges();
-        persistState();
-        _render();
-    };
+    return new Promise(resolve => {
+        const confirm = () => {
+            const name = nameInput.value.trim();
+            if (!name) return;
+            if (state.fileRanges.has(name)) {
+                errSpan.textContent = `"${name}" already exists`;
+                errSpan.style.display = 'inline';
+                return;
+            }
+            state.fileRanges.set(name, { color: nextRangeColor(), entryNums: [...overflow].sort((a, b) => a - b), label: name });
+            formRow.remove();
+            resolve(name);
+        };
+        const cancel = () => { formRow.remove(); resolve(null); };
 
-    formRow.querySelector('.se-frm-new-cancel').onclick = () => formRow.remove();
-
-    nameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') formRow.querySelector('.se-frm-new-confirm').click();
-        if (e.key === 'Escape') formRow.remove();
-    });
-
-    nameInput.addEventListener('input', () => {
-        errSpan.style.display = 'none';
+        formRow.querySelector('.se-frm-new-confirm').onclick = confirm;
+        formRow.querySelector('.se-frm-new-cancel').onclick = cancel;
+        nameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') confirm();
+            if (e.key === 'Escape') cancel();
+        });
+        nameInput.addEventListener('input', () => { errSpan.style.display = 'none'; });
     });
 }
 
 // ─── Auto-balance ─────────────────────────────────────────────────────────────
 
-function _autoBalance() {
-    const ranges  = [...state.fileRanges.entries()];
-    if (ranges.length === 0) return;
+async function _autoBalance() {
+    if (!state.fileRanges.size) return;
 
-    const allNums = ranges.flatMap(([, r]) => r.entryNums).sort((a, b) => a - b);
-    if (allNums.length === 0) return;
+    // Phase 0: detect orphan entries (in state.entries but not in any range)
+    const orphans = _findOrphanEntries();
+    if (orphans.length > 0) {
+        const entryList = orphans.slice(0, 20).map(n => `#${n}`).join(', ') +
+            (orphans.length > 20 ? ` … (+${orphans.length - 20} more)` : '');
+        // Re-use _showInlineNewFileForm to let user name a file for them
+        const tbody = _panel.querySelector('#se-frm-rows');
+        // Add a placeholder row so user sees the context
+        const infoRow = document.createElement('tr');
+        infoRow.className = 'se-frm-new-form';
+        infoRow.innerHTML = `<td colspan="5" class="se-frm-split-td" style="color:#fd971f;font-size:0.82em;padding:6px 10px;">
+            Unassigned entries found: ${escHtml(entryList)}. Name a file to collect them, or Cancel to skip.
+        </td>`;
+        tbody.appendChild(infoRow);
+        await new Promise(r => setTimeout(r, 0)); // let DOM update
 
-    const n     = ranges.length;
-    const chunk = Math.ceil(allNums.length / n);
-    for (let i = 0; i < n; i++) {
-        ranges[i][1].entryNums = allNums.slice(i * chunk, (i + 1) * chunk);
+        const newKey = await _showInlineNewFileForm({ overflow: orphans, label: 'orphans' });
+        infoRow.remove();
+        if (!newKey) {
+            // User skipped — continue without orphans
+        }
+        _sortRanges();
+        persistState();
+        _render();
     }
 
+    // Phase 1: Even distribution by count
+    const allNums = [...state.fileRanges.values()].flatMap(r => r.entryNums).sort((a, b) => a - b);
+    if (allNums.length === 0) return;
+
+    const rangeKeys = [...state.fileRanges.keys()];
+    const n = rangeKeys.length;
+    const chunk = Math.ceil(allNums.length / n);
+    for (let i = 0; i < n; i++) {
+        state.fileRanges.get(rangeKeys[i]).entryNums = allNums.slice(i * chunk, (i + 1) * chunk);
+    }
+    _render();
+
+    // Phase 2: Size-based shifting — move overflow from over-limit files to the smallest
+    // available file that comes AFTER the source file in part order
+    let changed = true;
+    let guard = 0;
+    while (changed && guard++ < 200) {
+        changed = false;
+        const keys = [...state.fileRanges.keys()];
+        for (let i = 0; i < keys.length - 1; i++) {
+            const src = state.fileRanges.get(keys[i]);
+            if (estimateRangeSizeKB(src.entryNums) <= FILE_SIZE_LIMIT_KB) continue;
+
+            // Candidate destinations: all files AFTER this one, sorted by current size (smallest first)
+            const dests = keys.slice(i + 1)
+                .map(k => ({ k, r: state.fileRanges.get(k) }))
+                .sort((a, b) => estimateRangeSizeKB(a.r.entryNums) - estimateRangeSizeKB(b.r.entryNums));
+
+            for (const { r: dest } of dests) {
+                const sorted = [...src.entryNums].sort((a, b) => a - b);
+                let movedAny = false;
+                // Move trailing entries one at a time until src is under limit or dest would exceed it
+                while (estimateRangeSizeKB(src.entryNums) > FILE_SIZE_LIMIT_KB) {
+                    const last = sorted[sorted.length - 1];
+                    if (estimateRangeSizeKB([last, ...dest.entryNums]) > FILE_SIZE_LIMIT_KB) break;
+                    sorted.pop();
+                    src.entryNums = [...sorted];
+                    dest.entryNums = [...dest.entryNums, last].sort((a, b) => a - b);
+                    movedAny = true;
+                    changed = true;
+                }
+                if (movedAny) break;
+            }
+        }
+    }
+    _render();
+
+    // Phase 3: Any file still over limit gets split — user names the new overflow file
+    const overKeys = [...state.fileRanges.keys()].filter(
+        k => estimateRangeSizeKB(state.fileRanges.get(k).entryNums) > FILE_SIZE_LIMIT_KB
+    );
+
+    for (const key of overKeys) {
+        const range = state.fileRanges.get(key);
+        if (!range) continue;
+
+        const sorted = [...range.entryNums].sort((a, b) => a - b);
+        // Find max entries that fit within the size limit
+        let splitAt = 0;
+        while (splitAt < sorted.length - 1 &&
+               estimateRangeSizeKB(sorted.slice(0, splitAt + 1)) <= FILE_SIZE_LIMIT_KB) {
+            splitAt++;
+        }
+        // Ensure at least one entry stays in the source
+        if (splitAt === 0) splitAt = 1;
+        const overflow = sorted.slice(splitAt);
+        if (overflow.length === 0) continue;
+
+        range.entryNums = sorted.slice(0, splitAt);
+
+        const newKey = await _showInlineNewFileForm({ overflow, label: `overflow from ${key}` });
+        if (!newKey) {
+            // User cancelled — put entries back
+            range.entryNums = sorted;
+            break;
+        }
+        _sortRanges();
+        _render();
+    }
+
+    _sortRanges();
     persistState();
     _render();
 }
