@@ -78,6 +78,14 @@ export function refreshFilesPanel() {
     if (_panel) _renderRows();
 }
 
+/**
+ * Toggle the files-needing-attention dialog open/closed.
+ * Called from both the popup panel button and the sidebar drawer button.
+ */
+export function toggleAttentionDialog() {
+    _toggleAttentionDialog();
+}
+
 // ─── Private helpers ─────────────────────────────────────────
 
 function _bindEvents() {
@@ -157,11 +165,20 @@ function _unassignedCount() {
 }
 
 function _updateAttentionBadge() {
-    const btn = _panel?.querySelector('#se-fp-attention-btn');
-    if (!btn) return;
     const count = _unassignedCount();
-    btn.style.display = count > 0 ? '' : 'none';
-    btn.textContent = count > 0 ? `!${count > 1 ? ' ' + count : ''}` : '!';
+    const label = count > 0 ? `! ${count}` : '';
+
+    const popupBtn = _panel?.querySelector('#se-fp-attention-btn');
+    if (popupBtn) {
+        popupBtn.style.display = count > 0 ? '' : 'none';
+        popupBtn.textContent = label;
+    }
+
+    const drawerBtn = document.getElementById('se-file-drawer-attn');
+    if (drawerBtn) {
+        drawerBtn.style.display = count > 0 ? '' : 'none';
+        drawerBtn.textContent = label;
+    }
 }
 
 function _fileStatusIcon(file, isAssigned) {

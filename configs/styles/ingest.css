@@ -389,26 +389,6 @@
     gap: 6px;
 }
 
-/* Circular ! button in files panel header */
-.se-fp-attention-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 5px;
-    border-radius: 10px;
-    background: var(--se-orange);
-    color: #272822;
-    font-size: 0.72em;
-    font-weight: 800;
-    border: none;
-    cursor: pointer;
-    line-height: 1;
-    white-space: nowrap;
-}
-.se-fp-attention-btn:hover { background: #ffa94d; }
-
 /* Per-file urgency ! badge */
 .se-fp-urgency {
     display: inline-flex;
