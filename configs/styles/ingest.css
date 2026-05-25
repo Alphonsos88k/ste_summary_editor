@@ -389,20 +389,12 @@
     gap: 6px;
 }
 
-/* Per-file urgency ! badge */
-.se-fp-urgency {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--se-orange);
-    color: #272822;
-    font-size: 0.68em;
-    font-weight: 800;
-    flex-shrink: 0;
-    line-height: 1;
+/* Compact variant of se-attn-circle used inside file list rows */
+.se-file-urgency {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    font-size: 0.7em;
 }
 
 /* Empty file yellow badge */
