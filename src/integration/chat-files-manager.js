@@ -24,7 +24,9 @@ export async function openChatFilesManager(char) {
     _panel.className = 'se-float-panel se-cfm-panel';
     _panel.innerHTML = html;
 
-    spawnPanel(_panel, document.getElementById('se-modal-overlay'), '.se-cfm-header');
+    const overlay = document.getElementById('se-modal-overlay');
+    overlay.appendChild(_panel);
+    spawnPanel(_panel, overlay, '.se-cfm-header');
 
     _panel.querySelector('#se-cfm-char-name').textContent = char.name;
 
