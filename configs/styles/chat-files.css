@@ -125,6 +125,41 @@
     flex-shrink: 0;
 }
 
+/* ─── Folder path button group ───────────────────────────────────────────── */
+
+.se-cfm-folder-group {
+    display: flex;
+    align-items: stretch;
+    height: 22px;
+}
+
+.se-cfm-folder-input {
+    width: 180px;
+    background: #1e1e18;
+    border: 1px solid #444;
+    border-right: none;
+    border-radius: 3px 0 0 3px;
+    color: #888;
+    font-size: 11px;
+    font-family: monospace;
+    padding: 0 7px;
+    cursor: default;
+    outline: none;
+}
+
+.se-cfm-folder-copy {
+    background: #1e1e18;
+    border: 1px solid #444;
+    border-radius: 0 3px 3px 0;
+    color: #ccc;
+    cursor: pointer;
+    padding: 0 8px;
+    font-size: 12px;
+    line-height: 1;
+    transition: background 0.1s, color 0.1s;
+}
+.se-cfm-folder-copy:hover { background: #3a3a2e; color: #a6e22e; }
+
 .se-cfm-autosave-status {
     font-size: 11px;
     color: #75715e;
