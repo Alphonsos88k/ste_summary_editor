@@ -1077,6 +1077,51 @@
 }
 .se-cfm-an-rc-rerun:hover { border-color: #fd971f; color: #fd971f; }
 .se-cfm-an-rc-rerun:disabled { opacity: 0.4; cursor: default; }
+
+/* Apply structural change button */
+.se-cfm-an-rc-apply {
+    flex-shrink: 0;
+    background: #201408;
+    border: 1px solid #fd971f;
+    color: #fd971f;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 8px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: background 0.1s;
+}
+.se-cfm-an-rc-apply:hover { background: #2e1a08; }
+.se-cfm-an-rc-apply.applied {
+    background: #0e2010;
+    border-color: #a6e22e;
+    color: #a6e22e;
+    cursor: default;
+}
+
+/* plan note text span (allows flex layout alongside Apply button) */
+.se-cfm-an-rc-plan-txt { flex: 1; }
+
+/* SWAP action badge */
+.se-cfm-an-rc-status.swap { color: #e6db74; }
+
+/* results dialog footer (Commit / Cancel) */
+.se-cfm-an-rc-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-top: 1px solid #2e2e26;
+    flex-shrink: 0;
+}
+.se-cfm-an-rc-footer-hint {
+    flex: 1;
+    font-size: 10px;
+    color: #fd971f;
+    font-style: italic;
+}
+
 .se-cfm-an-results-foot {
     padding: 9px 14px;
     border-top: 1px solid #2e2e26;
