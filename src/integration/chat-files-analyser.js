@@ -158,6 +158,7 @@ function _initCanvas(container) {
     _graph = new LG.LGraph();
     _lgc   = new LG.LGraphCanvas(_lgCanvas, _graph);
     _lgc.pixel_ratio           = window.devicePixelRatio || 1;
+    _lgc.show_info             = false;
 
     _lgc.background_color      = '#181812';
     _lgc.clear_background      = true;
@@ -230,9 +231,9 @@ function _registerNodeTypes() {
             super();
             this.addOutput('chats', 'se_chat');
             this.title   = 'Chat File';
-            this.color   = '#1c3a1c';
-            this.bgcolor = '#151510';
-            this.size    = [216, 56];
+            this.color   = '#2d6030';
+            this.bgcolor = '#141f12';
+            this.size    = [220, 58];
             this.properties = { fileName: '' };
         }
 
@@ -244,9 +245,14 @@ function _registerNodeTypes() {
 
         onDrawForeground(ctx) {
             if (!this.properties?.fileName) return;
-            ctx.fillStyle   = '#a6e22e99';
-            ctx.font        = '10px monospace';
-            ctx.fillText(this.properties.fileName.replace(/\.jsonl$/, '').slice(-32), 8, this.size[1] - 10);
+            ctx.fillStyle = '#a6e22e';
+            ctx.font      = '10px monospace';
+            const name    = this.properties.fileName.replace(/\.jsonl$/, '');
+            ctx.fillText(_canvasEllipsis(ctx, name, this.size[0] - 16), 8, this.size[1] - 10);
+            // border
+            ctx.strokeStyle = '#3a6a3a';
+            ctx.lineWidth   = 1;
+            ctx.strokeRect(0.5, 0.5, this.size[0] - 1, this.size[1] - 1);
         }
     }
     SEChatFileNode.title = 'Chat File';
@@ -259,9 +265,9 @@ function _registerNodeTypes() {
             this.addInput('from', 'se_chat');
             this.addOutput('ref', 'se_entry');
             this.title   = 'Entry';
-            this.color   = '#1a2c33';
-            this.bgcolor = '#151510';
-            this.size    = [210, 72];
+            this.color   = '#1a3d50';
+            this.bgcolor = '#0e1e28';
+            this.size    = [214, 74];
             this.properties = { num: 0, snippet: '' };
         }
 
@@ -272,11 +278,15 @@ function _registerNodeTypes() {
         }
 
         onDrawForeground(ctx) {
-            const snippet = String(this.properties?.snippet ?? '').slice(0, 50);
+            const snippet = String(this.properties?.snippet ?? '');
             if (!snippet) return;
-            ctx.fillStyle = '#66d9e899';
+            ctx.fillStyle = '#66d9e8';
             ctx.font      = '10px monospace';
-            ctx.fillText(snippet, 8, this.size[1] - 10);
+            ctx.fillText(_canvasEllipsis(ctx, snippet, this.size[0] - 16), 8, this.size[1] - 10);
+            // border
+            ctx.strokeStyle = '#1e5068';
+            ctx.lineWidth   = 1;
+            ctx.strokeRect(0.5, 0.5, this.size[0] - 1, this.size[1] - 1);
         }
     }
     SEEntryNode.title = 'Entry';
@@ -513,8 +523,52 @@ async function _openHelpDialog() {
     document.body.appendChild(dlg);
     _centerDialog(dlg);
     _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-help-hdr'));
-
     dlg.querySelector('.se-cfm-an-help-close').addEventListener('click', () => dlg.remove());
+
+    // ── Booklet navigation ──────────────────────────────────────
+    const navItems = [...dlg.querySelectorAll('.se-cfm-an-help-nav-item')];
+    const sections = [...dlg.querySelectorAll('.se-cfm-an-help-sec')];
+    const prevBtn  = dlg.querySelector('.se-cfm-an-help-prev');
+    const nextBtn  = dlg.querySelector('.se-cfm-an-help-next');
+    const pageNum  = dlg.querySelector('.se-cfm-an-help-page-num');
+
+    function getPages(sec) { return [...sec.querySelectorAll('.se-cfm-an-help-page')]; }
+    function activeSec()   { return sections.find(s => s.classList.contains('active')); }
+
+    function showPage(sec, idx) {
+        const pages = getPages(sec);
+        pages.forEach((p, i) => { p.hidden = (i !== idx); });
+        sec.dataset.pageIdx = idx;
+        const multi = pages.length > 1;
+        if (pageNum) pageNum.textContent = multi ? `${idx + 1} / ${pages.length}` : '';
+        if (prevBtn) { prevBtn.disabled = (idx === 0);              prevBtn.style.visibility = multi ? '' : 'hidden'; }
+        if (nextBtn) { nextBtn.disabled = (idx >= pages.length - 1); nextBtn.style.visibility = multi ? '' : 'hidden'; }
+    }
+
+    function showSection(sec) {
+        sections.forEach(s => s.classList.remove('active'));
+        navItems.forEach(n => n.classList.remove('active'));
+        sec.classList.add('active');
+        dlg.querySelector(`.se-cfm-an-help-nav-item[data-sec="${sec.dataset.sec}"]`)?.classList.add('active');
+        showPage(sec, 0);
+    }
+
+    navItems.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sec = sections.find(s => s.dataset.sec === btn.dataset.sec);
+            if (sec) showSection(sec);
+        });
+    });
+    prevBtn?.addEventListener('click', () => {
+        const sec = activeSec();
+        if (sec) showPage(sec, Math.max(0, Number(sec.dataset.pageIdx ?? 0) - 1));
+    });
+    nextBtn?.addEventListener('click', () => {
+        const sec = activeSec();
+        if (sec) showPage(sec, Math.min(getPages(sec).length - 1, Number(sec.dataset.pageIdx ?? 0) + 1));
+    });
+
+    showSection(sections.find(s => s.classList.contains('active')) ?? sections[0]);
 }
 
 function _centerDialog(dlg) {
@@ -621,6 +675,12 @@ function _bindEntryRefresh() {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
+
+function _canvasEllipsis(ctx, text, maxWidth) {
+    if (ctx.measureText(text).width <= maxWidth) return text;
+    while (text.length && ctx.measureText(text + '…').width > maxWidth) text = text.slice(0, -1);
+    return text + '…';
+}
 
 function _findFileNode(fileName) {
     return _graph?._nodes.find(n => n.type === 'se/chat_file' && n.properties?.fileName === fileName) ?? null;

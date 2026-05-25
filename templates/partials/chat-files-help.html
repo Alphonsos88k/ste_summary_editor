@@ -1,49 +1,117 @@
 <div class="se-cfm-an-help-hdr">
-    <span>&#x2139; Node Editor — Guide</span>
+    <span>Node Editor — Guide</span>
     <button class="se-close-circle se-cfm-an-help-close">&times;</button>
 </div>
-<div class="se-cfm-an-help-body">
+<div class="se-cfm-an-help-main">
+    <nav class="se-cfm-an-help-nav">
+        <button class="se-cfm-an-help-nav-item active" data-sec="nodes">Nodes</button>
+        <button class="se-cfm-an-help-nav-item" data-sec="ports">Ports &amp; Connections</button>
+        <button class="se-cfm-an-help-nav-item" data-sec="canvas">Canvas</button>
+        <button class="se-cfm-an-help-nav-item" data-sec="toolbar">Toolbar</button>
+        <button class="se-cfm-an-help-nav-item" data-sec="panels">Panels</button>
+        <button class="se-cfm-an-help-nav-item" data-sec="prompts">Prompts</button>
+    </nav>
+    <div class="se-cfm-an-help-content">
 
-    <p class="se-cfm-an-help-section">Nodes</p>
-    <ul>
-        <li><b>Chat File node</b> — represents one <code>.jsonl</code> chat file. Add it by clicking <b>+</b> next to a file in the Files sidebar. Only one chat file can be on the canvas at a time (single-file lock).</li>
-        <li><b>Entry node</b> — represents one summary entry from the Review table. Add it by clicking <b>+</b> in the Entries sidebar. Multiple entries can be on the canvas simultaneously.</li>
-    </ul>
+        <div class="se-cfm-an-help-sec active" data-sec="nodes">
+            <div class="se-cfm-an-help-page">
+                <h3>Chat File Node</h3>
+                <p>Represents a single <code>.jsonl</code> chat file from the character's chat history.</p>
+                <ul>
+                    <li>Add it with <b>+</b> in the Files sidebar.</li>
+                    <li><b>Single-file lock</b> — only one chat file can be on the canvas at a time. All other + buttons dim until the current file node is removed.</li>
+                    <li>Remove it with the sidebar <b>×</b> button or by right-clicking the node → Remove.</li>
+                </ul>
+                <p>The file name is shown inside the node body and truncated with … if too long.</p>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>Entry Node</h3>
+                <p>Represents one numbered summary entry from the Review table.</p>
+                <ul>
+                    <li>Add it with <b>+</b> in the Entries sidebar. Multiple entries can be on canvas simultaneously.</li>
+                    <li>The entry number is the node title; a snippet of the content is shown in the body.</li>
+                    <li>Entries update automatically when you ingest new files or delete an entry in the Review tab.</li>
+                </ul>
+            </div>
+        </div>
 
-    <p class="se-cfm-an-help-section">Ports &amp; Connections</p>
-    <ul>
-        <li>Each node exposes circular ports on its edges. <b>Output ports</b> (right side) send data; <b>Input ports</b> (left side) receive it.</li>
-        <li><b>Chat File</b> has one output port <em>chats</em> (green) — drag from it to an Entry's input to link them.</li>
-        <li><b>Entry</b> has one input port <em>from</em> (cyan) and one output port <em>ref</em> — the output can chain to future analysis nodes.</li>
-        <li>Drag from any output port circle to any compatible input port circle to create a connection. Connections are colour-coded per chat file.</li>
-        <li>To remove a connection: right-click the link line, or right-click the node and choose <em>Remove</em>.</li>
-    </ul>
+        <div class="se-cfm-an-help-sec" data-sec="ports" hidden>
+            <div class="se-cfm-an-help-page">
+                <h3>Ports</h3>
+                <p>Ports are the small circles on the edges of each node. They are typed — only compatible ports can connect.</p>
+                <ul>
+                    <li><b>Output ports</b> are on the right side of a node.</li>
+                    <li><b>Input ports</b> are on the left side.</li>
+                    <li><b>Chat File</b> exposes one output: <em class="se-cfm-an-help-tag green">chats</em> — sends the file reference downstream.</li>
+                    <li><b>Entry</b> exposes one input: <em class="se-cfm-an-help-tag cyan">from</em> — receives from a chat file. And one output: <em class="se-cfm-an-help-tag purple">ref</em> — for chaining to future analysis nodes.</li>
+                </ul>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>Connecting &amp; Disconnecting</h3>
+                <ul>
+                    <li><b>Connect</b> — hover over an output port until it highlights, then drag to a compatible input port on another node. Release to create the link.</li>
+                    <li>Links are colour-coded — each chat file gets a unique colour shared by all its connections.</li>
+                    <li><b>Disconnect</b> — right-click the link line and choose <em>Delete</em>, or right-click the node → <em>Remove</em> to remove it and all its links.</li>
+                </ul>
+            </div>
+        </div>
 
-    <p class="se-cfm-an-help-section">Canvas Navigation</p>
-    <ul>
-        <li><b>Pan</b> — click and drag on empty canvas space.</li>
-        <li><b>Zoom</b> — scroll wheel, or use the <b>+</b> / <b>−</b> zoom pill (bottom-right). Click the <b>%</b> label to reset to 100%.</li>
-        <li>Right-click a node for context actions (Remove, Clone, etc.).</li>
-    </ul>
+        <div class="se-cfm-an-help-sec" data-sec="canvas" hidden>
+            <div class="se-cfm-an-help-page">
+                <h3>Navigation</h3>
+                <ul>
+                    <li><b>Pan</b> — click and drag on empty canvas space.</li>
+                    <li><b>Zoom</b> — scroll wheel anywhere on the canvas.</li>
+                    <li><b>Zoom pill</b> (bottom-right) — click <b>+</b> or <b>−</b> to step zoom. Click the <b>%</b> label to reset to 100%.</li>
+                    <li><b>Move node</b> — drag the node's title bar.</li>
+                    <li><b>Context menu</b> — right-click a node for Remove, Clone, and other actions.</li>
+                </ul>
+            </div>
+        </div>
 
-    <p class="se-cfm-an-help-section">Toolbar</p>
-    <ul>
-        <li><b>Fit</b> — zoom and pan to fit all nodes in the visible area.</li>
-        <li><b>Origin</b> — reset view to canvas origin (0, 0) at 100% zoom.</li>
-        <li><b>Gather</b> — snap all scattered nodes back to a tidy grid near the centre.</li>
-        <li><b>Layout</b> — auto-arrange all nodes into a grid, then fit to view.</li>
-        <li><b>Clear</b> — remove every node and connection from the canvas.</li>
-        <li><b>&#9881; Prompts</b> — edit the LLM system prompts used for digest generation (Pass 1) and entry analysis (Pass 2).</li>
-    </ul>
+        <div class="se-cfm-an-help-sec" data-sec="toolbar" hidden>
+            <div class="se-cfm-an-help-page">
+                <h3>Toolbar Actions</h3>
+                <ul>
+                    <li><b>Fit</b> — zoom and pan to fit all nodes inside the visible canvas area.</li>
+                    <li><b>Origin</b> — reset the view to canvas origin (0, 0) at 100% zoom without moving nodes.</li>
+                    <li><b>Gather</b> — snap all scattered nodes back into a compact grid near the canvas centre.</li>
+                    <li><b>Layout</b> — auto-arrange all nodes into a uniform grid, then run Fit.</li>
+                    <li><b>Clear</b> — remove every node and connection from the canvas. This does not delete chat files or entries.</li>
+                </ul>
+            </div>
+        </div>
 
-    <p class="se-cfm-an-help-section">Pop-out Panels</p>
-    <ul>
-        <li>The <b>Files</b> and <b>Entries</b> sidebar sections each have a <b>&#x29C9;</b> pop-out button — click it to detach that list into a draggable floating panel so you can reposition it freely while working on the canvas.</li>
-    </ul>
+        <div class="se-cfm-an-help-sec" data-sec="panels" hidden>
+            <div class="se-cfm-an-help-page">
+                <h3>Sidebar Pop-out Panels</h3>
+                <p>Both the <b>Files</b> and <b>Entries</b> sections in the left sidebar have a <b>&#x29C9;</b> pop-out button in their header.</p>
+                <ul>
+                    <li>Clicking it detaches that list into a <b>floating draggable panel</b> so you can reposition it freely while working on the canvas.</li>
+                    <li>Close the floating panel with its <b>×</b> button to re-dock it.</li>
+                    <li>Both panels can be popped out simultaneously.</li>
+                </ul>
+            </div>
+        </div>
 
-    <p class="se-cfm-an-help-section">Updating This Guide</p>
-    <ul>
-        <li>Content lives in <code>templates/partials/chat-files-help.html</code>. Update it whenever a new node type, port, or major canvas feature is added.</li>
-    </ul>
+        <div class="se-cfm-an-help-sec" data-sec="prompts" hidden>
+            <div class="se-cfm-an-help-page">
+                <h3>LLM Prompts</h3>
+                <p>Click <b>&#9881; Prompts</b> in the toolbar to open the prompt editor. Three prompts power the analysis pipeline:</p>
+                <ul>
+                    <li><em class="se-cfm-an-help-tag green">Chat Digest — Pass 1</em> — generates a digest from the raw chat file.</li>
+                    <li><em class="se-cfm-an-help-tag cyan">Chat Digest Refinement</em> — optional feedback loop to refine the digest (up to 3 rounds).</li>
+                    <li><em class="se-cfm-an-help-tag purple">Entry Analysis — Pass 2</em> — analyses entries against the digest. Should return structured JSON with REWRITE / SPLIT / MERGE / NO_CHANGE actions.</li>
+                </ul>
+                <p>Changes save immediately. Prompts are also accessible from the main Prompts Hub.</p>
+            </div>
+        </div>
 
+        <div class="se-cfm-an-help-pager">
+            <button class="se-cfm-an-help-prev">&#8249; Prev</button>
+            <span class="se-cfm-an-help-page-num"></span>
+            <button class="se-cfm-an-help-next">Next &#8250;</button>
+        </div>
+
+    </div>
 </div>
