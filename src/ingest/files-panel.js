@@ -91,10 +91,6 @@ export function toggleAttentionDialog() {
 function _bindEvents() {
     _panel.querySelector('.se-fp-close').addEventListener('click', closeFilesPanel);
     _panel.addEventListener('change', _handleChange);
-
-    const attentionBtn = _panel.querySelector('#se-fp-attention-btn');
-    if (attentionBtn) attentionBtn.addEventListener('click', _toggleAttentionDialog);
-
     document.addEventListener('se:supplementary-changed', _onSuppChanged);
 }
 
@@ -166,18 +162,10 @@ function _unassignedCount() {
 
 function _updateAttentionBadge() {
     const count = _unassignedCount();
-    const label = count > 0 ? `! ${count}` : '';
-
-    const popupBtn = _panel?.querySelector('#se-fp-attention-btn');
-    if (popupBtn) {
-        popupBtn.style.display = count > 0 ? '' : 'none';
-        popupBtn.textContent = label;
-    }
-
     const drawerBtn = document.getElementById('se-file-drawer-attn');
     if (drawerBtn) {
         drawerBtn.style.display = count > 0 ? '' : 'none';
-        drawerBtn.textContent = label;
+        drawerBtn.textContent = count > 0 ? `! ${count}` : '';
     }
 }
 
@@ -241,7 +229,7 @@ function _buildFileRow(file) {
 
     const needsLabel = file.isSupplementaryCandidate && !isAssigned;
     const urgencyBadge = needsLabel
-        ? '<span class="se-fp-urgency" title="Needs category assignment">!</span>' : '';
+        ? '<span class="se-attn-circle" title="Needs category assignment">!</span>' : '';
 
     const assignedLabel = isAssigned
         ? `<span class="se-fp-assigned-label">${escHtml(_suppLabel(suppEntry.category))}</span>` : '';

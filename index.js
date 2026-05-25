@@ -2145,18 +2145,20 @@ function renderIngestSummary() {
     $list.empty();
 
     for (const file of state.files) {
-        let cls  = '';
-        let icon = '&#10003;';
+        let cls     = '';
+        let icon    = '&#10003;';
+        let urgency = '';
         if (file.problematic) {
             cls  = ' problematic';
-            icon = '&#63;'; // ?
+            icon = '&#63;';
         } else if (file.isSupplementaryCandidate) {
             const isAssigned = state.supplementaryFiles.has(file.name) && !!state.supplementaryFiles.get(file.name)?.category;
             cls  = isAssigned ? ' supp-assigned' : ' supp-candidate';
             icon = isAssigned ? '&#10003;' : '&#9432;';
+            if (!isAssigned) urgency = '<span class="se-attn-circle se-file-urgency" title="Needs category assignment">!</span>';
         } else if (!file.valid) {
             cls  = ' invalid';
-            icon = '&#9432;'; // ℹ info circle
+            icon = '&#9432;';
         }
         const $row = $(fillTemplate(_tplFileItem, {
             cls,
@@ -2164,6 +2166,7 @@ function renderIngestSummary() {
             nameAttr: escAttr(file.name),
             name:     escHtml(file.name),
             count:    file.entryCount,
+            urgency,
         }));
         $list.append($row);
     }
