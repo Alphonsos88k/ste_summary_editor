@@ -5,17 +5,33 @@
  * Connections are colour-coded; ports are ComfyUI-style circular slots.
  */
 
-import { state } from '../core/state.js';
+import { state, persistState, snapshotState, restoreSnapshot } from '../core/state.js';
 import { escHtml } from '../core/utils.js';
 import { registerPrompt, getRegisteredPrompts, getPrompt, setPrompt } from '../core/system-prompts.js';
 import { loadTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
+import { shiftEntriesUp } from '../table/reorder.js';
+import { renderTable } from '../table/table.js';
+import { detectGaps } from '../ingest/gap-detection.js';
 
 // ─── Prompt registration ──────────────────────────────────────
 
 registerPrompt('chat-digest',    'Chat Digest — Pass 1',    '', { location: 'Chat Files › Analyse tab' });
 registerPrompt('digest-refine',  'Chat Digest Refinement',  '', { location: 'Chat Files › Analyse tab' });
-registerPrompt('entry-analysis', 'Entry Analysis — Pass 2', '', { warnJson: true, location: 'Chat Files › Analyse tab' });
+registerPrompt('entry-analysis', 'Entry Analysis — Pass 2',
+`Analyse the provided summary entry against the chat digest and the full entry list.
+
+Sentence soft cap: entries work best at 3–4 sentences. If an entry has 7 or more sentences, consider recommending SPLIT — but this is not required for contextually dense passages where length is justified.
+
+Return ONLY a valid JSON object:
+{
+  "action": "REWRITE" | "SPLIT" | "MERGE" | "SWAP" | "NO_CHANGE",
+  "reason": "brief explanation",
+  "proposed": "full rewritten text (REWRITE only)",
+  "parts": ["part 1 text", "part 2 text", ...] (SPLIT only — include full text for each new entry),
+  "target": <entry number> (MERGE or SWAP only)
+}`,
+{ warnJson: true, location: 'Chat Files › Analyse tab' });
 
 // ─── Module state ─────────────────────────────────────────────
 
@@ -771,37 +787,103 @@ function _parseAction(raw) {
         if (m) {
             const obj = JSON.parse(m[0]);
             const a = (obj.action ?? '').toUpperCase();
-            if (['REWRITE','SPLIT','MERGE','NO_CHANGE'].includes(a)) return obj;
+            if (['REWRITE','SPLIT','MERGE','SWAP','NO_CHANGE'].includes(a)) return { ...obj, action: a };
         }
     } catch { /* not JSON */ }
-    for (const a of ['SPLIT','MERGE','REWRITE','NO_CHANGE']) {
+    for (const a of ['SPLIT','MERGE','SWAP','REWRITE','NO_CHANGE']) {
         if (raw.toUpperCase().includes(a)) return { action: a };
     }
     return null;
 }
 
 function _actionClass(action) {
-    return ({ REWRITE:'rewrite', SPLIT:'split', MERGE:'merge', NO_CHANGE:'no-change' })[action] ?? 'pending';
+    return ({ REWRITE:'rewrite', SPLIT:'split', MERGE:'merge', SWAP:'swap', NO_CHANGE:'no-change' })[action] ?? 'pending';
 }
+
+const _ACTION_LABELS = { REWRITE:'↺ Rewrite', SPLIT:'✂ Split', MERGE:'⬡ Merge', SWAP:'⇄ Swap', NO_CHANGE:'✓ No change' };
 
 function _makePlanNote(parsed, num) {
     if (!parsed) return '';
     const a = parsed.action;
+    let icon, text, canApply = false;
+
     if (a === 'SPLIT') {
-        const into = parsed.into ?? parsed.parts ?? parsed.count ?? '?';
-        return `<div class="se-cfm-an-rc-plan">` +
-            `<span class="se-cfm-an-rc-plan-icon">&#x2702;</span>` +
-            `Split into ${into} entries &mdash; entries #${num + 1}+ shift down` +
-            `</div>`;
+        const parts  = parsed.parts;
+        const into   = Array.isArray(parts) ? parts.length : (parsed.into ?? parsed.count ?? '?');
+        icon     = '&#x2702;';
+        text     = `Split into ${into} entries — entries #${num + 1}+ shift down`;
+        canApply = Array.isArray(parts) && parts.length >= 2;
+    } else if (a === 'MERGE') {
+        const target = parsed.target ?? parsed.with ?? (num + 1);
+        icon     = '&#x29EB;';
+        text     = `Merge with entry #${target} — entries renumber`;
+        canApply = !!(parsed.target ?? parsed.with);
+    } else if (a === 'SWAP') {
+        const target = parsed.target ?? parsed.with;
+        if (!target) return '';
+        icon     = '&#x21C4;';
+        text     = `Swap content with entry #${target}`;
+        canApply = true;
+    } else {
+        return '';
     }
-    if (a === 'MERGE') {
-        const with_ = parsed.with ?? parsed.target ?? (num + 1);
-        return `<div class="se-cfm-an-rc-plan">` +
-            `<span class="se-cfm-an-rc-plan-icon">&#x29EB;</span>` +
-            `Merge with entry #${with_} &mdash; entries above #${with_} shift up` +
-            `</div>`;
+
+    return `<div class="se-cfm-an-rc-plan">` +
+        `<span class="se-cfm-an-rc-plan-icon">${icon}</span>` +
+        `<span class="se-cfm-an-rc-plan-txt">${escHtml(text)}</span>` +
+        (canApply
+            ? `<button class="se-cfm-an-rc-apply" data-apply-num="${num}">Apply</button>`
+            : '') +
+        `</div>`;
+}
+
+// ─── Structural apply operations (staged — caller owns persist/revert) ───────
+
+function _stageSwap(numA, numB) {
+    const a = state.entries.get(numA);
+    const b = state.entries.get(numB);
+    if (!a || !b) throw new Error(`Entry #${numA} or #${numB} not found`);
+    [a.content, b.content] = [b.content, a.content];
+    state.modified.add(numA);
+    state.modified.add(numB);
+    renderTable();
+}
+
+function _stageMerge(numKeep, numRemove) {
+    const keep   = state.entries.get(numKeep);
+    const remove = state.entries.get(numRemove);
+    if (!keep || !remove) throw new Error(`Entry #${numKeep} or #${numRemove} not found`);
+    keep.content = `${keep.content}\n${remove.content}`.trim();
+    state.modified.add(numKeep);
+    if (remove.actId) state.acts.get(remove.actId)?.entryNums.delete(numRemove);
+    state.entries.delete(numRemove);
+    state.selected.delete(numRemove);
+    state.modified.delete(numRemove);
+    shiftEntriesUp(numRemove, -1);
+    detectGaps();
+    renderTable();
+}
+
+function _stageSplit(num, parts) {
+    if (!Array.isArray(parts) || parts.length < 2) throw new Error('SPLIT requires at least 2 parts');
+    const entry = state.entries.get(num);
+    if (!entry) throw new Error(`Entry #${num} not found`);
+    const { actId, date, time, location, source } = entry;
+    shiftEntriesUp(num, parts.length - 1);
+    if (actId) state.acts.get(actId)?.entryNums.delete(num);
+    for (let i = 0; i < parts.length; i++) {
+        const n = num + i;
+        state.entries.set(n, {
+            num: n, content: parts[i].trim(),
+            date: i === 0 ? (date || '') : '',
+            time: i === 0 ? (time || '') : '',
+            location: i === 0 ? (location || '') : '',
+            notes: '', actId: actId || null, source: source || '',
+        });
+        if (actId) state.acts.get(actId)?.entryNums.add(n);
     }
-    return '';
+    detectGaps();
+    renderTable();
 }
 
 function _buildShiftBanner(entryNums, resultsByNum) {
@@ -849,6 +931,10 @@ function _cardHtml(num, snippet) {
 function _createResultsDialog(fileName, digest, entryNodes) {
     document.getElementById('se-cfm-an-results-dlg')?.remove();
 
+    // Snapshot state at dialog open — restored on Cancel
+    const _snap = snapshotState();
+    let _staged = false;   // true once at least one structural Apply has run
+
     const dlg = document.createElement('div');
     dlg.id = 'se-cfm-an-results-dlg';
     dlg.className = 'se-cfm-an-results-dlg';
@@ -856,7 +942,6 @@ function _createResultsDialog(fileName, digest, entryNodes) {
     const nums = entryNodes.map(n => n.properties?.num);
     const resultsByNum = {};
 
-    // Build card HTML for all entries (hidden by pagination)
     const allCardsHtml = nums.map(num => {
         const entry   = state.entries?.get(num);
         const snippet = entry ? String(entry.content ?? '').slice(0, 280) : '';
@@ -869,7 +954,7 @@ function _createResultsDialog(fileName, digest, entryNodes) {
     dlg.innerHTML =
         `<div class="se-cfm-an-run-hdr">` +
         `<span>Analysis Results &mdash; ${escHtml(fileName)}</span>` +
-        `<button class="se-close-circle se-cfm-an-results-close">&times;</button></div>` +
+        `<button class="se-close-circle se-cfm-an-results-x">&times;</button></div>` +
         `<div id="se-cfm-an-shift-wrap"></div>` +
         `<div class="se-cfm-an-results-cards" id="se-cfm-an-rc-list">${allCardsHtml}</div>` +
         (totalPages > 1
@@ -878,11 +963,42 @@ function _createResultsDialog(fileName, digest, entryNodes) {
               `<span class="se-cfm-an-rc-page-lbl" id="se-cfm-an-rc-page-lbl">1 / ${totalPages}</span>` +
               `<button class="se-cfm-an-rc-page-btn" id="se-cfm-an-rc-next">Next &#8250;</button>` +
               `</div>`
-            : '');
+            : '') +
+        `<div class="se-cfm-an-rc-footer">` +
+        `<span class="se-cfm-an-rc-footer-hint" id="se-cfm-an-rc-footer-hint"></span>` +
+        `<button class="se-cfm-an-run-cancel-btn se-cfm-an-rc-cancel">Cancel</button>` +
+        `<button class="se-cfm-an-run-go-btn se-cfm-an-rc-commit">&#10003;&ensp;Commit changes</button>` +
+        `</div>`;
 
     document.body.appendChild(dlg);
     _centerDialog(dlg);
     _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
+
+    const hintEl = dlg.querySelector('#se-cfm-an-rc-footer-hint');
+    const _setHint = msg => { if (hintEl) hintEl.textContent = msg; };
+
+    // ── Cancel: revert all staged changes ────────────────────────
+    const _cancel = () => {
+        if (_staged) {
+            restoreSnapshot(_snap);
+            renderTable();
+            document.dispatchEvent(new CustomEvent('se:entries-changed'));
+        }
+        dlg.remove();
+    };
+
+    // ── Commit: persist staged changes ───────────────────────────
+    const _commit = () => {
+        if (_staged) {
+            persistState();
+            document.dispatchEvent(new CustomEvent('se:entries-changed'));
+        }
+        dlg.remove();
+    };
+
+    dlg.querySelector('.se-cfm-an-results-x').addEventListener('click',  _cancel);
+    dlg.querySelector('.se-cfm-an-rc-cancel').addEventListener('click',   _cancel);
+    dlg.querySelector('.se-cfm-an-rc-commit').addEventListener('click',   _commit);
 
     // ── Pagination ────────────────────────────────────────────────
     const showPage = p => {
@@ -905,9 +1021,32 @@ function _createResultsDialog(fileName, digest, entryNodes) {
         dlg.querySelector('#se-cfm-an-rc-next')?.addEventListener('click', () => showPage(page + 1));
     }
 
-    dlg.querySelector('.se-cfm-an-results-close').addEventListener('click', () => dlg.remove());
+    // ── Apply result to card ──────────────────────────────────────
+    const _applyResult = (num, raw) => {
+        resultsByNum[num] = raw;
+        const result = dlg.querySelector(`#se-cfm-an-rc-r-${num}`);
+        const status = dlg.querySelector(`#se-cfm-an-rc-s-${num}`);
+        const rerun  = dlg.querySelector(`[data-rc-num="${num}"]`);
+        const popout = dlg.querySelector(`[data-rc-pop="${num}"]`);
+        const planEl = dlg.querySelector(`#se-cfm-an-rc-plan-${num}`);
 
-    // ── Re-run buttons ────────────────────────────────────────────
+        if (result) { result.value = raw; result.disabled = false; }
+        if (rerun)  rerun.disabled = false;
+        if (popout) popout.disabled = false;
+
+        const parsed = _parseAction(raw);
+        const action = parsed?.action ?? null;
+        if (status) {
+            status.textContent = _ACTION_LABELS[action] ?? '✓ Done';
+            status.className = `se-cfm-an-rc-status ${_actionClass(action)}`;
+        }
+        if (planEl) planEl.innerHTML = _makePlanNote(parsed, num);
+
+        const shiftWrap = dlg.querySelector('#se-cfm-an-shift-wrap');
+        if (shiftWrap) shiftWrap.innerHTML = _buildShiftBanner(nums, resultsByNum);
+    };
+
+    // ── Re-run ────────────────────────────────────────────────────
     const _doRerun = async (num, feedbackVal) => {
         const entry  = state.entries?.get(num);
         if (!entry) return;
@@ -955,32 +1094,35 @@ function _createResultsDialog(fileName, digest, entryNodes) {
         });
     });
 
-    // ── Apply result to card + plan note + shift banner ───────────
-    const _applyResult = (num, raw) => {
-        resultsByNum[num] = raw;
-        const result = dlg.querySelector(`#se-cfm-an-rc-r-${num}`);
-        const status = dlg.querySelector(`#se-cfm-an-rc-s-${num}`);
-        const rerun  = dlg.querySelector(`[data-rc-num="${num}"]`);
-        const popout = dlg.querySelector(`[data-rc-pop="${num}"]`);
-        const planEl = dlg.querySelector(`#se-cfm-an-rc-plan-${num}`);
-
-        if (result) { result.value = raw; result.disabled = false; }
-        if (rerun)  rerun.disabled = false;
-        if (popout) popout.disabled = false;
-
-        const parsed = _parseAction(raw);
-        const action = parsed?.action ?? null;
-        if (status) {
-            const labels = { REWRITE:'↺ Rewrite', SPLIT:'✂ Split', MERGE:'⬡ Merge', NO_CHANGE:'✓ No change' };
-            status.textContent = labels[action] ?? '✓ Done';
-            status.className = `se-cfm-an-rc-status ${_actionClass(action)}`;
+    // ── Apply structural change buttons (event delegation) ────────
+    dlg.querySelector('#se-cfm-an-rc-list')?.addEventListener('click', e => {
+        const applyBtn = e.target.closest('.se-cfm-an-rc-apply');
+        if (!applyBtn || applyBtn.disabled) return;
+        const num    = Number(applyBtn.dataset.applyNum);
+        const parsed = _parseAction(resultsByNum[num] ?? '');
+        if (!parsed) return;
+        applyBtn.disabled = true;
+        try {
+            if (parsed.action === 'SWAP') {
+                const target = parsed.target ?? parsed.with;
+                _stageSwap(num, target);
+                _setHint(`⇄ Swapped #${num} ↔ #${target} — not yet saved`);
+            } else if (parsed.action === 'MERGE') {
+                const target = parsed.target ?? parsed.with ?? (num + 1);
+                _stageMerge(num, target);
+                _setHint(`⬡ Merged #${num} + #${target} — not yet saved`);
+            } else if (parsed.action === 'SPLIT') {
+                _stageSplit(num, parsed.parts);
+                _setHint(`✂ Split #${num} into ${parsed.parts.length} entries — not yet saved`);
+            }
+            _staged = true;
+            applyBtn.textContent = '✓ Applied';
+            applyBtn.classList.add('applied');
+        } catch (err) {
+            applyBtn.disabled = false;
+            _setHint(`Error: ${err.message}`);
         }
-        if (planEl) planEl.innerHTML = _makePlanNote(parsed, num);
-
-        // refresh shift banner
-        const shiftWrap = dlg.querySelector('#se-cfm-an-shift-wrap');
-        if (shiftWrap) shiftWrap.innerHTML = _buildShiftBanner(nums, resultsByNum);
-    };
+    });
 
     const updateEntry = (num, raw) => {
         const fb = dlg.querySelector(`#se-cfm-an-rc-f-${num}`);
