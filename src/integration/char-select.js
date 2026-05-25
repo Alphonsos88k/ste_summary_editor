@@ -63,6 +63,9 @@ export function initCharSelect() {
     sel.addEventListener('change', _handleChange);
 
     _updateStrip(sel);
+
+    // Notify listeners so things like the Chat Files button sync on open/swap
+    document.dispatchEvent(new CustomEvent('se:character-changed', { detail: state.associatedCharacter }));
 }
 
 /**
