@@ -2157,58 +2157,48 @@ function updateSortIndicators() {
 /**
  * Render the file list (in drawer) and summary bar on the Ingest tab.
  */
+function _fileItemStyle(file) {
+    if (file.problematic) return { cls: ' problematic', icon: '&#63;' };
+    if (file.isSupplementaryCandidate) {
+        const assigned = state.supplementaryFiles.has(file.name) && !!state.supplementaryFiles.get(file.name)?.category;
+        return {
+            cls:  assigned ? ' supp-assigned' : ' supp-candidate',
+            icon: assigned ? '&#10003;' : '<span class="se-urgency-dot" title="Needs category assignment">!</span>',
+        };
+    }
+    if (!file.valid) return { cls: ' invalid', icon: '&#9432;' };
+    return { cls: '', icon: '&#10003;' };
+}
+
 function renderIngestSummary() {
-    const $list = $('#se-file-list');
-    const $text = $('#se-ingest-summary .se-ingest-summary-text');
+    const $list    = $('#se-file-list');
+    const $text    = $('#se-ingest-summary .se-ingest-summary-text');
     const $filesBtn = $('#se-btn-show-files');
     $list.empty();
 
     for (const file of state.files) {
-        let cls  = '';
-        let icon = '&#10003;';
-        if (file.problematic) {
-            cls  = ' problematic';
-            icon = '&#63;';
-        } else if (file.isSupplementaryCandidate) {
-            const isAssigned = state.supplementaryFiles.has(file.name) && !!state.supplementaryFiles.get(file.name)?.category;
-            cls  = isAssigned ? ' supp-assigned' : ' supp-candidate';
-            icon = isAssigned
-                ? '&#10003;'
-                : '<span class="se-urgency-dot" title="Needs category assignment">!</span>';
-        } else if (!file.valid) {
-            cls  = ' invalid';
-            icon = '&#9432;';
-        }
-        const $row = $(fillTemplate(_tplFileItem, {
+        const { cls, icon } = _fileItemStyle(file);
+        $list.append($(fillTemplate(_tplFileItem, {
             cls,
             icon,
             nameAttr: escAttr(file.name),
             name:     escHtml(file.name),
             count:    file.entryCount,
-        }));
-        $list.append($row);
+        })));
     }
 
-    // Enable/disable timeline button based on marked files
     $('#se-btn-timeline').prop('disabled', !hasTimelineFiles());
-
-    // Keep files assignment panel in sync
     refreshFilesPanel();
 
-    // File count pill in drawer header
     const totalFiles = state.files.length;
     const $count = $('#se-file-drawer-count');
-    if (totalFiles > 0) {
-        $count.text(totalFiles).show();
-    } else {
-        $count.text('').hide();
-    }
+    $count.text(totalFiles > 0 ? totalFiles : '').toggle(totalFiles > 0);
 
     if (state.entries.size > 0) {
         const validFiles = state.files.filter(f => f.valid).length;
-        const dupCount = state.files.reduce((sum, f) => sum + (f.duplicates || 0), 0);
+        const dupCount   = state.files.reduce((sum, f) => sum + (f.duplicates || 0), 0);
         let html = `<strong>${state.entries.size} entries</strong> from ${validFiles} file${validFiles === 1 ? '' : 's'}`;
-        if (dupCount > 0) html += ` &middot; <span class="se-warn">${dupCount} dupes</span>`;
+        if (dupCount > 0)          html += ` &middot; <span class="se-warn">${dupCount} dupes</span>`;
         if (state.gaps.length > 0) html += ` &middot; <span class="se-warn">${state.gaps.length} gaps</span>`;
         $text.html(html);
         $filesBtn.show();
