@@ -1603,6 +1603,12 @@ function bindActsEvents() {
         toggleMinimap();
     });
     $('#se-btn-minimap-close').on('click', toggleMinimap);
+    $('#se-btn-minimap-fullscreen').on('click', () => {
+        const $overlay = $('#se-minimap-overlay');
+        const entering = $overlay.toggleClass('se-minimap-fullscreen').hasClass('se-minimap-fullscreen');
+        $('#se-btn-minimap-fullscreen').html(entering ? '&#x2B1C;' : '&#x26F6;')
+            .attr('title', entering ? 'Exit fullscreen' : 'Fullscreen');
+    });
     $('#se-btn-story-context').on('click', openStoryContextPanel);
     $('#se-btn-entry-analytics').on('click', openAnalyticsPanel);
     $('#se-btn-conflict-review').on('click', openConflictReview);
