@@ -1281,6 +1281,53 @@
     color: #75715e;
 }
 
+/* entry browser nav bar (top of left col) */
+.se-cfm-an-det-entry-nav {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+    margin-bottom: 2px;
+}
+.se-cfm-an-det-entry-sel {
+    flex: 1;
+    background: #131310;
+    border: 1px solid #3a3a30;
+    color: #c8c8b8;
+    border-radius: 4px;
+    font-size: 10px;
+    padding: 2px 4px;
+    min-width: 0;
+    cursor: pointer;
+}
+.se-cfm-an-det-entry-sel:focus { outline: none; border-color: #66d9e8; }
+
+/* proposed / original toggle chip */
+.se-cfm-an-det-orig-tog {
+    flex-shrink: 0;
+    background: #201408;
+    border: 1px solid #fd971f;
+    color: #fd971f;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: background 0.1s;
+}
+.se-cfm-an-det-orig-tog:hover { background: #2e1a08; }
+
+/* entry label below the nav */
+.se-cfm-an-det-entry-lbl {
+    font-size: 10px;
+    font-weight: 600;
+    color: #75715e;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 3px;
+}
+
 /* ─── Refine ? help pill (digest review) ─────────────────────────────────── */
 
 .se-cfm-an-digest-refine-wrap {
