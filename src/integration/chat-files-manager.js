@@ -106,15 +106,24 @@ function _relDate(ts) {
 function _bindPanelEvents() {
     _panel.querySelector('.se-cfm-close')?.addEventListener('click', closeChatFilesManager);
 
-    document.getElementById('se-cfm-search')?.addEventListener('input', function () {
+    _panel.querySelector('#se-cfm-search')?.addEventListener('input', function () {
         const q = this.value.toLowerCase().trim();
         _panel.querySelectorAll('.se-cfm-file-item').forEach(el => {
             el.style.display = !q || el.dataset.cfmFile.toLowerCase().includes(q) ? '' : 'none';
         });
     });
 
-    document.getElementById('se-cfm-path-copy')?.addEventListener('click', () => {
-        const val = document.getElementById('se-cfm-path-input')?.value;
+    _panel.querySelector('#se-cfm-path-copy')?.addEventListener('click', () => {
+        const val = _panel.querySelector('#se-cfm-path-input')?.value;
         if (val) navigator.clipboard.writeText(val).catch(() => {});
+    });
+
+    _panel.querySelector('#se-cfm-folder-btn')?.addEventListener('click', function () {
+        const folder = _currentChar?.avatar.replace(/\.[^.]+$/, '') ?? '';
+        const path = `public/chats/${folder}/`;
+        navigator.clipboard.writeText(path).catch(() => {});
+        const prev = this.textContent;
+        this.textContent = 'Copied!';
+        setTimeout(() => { this.textContent = prev; }, 1500);
     });
 }
