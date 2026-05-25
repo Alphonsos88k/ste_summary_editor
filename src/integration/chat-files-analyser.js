@@ -1,43 +1,36 @@
 /**
  * @module chat-files-analyser
- * @description Cytoscape.js node canvas for the Analyse tab.
- * Chat files and summary entries appear as draggable nodes with edge-handle
- * docks; relationships drawn as colour-coded directed edges.
+ * @description LiteGraph.js node canvas for the Analyse tab.
+ * Chat files appear as output nodes; summary entries as input nodes.
+ * Connections are colour-coded; ports are ComfyUI-style circular slots.
  */
 
 import { state } from '../core/state.js';
 import { escHtml } from '../core/utils.js';
-import { registerPrompt } from '../core/system-prompts.js';
-import { openSystemPromptHub } from '../core/system-prompts.js';
+import { registerPrompt, openSystemPromptHub } from '../core/system-prompts.js';
 
 // ─── Prompt registration ──────────────────────────────────────
 
-registerPrompt('chat-digest',    'Chat Digest — Pass 1',       '', { location: 'Chat Files › Analyse tab' });
-registerPrompt('digest-refine',  'Chat Digest Refinement',     '', { location: 'Chat Files › Analyse tab' });
-registerPrompt('entry-analysis', 'Entry Analysis — Pass 2',    '', { warnJson: true, location: 'Chat Files › Analyse tab' });
+registerPrompt('chat-digest',    'Chat Digest — Pass 1',    '', { location: 'Chat Files › Analyse tab' });
+registerPrompt('digest-refine',  'Chat Digest Refinement',  '', { location: 'Chat Files › Analyse tab' });
+registerPrompt('entry-analysis', 'Entry Analysis — Pass 2', '', { warnJson: true, location: 'Chat Files › Analyse tab' });
 
 // ─── Module state ─────────────────────────────────────────────
 
-let _cy          = null;
-let _eh          = null;   // edgehandles instance
-let _panel       = null;
-let _files       = [];
-let _activeFile  = null;   // only one chat file on canvas at a time
-let _removeBtn   = null;   // floating × overlay
-let _popPanels   = { files: null, entries: null };
+let _graph        = null;
+let _lgc          = null;   // LGraphCanvas
+let _lgCanvas     = null;   // <canvas> element inside container
+let _panel        = null;
+let _files        = [];
+let _activeFile   = null;
+let _popPanels    = { files: null, entries: null };
 let _edgeColorIdx = 0;
+let _typesReady   = false;
 
-const _CDN_CY = 'https://cdn.jsdelivr.net/npm/cytoscape@3/dist/cytoscape.min.js';
-const _CDN_EH = 'https://cdn.jsdelivr.net/npm/cytoscape-edgehandles@4/cytoscape-edgehandles.min.js';
+const _CDN_LG     = 'https://cdn.jsdelivr.net/npm/litegraph.js/build/litegraph.min.js';
+const _CDN_LG_CSS = 'https://cdn.jsdelivr.net/npm/litegraph.js/css/litegraph.css';
 
-const _EDGE_PALETTE = ['#a6e22e', '#66d9e8', '#f92672', '#fd971f', '#ae81ff', '#e6db74', '#66d9e8', '#cfcfc2'];
-
-const _C = {
-    file:  '#a6e22e',
-    entry: '#66d9e8',
-    bg:    '#1e1e18',
-    sel:   '#fd971f',
-};
+const _EDGE_PALETTE = ['#a6e22e', '#66d9e8', '#f92672', '#fd971f', '#ae81ff', '#e6db74', '#cfcfc2'];
 
 // ─── Public API ──────────────────────────────────────────────
 
@@ -49,53 +42,39 @@ export async function initAnalyser(panel, files) {
     _renderEntryListInto(_panel.querySelector('#se-cfm-an-entry-list'));
     _bindPopOutButtons();
 
-    const canvasEl = _panel.querySelector('#se-cfm-an-canvas');
-    if (!canvasEl) return;
+    const container = _panel.querySelector('#se-cfm-an-canvas');
+    if (!container) return;
 
-    _showMsg(canvasEl, 'Loading Cytoscape…');
-
+    _showMsg(container, 'Loading LiteGraph…');
     try {
-        await _loadScript(_CDN_CY, () => window.cytoscape);
-        await _loadScript(_CDN_EH, () => window.cytoscapeEdgehandles);
-        window.cytoscape.use(window.cytoscapeEdgehandles);
+        await _loadStyle(_CDN_LG_CSS);
+        await _loadScript(_CDN_LG, () => window.LiteGraph);
     } catch {
-        _showMsg(canvasEl, 'Failed to load canvas library — check internet connection.');
+        _showMsg(container, 'Failed to load canvas library — check internet connection.');
         return;
     }
 
-    _cy = window.cytoscape({
-        container: canvasEl,
-        elements:  [],
-        style:     _buildStyle(),
-        layout:    { name: 'preset' },
-        minZoom:   0.15,
-        maxZoom:   3,
-    });
-
-    _showMsg(canvasEl, null);
-    _initRemoveBtn(canvasEl);
-    _initEdgeHandles();
+    _showMsg(container, null);
+    _registerNodeTypes();
+    _initCanvas(container);
     _bindToolbar();
-    _bindNodeEvents();
     _bindEntryRefresh();
 }
 
 export function destroyAnalyser() {
-    _eh?.disable?.();
-    _cy?.destroy();
-    _cy = _eh = null;
-    _removeBtn?.remove();
-    _removeBtn = null;
+    _graph?.stop?.();
+    _lgc?.stopRendering?.();
+    _lgCanvas?.remove();
+    _graph = _lgc = _lgCanvas = null;
     _popPanels.files?.panel?.remove();
     _popPanels.entries?.panel?.remove();
-    _popPanels   = { files: null, entries: null };
-    _panel       = null;
-    _files       = [];
-    _activeFile  = null;
+    _popPanels    = { files: null, entries: null };
+    _panel        = null;
+    _files        = [];
+    _activeFile   = null;
     _edgeColorIdx = 0;
 }
 
-/** Refresh the entries sidebar — call when entries state changes. */
 export function refreshEntries() {
     const container = _popPanels.entries
         ? _popPanels.entries.panel.querySelector('#se-cfm-an-pop-entries')
@@ -106,57 +85,201 @@ export function refreshEntries() {
 // ─── Node operations ─────────────────────────────────────────
 
 export function addFileNode(fileName) {
-    if (!_cy || _activeFile) return;
-    const id = `file::${fileName}`;
-    if (_cy.getElementById(id).length) return;
+    if (!_lgc || _activeFile) return;
+    if (_findFileNode(fileName)) return;
 
-    const label = fileName.replace(/\.jsonl$/, '');
-    _cy.add({ data: { id, label, type: 'file', fileName }, position: _nextPos('file') });
+    const node = window.LiteGraph.createNode('se/chat_file');
+    node.properties.fileName = fileName;
+    node.title = fileName.replace(/\.jsonl$/, '').slice(-28);
+    _placeNode(node, 'file');
+    _graph.add(node);
 
     _activeFile = fileName;
     _refreshFileButtons();
 }
 
 export function removeFileNode(fileName) {
-    if (!_cy) return;
-    _cy.remove(`[id = "file::${fileName}"]`);
-    _cy.remove(`[source = "file::${fileName}"]`);
+    const node = _findFileNode(fileName);
+    if (!node) return;
+    _graph.remove(node);
     if (_activeFile === fileName) {
         _activeFile = null;
         _refreshFileButtons();
     }
-    _hideRemoveBtn();
 }
 
 export function addEntryNode(num) {
-    if (!_cy) return;
-    const id = `entry::${num}`;
-    if (_cy.getElementById(id).length) return;
+    if (!_lgc) return;
+    if (_findEntryNode(num)) return;
 
     const entry   = state.entries?.get(num);
-    const snippet = entry ? String(entry.content ?? '').slice(0, 55).replace(/\n/g, ' ') : `Entry ${num}`;
-    _cy.add({ data: { id, label: `#${num}`, snippet, type: 'entry', num }, position: _nextPos('entry') });
+    const snippet = entry ? String(entry.content ?? '').slice(0, 55).replaceAll('\n', ' ') : `Entry ${num}`;
+    const node    = window.LiteGraph.createNode('se/entry');
+    node.properties.num     = num;
+    node.properties.snippet = snippet;
+    node.title = `#${num}`;
+    _placeNode(node, 'entry');
+    _graph.add(node);
     _markAdded(`[data-an-add-entry="${num}"]`, true);
 }
 
 export function removeEntryNode(num) {
-    if (!_cy) return;
-    _cy.remove(`[id = "entry::${num}"]`);
-    _cy.remove(`[target = "entry::${num}"]`);
+    const node = _findEntryNode(num);
+    if (!node) return;
+    _graph.remove(node);
     _markAdded(`[data-an-add-entry="${num}"]`, false);
-    _hideRemoveBtn();
 }
 
-/** Draw a directed edge from a file node to an entry node (called by analysis pass). */
 export function connectNodes(fileName, entryNum) {
-    if (!_cy) return;
-    const src = `file::${fileName}`;
-    const tgt = `entry::${entryNum}`;
-    const id  = `edge::${src}::${tgt}`;
-    if (_cy.getElementById(id).length) return;
-    if (!_cy.getElementById(src).length || !_cy.getElementById(tgt).length) return;
-    const color = _nextEdgeColor();
-    _cy.add({ data: { id, source: src, target: tgt, color } });
+    const src = _findFileNode(fileName);
+    const tgt = _findEntryNode(entryNum);
+    if (!src || !tgt) return;
+    src.connect(0, tgt, 0);
+}
+
+// ─── Canvas initialisation ────────────────────────────────────
+
+function _initCanvas(container) {
+    const LG = window.LiteGraph;
+
+    // Monokai global defaults
+    LG.NODE_DEFAULT_COLOR        = '#2a2a1e';
+    LG.NODE_DEFAULT_BGCOLOR      = '#1a1a12';
+    LG.NODE_TITLE_HEIGHT         = 26;
+    LG.NODE_SLOT_HEIGHT          = 22;
+    LG.DEFAULT_SHADOW_OFFSET_X   = 0;
+    LG.DEFAULT_SHADOW_OFFSET_Y   = 0;
+    LG.NODE_TEXT_SIZE            = 11;
+
+    _lgCanvas = document.createElement('canvas');
+    _lgCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
+    container.insertBefore(_lgCanvas, container.firstChild);
+
+    _graph = new LG.LGraph();
+    _lgc   = new LG.LGraphCanvas(_lgCanvas, _graph);
+
+    _lgc.background_color      = '#181812';
+    _lgc.clear_background      = true;
+    _lgc.snap_to_grid          = 22;
+    _lgc.render_shadows        = false;
+    _lgc.render_canvas_border  = false;
+    _lgc.connections_width     = 2;
+    _lgc.default_link_color    = '#66d9e8';
+
+    // Dot-grid background drawn on canvas (not CSS — LG owns the canvas pixels)
+    _lgc.onDrawBackground = function(ctx, visArea) {
+        ctx.fillStyle = '#181812';
+        ctx.fillRect(visArea[0], visArea[1], visArea[2], visArea[3]);
+        ctx.fillStyle = '#3a3a2c';
+        const G = 22;
+        const sx = Math.floor(visArea[0] / G) * G;
+        const sy = Math.floor(visArea[1] / G) * G;
+        for (let x = sx; x < visArea[0] + visArea[2]; x += G) {
+            for (let y = sy; y < visArea[1] + visArea[3]; y += G) {
+                ctx.beginPath();
+                ctx.arc(x, y, 1, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    };
+
+    // Disable canvas right-click "Add Node" menu — nodes come from sidebar only
+    _lgc.getCanvasMenuOptions = () => [];
+
+    // Zoom pill sync
+    const label = _panel?.querySelector('#se-cfm-an-zoom-label');
+    _lgc.onAfterRender = function() {
+        if (label) label.textContent = `${Math.round((_lgc.ds?.scale ?? 1) * 100)}%`;
+    };
+
+    // Sync sidebar when nodes removed via LiteGraph native context menu
+    _graph.onNodeRemoved = function(node) {
+        if (node.type === 'se/chat_file') {
+            if (_activeFile === node.properties?.fileName) {
+                _activeFile = null;
+                _refreshFileButtons();
+            }
+        } else if (node.type === 'se/entry') {
+            _markAdded(`[data-an-add-entry="${node.properties?.num}"]`, false);
+        }
+    };
+
+    _graph.start(60);
+    _lgc.resize();
+
+    new ResizeObserver(() => _lgc?.resize()).observe(container);
+}
+
+// ─── Node type registration ───────────────────────────────────
+
+function _registerNodeTypes() {
+    if (_typesReady) return;
+    _typesReady = true;
+
+    const LG = window.LiteGraph;
+
+    // Port colours
+    LG.registered_link_types = LG.registered_link_types ?? {};
+    LG.registered_link_types['se_chat']  = { name: 'se_chat',  color: '#a6e22e' };
+    LG.registered_link_types['se_entry'] = { name: 'se_entry', color: '#66d9e8' };
+
+    // ── Chat File node ──────────────────────────────────────────────
+    class SEChatFileNode extends LG.LGraphNode {
+        constructor() {
+            super();
+            this.addOutput('chats', 'se_chat');
+            this.title   = 'Chat File';
+            this.color   = '#1c3a1c';
+            this.bgcolor = '#151510';
+            this.size    = [216, 56];
+            this.properties = { fileName: '' };
+        }
+
+        onConnectionsChange(type, _slot, isConnected, link) {
+            if (type === LG.OUTPUT && isConnected && link) {
+                link.color = _nextEdgeColor();
+            }
+        }
+
+        onDrawForeground(ctx) {
+            if (!this.properties?.fileName) return;
+            ctx.fillStyle   = '#75715e';
+            ctx.font        = '9px monospace';
+            ctx.fillText('📄 ' + this.properties.fileName.replace(/\.jsonl$/, '').slice(-32), 8, this.size[1] - 10);
+        }
+    }
+    SEChatFileNode.title = 'Chat File';
+    LG.registerNodeType('se/chat_file', SEChatFileNode);
+
+    // ── Entry node ──────────────────────────────────────────────────
+    class SEEntryNode extends LG.LGraphNode {
+        constructor() {
+            super();
+            this.addInput('from', 'se_chat');
+            this.addOutput('ref', 'se_entry');
+            this.title   = 'Entry';
+            this.color   = '#1a2c33';
+            this.bgcolor = '#151510';
+            this.size    = [210, 72];
+            this.properties = { num: 0, snippet: '' };
+        }
+
+        onConnectionsChange(type, _slot, isConnected, link) {
+            if (type === LG.INPUT && isConnected && link) {
+                link.color = _nextEdgeColor();
+            }
+        }
+
+        onDrawForeground(ctx) {
+            const snippet = String(this.properties?.snippet ?? '').slice(0, 50);
+            if (!snippet) return;
+            ctx.fillStyle = '#888';
+            ctx.font      = '9px monospace';
+            ctx.fillText(snippet, 8, this.size[1] - 10);
+        }
+    }
+    SEEntryNode.title = 'Entry';
+    LG.registerNodeType('se/entry', SEEntryNode);
 }
 
 // ─── Sidebar renderers ────────────────────────────────────────
@@ -168,8 +291,8 @@ function _renderFileListInto(container) {
         return;
     }
     container.innerHTML = _files.map(f => {
-        const name    = f.file_name ?? '';
-        const label   = name.replace(/\.jsonl$/, '');
+        const name     = f.file_name ?? '';
+        const label    = name.replace(/\.jsonl$/, '');
         const onCanvas = _activeFile === name;
         return `<div class="se-cfm-an-node-item">` +
             `<span class="se-cfm-an-node-label" title="${escHtml(name)}">${escHtml(label)}</span>` +
@@ -194,10 +317,10 @@ function _renderEntryListInto(container) {
         return;
     }
     container.innerHTML = entries
-        .sort((a, b) => a.num - b.num)
+        .toSorted((a, b) => a.num - b.num)
         .map(e => {
-            const onCanvas = _cy?.getElementById(`entry::${e.num}`).length > 0;
-            const snippet  = String(e.content ?? '').slice(0, 38).replace(/\n/g, ' ');
+            const onCanvas = !!_findEntryNode(e.num);
+            const snippet  = String(e.content ?? '').slice(0, 38).replaceAll('\n', ' ');
             return `<div class="se-cfm-an-node-item">` +
                 `<span class="se-cfm-an-node-label" title="${escHtml(String(e.content ?? ''))}">` +
                 `<span style="color:var(--se-cyan);margin-right:4px;">#${e.num}</span>${escHtml(snippet)}` +
@@ -225,17 +348,18 @@ function _bindPopOutButtons() {
 function _popOut(type) {
     if (_popPanels[type]) return;
 
-    const title   = type === 'files' ? 'Chat Files' : 'Entries';
-    const listId  = `se-cfm-an-pop-${type}`;
-    const pop     = document.createElement('div');
+    const title  = type === 'files' ? 'Chat Files' : 'Entries';
+    const listId = `se-cfm-an-pop-${type}`;
+    const pop    = document.createElement('div');
     pop.className = 'se-cfm-an-pop-panel';
     pop.innerHTML =
         `<div class="se-cfm-an-pop-hdr" id="se-cfm-an-pop-hdr-${type}">` +
         `<span>${escHtml(title)}</span>` +
         `<button class="se-cfm-an-pop-close" title="Restore to panel">&#x00D7;</button></div>` +
-        `<div class="se-cfm-an-pop-body"><div class="se-cfm-an-${type === 'files' ? 'file' : 'entry'}-list" id="${listId}"></div></div>`;
+        `<div class="se-cfm-an-pop-body">` +
+        `<div class="se-cfm-an-${type === 'files' ? 'file' : 'entry'}-list" id="${listId}"></div>` +
+        `</div>`;
 
-    // Position near sidebar
     const sbRect = _panel?.querySelector('.se-cfm-an-sidebar')?.getBoundingClientRect();
     if (sbRect) {
         pop.style.left = `${sbRect.left + 4}px`;
@@ -287,7 +411,7 @@ function _attachPopDrag(pop, hdrSelector) {
         if (e.target.closest('button')) return;
         sx = e.clientX; sy = e.clientY;
         const r = pop.getBoundingClientRect();
-        sl = r.left;   st = r.top;
+        sl = r.left; st = r.top;
         hdr.setPointerCapture(e.pointerId);
     }, { signal });
     hdr?.addEventListener('pointermove', e => {
@@ -305,65 +429,95 @@ function _attachPopDrag(pop, hdrSelector) {
 
 function _bindToolbar() {
     const p = _panel;
-    p?.querySelector('#se-cfm-an-fit')?.addEventListener('click', () => {
-        if (_cy?.elements().length) _cy.fit(undefined, 48);
+    p?.querySelector('#se-cfm-an-fit')?.addEventListener('click', _fitView);
+    p?.querySelector('#se-cfm-an-origin')?.addEventListener('click', () => {
+        if (!_lgc) return;
+        _lgc.ds.scale  = 1;
+        _lgc.ds.offset = [0, 0];
+        _lgc.setDirty(true, true);
     });
+    p?.querySelector('#se-cfm-an-gather')?.addEventListener('click', _gatherNodes);
     p?.querySelector('#se-cfm-an-layout')?.addEventListener('click', () => {
-        _cy?.layout({ name: 'cose', animate: true, animationDuration: 300, padding: 48 }).run();
+        if (!_graph) return;
+        const nodes = _graph._nodes;
+        if (!nodes.length) return;
+        const COLS = Math.ceil(Math.sqrt(nodes.length));
+        nodes.forEach((node, i) => {
+            node.pos = [(i % COLS) * 270 + 40, Math.floor(i / COLS) * 130 + 40];
+        });
+        _lgc.setDirty(true, true);
+        _fitView();
     });
     p?.querySelector('#se-cfm-an-clear')?.addEventListener('click', _clearCanvas);
     p?.querySelector('#se-cfm-an-prompts')?.addEventListener('click', () => openSystemPromptHub());
 
-    // Zoom controls
-    const slider = p?.querySelector('#se-cfm-an-zoom');
-    const label  = p?.querySelector('#se-cfm-an-zoom-label');
+    // Floating zoom pill
+    const label = p?.querySelector('#se-cfm-an-zoom-label');
     p?.querySelector('#se-cfm-an-zoom-in')?.addEventListener('click',  () => _stepZoom(0.15));
     p?.querySelector('#se-cfm-an-zoom-out')?.addEventListener('click', () => _stepZoom(-0.15));
-    slider?.addEventListener('input', () => {
-        const z = Number(slider.value) / 100;
-        _cy?.zoom({ level: z, renderedPosition: { x: _cy.container().offsetWidth / 2, y: _cy.container().offsetHeight / 2 } });
-        if (label) label.textContent = `${slider.value}%`;
-    });
-    _cy?.on('zoom', () => {
-        const pct = Math.round((_cy.zoom() ?? 1) * 100);
-        if (slider) slider.value = String(pct);
-        if (label)  label.textContent = `${pct}%`;
+    label?.addEventListener('click', () => {
+        if (!_lgc || !_lgCanvas) return;
+        _lgc.ds.scale  = 1;
+        _lgc.ds.offset = [_lgCanvas.offsetWidth / 2, _lgCanvas.offsetHeight / 2];
+        _lgc.setDirty(true, true);
     });
 }
 
 function _stepZoom(delta) {
-    if (!_cy) return;
-    const next = Math.min(3, Math.max(0.15, _cy.zoom() + delta));
-    _cy.zoom({ level: next, renderedPosition: { x: _cy.container().offsetWidth / 2, y: _cy.container().offsetHeight / 2 } });
+    if (!_lgc || !_lgCanvas) return;
+    const next = Math.min(3, Math.max(0.15, (_lgc.ds?.scale ?? 1) + delta));
+    _lgc.ds.changeScale(next, [_lgCanvas.offsetWidth / 2, _lgCanvas.offsetHeight / 2]);
+    _lgc.setDirty(true, true);
+}
+
+function _fitView() {
+    if (!_lgc || !_graph || !_lgCanvas) return;
+    const nodes = _graph._nodes;
+    if (!nodes.length) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of nodes) {
+        minX = Math.min(minX, n.pos[0]);
+        minY = Math.min(minY, n.pos[1]);
+        maxX = Math.max(maxX, n.pos[0] + n.size[0]);
+        maxY = Math.max(maxY, n.pos[1] + n.size[1]);
+    }
+    const w   = _lgCanvas.offsetWidth;
+    const h   = _lgCanvas.offsetHeight;
+    const PAD = 60;
+    const scale = Math.min(
+        (w - PAD * 2) / Math.max(1, maxX - minX),
+        (h - PAD * 2) / Math.max(1, maxY - minY),
+        2,
+    );
+    _lgc.ds.scale  = scale;
+    _lgc.ds.offset = [w / 2 - ((minX + maxX) / 2) * scale, h / 2 - ((minY + maxY) / 2) * scale];
+    _lgc.setDirty(true, true);
+}
+
+function _gatherNodes() {
+    if (!_lgc || !_graph) return;
+    const nodes  = _graph._nodes;
+    if (!nodes.length) return;
+    const GRID   = 22;
+    const perRow = Math.ceil(Math.sqrt(nodes.length));
+    nodes.forEach((node, i) => {
+        node.pos = [
+            Math.round(((i % perRow) * 240) / GRID) * GRID,
+            Math.round((Math.floor(i / perRow) * 120) / GRID) * GRID,
+        ];
+    });
+    _lgc.setDirty(true, true);
+    _fitView();
 }
 
 function _clearCanvas() {
-    _cy?.elements().remove();
+    if (!_graph) return;
+    _graph.clear();
     _activeFile = null;
     _refreshFileButtons();
-    _panel?.querySelectorAll('[data-an-add-entry].added').forEach(b => { b.classList.remove('added'); b.textContent = '+'; });
-    _hideRemoveBtn();
-}
-
-// ─── Node events ──────────────────────────────────────────────
-
-function _bindNodeEvents() {
-    if (!_cy) return;
-
-    _cy.on('select', 'node', e => _showRemoveBtn(e.target));
-    _cy.on('unselect', 'node', () => _hideRemoveBtn());
-    _cy.on('tap', e => { if (e.target === _cy) { _cy.elements().unselect(); _hideRemoveBtn(); } });
-    _cy.on('zoom pan position', () => {
-        const sel = _cy.$(':selected').first();
-        if (sel.length) _showRemoveBtn(sel);
-        else _hideRemoveBtn();
-    });
-
-    // Right-click also removes
-    _cy.on('cxttap', 'node', e => {
-        const node = e.target;
-        if (node.data('type') === 'file') removeFileNode(node.data('fileName'));
-        else removeEntryNode(node.data('num'));
+    _panel?.querySelectorAll('[data-an-add-entry].added').forEach(b => {
+        b.classList.remove('added');
+        b.textContent = '+';
     });
 }
 
@@ -371,59 +525,22 @@ function _bindEntryRefresh() {
     document.addEventListener('se:entries-changed', refreshEntries);
 }
 
-// ─── Floating remove button ───────────────────────────────────
-
-function _initRemoveBtn(canvasEl) {
-    _removeBtn = document.createElement('button');
-    _removeBtn.className = 'se-cfm-an-node-remove';
-    _removeBtn.title = 'Remove node';
-    _removeBtn.textContent = '×';
-    _removeBtn.style.display = 'none';
-    canvasEl.appendChild(_removeBtn);
-
-    _removeBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        const sel = _cy?.$(':selected').first();
-        if (!sel?.length) return;
-        if (sel.data('type') === 'file') removeFileNode(sel.data('fileName'));
-        else removeEntryNode(sel.data('num'));
-    });
-}
-
-function _showRemoveBtn(node) {
-    if (!_removeBtn || !_cy || !node?.length) return;
-    const pos = node.renderedPosition();
-    const w   = node.renderedWidth()  / 2;
-    const h   = node.renderedHeight() / 2;
-    _removeBtn.style.left    = `${pos.x + w - 8}px`;
-    _removeBtn.style.top     = `${pos.y - h - 8}px`;
-    _removeBtn.style.display = 'flex';
-}
-
-function _hideRemoveBtn() {
-    if (_removeBtn) _removeBtn.style.display = 'none';
-}
-
-// ─── Edge handles ─────────────────────────────────────────────
-
-function _initEdgeHandles() {
-    if (!_cy || !window.cytoscapeEdgehandles) return;
-    _eh = _cy.edgehandles({
-        preview:         false,
-        hoverDelay:      100,
-        snap:            false,
-        noEdgeEventsInDraw: true,
-        handlePosition:  () => 'middle top',
-        edgeParams:      (src, tgt) => {
-            const color = _nextEdgeColor();
-            return { data: { id: `edge::${src.id()}::${tgt.id()}`, color } };
-        },
-        loopAllowed:     () => false,
-    });
-    _eh.enable();
-}
-
 // ─── Helpers ─────────────────────────────────────────────────
+
+function _findFileNode(fileName) {
+    return _graph?._nodes.find(n => n.type === 'se/chat_file' && n.properties?.fileName === fileName) ?? null;
+}
+
+function _findEntryNode(num) {
+    return _graph?._nodes.find(n => n.type === 'se/entry' && n.properties?.num === num) ?? null;
+}
+
+function _placeNode(node, type) {
+    const GRID  = 22;
+    const col   = type === 'file' ? 2 : 12;
+    const count = (_graph?._nodes ?? []).filter(n => n.type === (type === 'file' ? 'se/chat_file' : 'se/entry')).length;
+    node.pos = [col * GRID, (2 + count * 5) * GRID];
+}
 
 function _markAdded(selector, added) {
     _panel?.querySelectorAll(selector).forEach(b => {
@@ -439,7 +556,6 @@ function _markAdded(selector, added) {
 }
 
 function _refreshFileButtons() {
-    // Re-render all file list containers
     const sidebar = _panel?.querySelector('#se-cfm-an-file-list');
     if (sidebar) _renderFileListInto(sidebar);
     if (_popPanels.files) {
@@ -449,15 +565,7 @@ function _refreshFileButtons() {
 }
 
 function _updateFileListState(container) {
-    const hasActive = !!_activeFile;
-    container.classList.toggle('has-active-file', hasActive);
-}
-
-function _nextPos(type) {
-    if (!_cy) return { x: 100, y: 100 };
-    const col   = type === 'file' ? 130 : 440;
-    const count = _cy.nodes(`[type = "${type}"]`).length;
-    return { x: col, y: 80 + count * 90 };
+    container.classList.toggle('has-active-file', !!_activeFile);
 }
 
 function _nextEdgeColor() {
@@ -466,105 +574,36 @@ function _nextEdgeColor() {
     return color;
 }
 
-function _showMsg(canvasEl, msg) {
-    let el = canvasEl.querySelector('.se-cfm-an-loading');
+function _showMsg(container, msg) {
+    let el = container.querySelector('.se-cfm-an-loading');
     if (msg) {
-        if (!el) { el = document.createElement('div'); el.className = 'se-cfm-an-loading'; canvasEl.appendChild(el); }
+        if (!el) { el = document.createElement('div'); el.className = 'se-cfm-an-loading'; container.appendChild(el); }
         el.textContent = msg;
     } else {
         el?.remove();
     }
 }
 
-// ─── Script loader ────────────────────────────────────────────
+// ─── Asset loaders ────────────────────────────────────────────
 
 function _loadScript(src, check) {
     return new Promise((resolve, reject) => {
         if (check?.()) { resolve(); return; }
         const s = document.createElement('script');
-        s.src = src;
+        s.src     = src;
         s.onload  = () => resolve();
         s.onerror = () => reject(new Error(`Failed to load ${src}`));
         document.head.appendChild(s);
     });
 }
 
-// ─── Cytoscape stylesheet ─────────────────────────────────────
-
-function _buildStyle() {
-    return [
-        {
-            selector: 'node[type = "file"]',
-            style: {
-                shape:              'round-rectangle',
-                'background-color': _C.bg,
-                'border-width':     2,
-                'border-color':     _C.file,
-                label:              'data(label)',
-                color:              _C.file,
-                'font-size':        '11px',
-                'font-family':      'monospace',
-                'text-valign':      'center',
-                'text-halign':      'center',
-                width:              170,
-                height:             46,
-                'text-max-width':   '150px',
-                'text-wrap':        'ellipsis',
-            },
-        },
-        {
-            selector: 'node[type = "entry"]',
-            style: {
-                shape:              'round-rectangle',
-                'background-color': _C.bg,
-                'border-width':     1.5,
-                'border-color':     _C.entry,
-                label:              'data(label)',
-                color:              _C.entry,
-                'font-size':        '11px',
-                'font-family':      'monospace',
-                'text-valign':      'center',
-                'text-halign':      'center',
-                width:              90,
-                height:             38,
-            },
-        },
-        {
-            selector: 'edge',
-            style: {
-                width:                1.5,
-                'line-color':         'data(color)',
-                'target-arrow-color': 'data(color)',
-                'target-arrow-shape': 'triangle',
-                'curve-style':        'bezier',
-                'arrow-scale':        0.8,
-            },
-        },
-        {
-            selector: ':selected',
-            style: { 'border-color': _C.sel, 'border-width': 2.5 },
-        },
-        {
-            selector: 'node:active',
-            style: { 'overlay-opacity': 0.12 },
-        },
-        {
-            selector: '.eh-handle',
-            style: {
-                'background-color': '#fd971f',
-                width:  10,
-                height: 10,
-                shape:  'ellipse',
-            },
-        },
-        {
-            selector: '.eh-ghost-edge',
-            style: {
-                'line-color':         '#fd971f',
-                'target-arrow-color': '#fd971f',
-                'target-arrow-shape': 'triangle',
-                'curve-style':        'bezier',
-            },
-        },
-    ];
+function _loadStyle(href) {
+    return new Promise(resolve => {
+        if (document.querySelector(`link[href="${href}"]`)) { resolve(); return; }
+        const link  = document.createElement('link');
+        link.rel    = 'stylesheet';
+        link.href   = href;
+        link.onload = resolve;
+        document.head.appendChild(link);
+    });
 }
