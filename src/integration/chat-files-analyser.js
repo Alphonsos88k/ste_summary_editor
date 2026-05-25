@@ -24,10 +24,12 @@ let _lgc          = null;   // LGraphCanvas
 let _lgCanvas     = null;   // <canvas> element inside container
 let _panel        = null;
 let _files        = [];
+let _char         = null;   // current ST character (for /getchat API)
 let _activeFile   = null;
 let _popPanels    = { files: null, entries: null };
 let _edgeColorIdx = 0;
 let _typesReady   = false;
+let _tipEl        = null;   // shared tooltip DOM element
 
 const _CDN_LG     = 'https://cdn.jsdelivr.net/npm/litegraph.js/build/litegraph.min.js';
 
@@ -35,9 +37,10 @@ const _EDGE_PALETTE = ['#a6e22e', '#66d9e8', '#f92672', '#fd971f', '#ae81ff', '#
 
 // ─── Public API ──────────────────────────────────────────────
 
-export async function initAnalyser(panel, files) {
+export async function initAnalyser(panel, files, char) {
     _panel = panel;
     _files = files ?? [];
+    _char  = char ?? null;
 
     _renderFileListInto(_panel.querySelector('#se-cfm-an-file-list'));
     _renderEntryListInto(_panel.querySelector('#se-cfm-an-entry-list'));
@@ -69,8 +72,11 @@ export function destroyAnalyser() {
     _popPanels.files?.panel?.remove();
     _popPanels.entries?.panel?.remove();
     _popPanels    = { files: null, entries: null };
+    _tipEl?.remove();
+    _tipEl        = null;
     _panel        = null;
     _files        = [];
+    _char         = null;
     _activeFile   = null;
     _edgeColorIdx = 0;
 }
@@ -204,7 +210,11 @@ function _initCanvas(container) {
         } else if (node.type === 'se/entry') {
             _markAdded(`[data-an-add-entry="${node.properties?.num}"]`, false);
         }
+        _refreshRunBtn();
     };
+
+    _graph.onNodeAdded        = () => _refreshRunBtn();
+    _graph.onConnectionChange = () => _refreshRunBtn();
 
     _graph.start(60);
     _lgc.resize();
@@ -454,7 +464,9 @@ function _attachPopDrag(pop, hdrSelector) {
 function _bindToolbar() {
     const p = _panel;
     p?.querySelector('#se-cfm-an-fit')?.addEventListener('click', _fitView);
+    p?.querySelector('#se-cfm-an-run')?.addEventListener('click', _openRunConfirm);
     p?.querySelector('#se-cfm-an-help')?.addEventListener('click', _openHelpDialog);
+    _initTooltips(p?.querySelector('.se-cfm-an-toolbar'));
     p?.querySelector('#se-cfm-an-origin')?.addEventListener('click', () => {
         if (!_lgc) return;
         _lgc.ds.scale  = 1;
@@ -487,6 +499,258 @@ function _bindToolbar() {
         _lgc.ds.offset = [_lgCanvas.offsetWidth / 2, _lgCanvas.offsetHeight / 2];
         _lgc.setDirty(true, true);
         _updateZoomLabel();
+    });
+}
+
+// ─── Run button state ─────────────────────────────────────────
+
+function _refreshRunBtn() {
+    const btn = _panel?.querySelector('#se-cfm-an-run');
+    if (!btn) return;
+    const hasLinks = _graph ? Object.keys(_graph.links ?? {}).length > 0 : false;
+    btn.disabled = !hasLinks;
+}
+
+// ─── Connection graph traversal ───────────────────────────────
+
+function _getConnectedGraph() {
+    if (!_graph) return null;
+    const fileNode = _graph._nodes.find(n => n.type === 'se/chat_file');
+    if (!fileNode) return null;
+
+    const seen = new Set();
+    const entryNodes = [];
+
+    function traverse(node) {
+        for (const output of (node.outputs ?? [])) {
+            for (const linkId of (output.links ?? [])) {
+                const link = _graph.links[linkId];
+                if (!link) continue;
+                const target = _graph._nodes.find(n => n.id === link.target_id);
+                if (!target || target.type !== 'se/entry' || seen.has(target.id)) continue;
+                seen.add(target.id);
+                entryNodes.push(target);
+                traverse(target);
+            }
+        }
+    }
+
+    traverse(fileNode);
+    return entryNodes.length > 0 ? { fileNode, entryNodes } : null;
+}
+
+// ─── Run confirmation dialog ──────────────────────────────────
+
+function _openRunConfirm() {
+    const existing = document.getElementById('se-cfm-an-run-dlg');
+    if (existing) { existing.remove(); return; }
+
+    const conn = _getConnectedGraph();
+    if (!conn) return;
+    const { fileNode, entryNodes } = conn;
+
+    const fileName  = fileNode.properties?.fileName ?? '';
+    const entryList = entryNodes.map(e => `#${e.properties?.num}`).join(', ');
+    const hasRefine = !!getPrompt('digest-refine');
+
+    const dlg = document.createElement('div');
+    dlg.id = 'se-cfm-an-run-dlg';
+    dlg.className = 'se-cfm-an-run-dlg';
+    dlg.innerHTML =
+        `<div class="se-cfm-an-run-hdr">` +
+        `<span>Run Analysis</span>` +
+        `<button class="se-close-circle se-cfm-an-run-close">&times;</button></div>` +
+        `<div class="se-cfm-an-run-body">` +
+        `<div class="se-cfm-an-run-info">` +
+        `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Chat file</span>` +
+        `<span class="se-cfm-an-run-val">${escHtml(fileName)}</span></div>` +
+        `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Entries</span>` +
+        `<span class="se-cfm-an-run-val">${escHtml(entryList)}</span></div>` +
+        `</div>` +
+        `<div class="se-cfm-an-run-pipeline">` +
+        `<div class="se-cfm-an-run-step"><em class="se-cfm-an-help-tag green">Pass 1</em>` +
+        `<span>Chat Digest — reads the full chat file and generates a structured digest</span></div>` +
+        (hasRefine
+            ? `<div class="se-cfm-an-run-step"><em class="se-cfm-an-help-tag cyan">Refine</em>` +
+              `<span>Digest Refinement — improves the digest in up to 3 feedback rounds</span></div>`
+            : '') +
+        `<div class="se-cfm-an-run-step"><em class="se-cfm-an-help-tag purple">Pass 2</em>` +
+        `<span>Entry Analysis — scores each entry against the digest. Returns REWRITE / SPLIT / MERGE / NO_CHANGE actions with reasons</span></div>` +
+        `</div></div>` +
+        `<div class="se-cfm-an-run-foot">` +
+        `<button class="se-cfm-an-run-cancel-btn">Cancel</button>` +
+        `<button class="se-cfm-an-run-go-btn">&#9654;&ensp;Run</button></div>`;
+
+    document.body.appendChild(dlg);
+    _centerDialog(dlg);
+    _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
+
+    dlg.querySelector('.se-cfm-an-run-close').addEventListener('click', () => dlg.remove());
+    dlg.querySelector('.se-cfm-an-run-cancel-btn').addEventListener('click', () => dlg.remove());
+    dlg.querySelector('.se-cfm-an-run-go-btn').addEventListener('click', async () => {
+        dlg.remove();
+        await _runAnalysis(fileNode, entryNodes);
+    });
+}
+
+// ─── Analysis pipeline ────────────────────────────────────────
+
+async function _runAnalysis(fileNode, entryNodes) {
+    const runBtn = _panel?.querySelector('#se-cfm-an-run');
+    const setLabel = msg => { if (runBtn) { runBtn.textContent = msg; runBtn.disabled = true; } };
+
+    try {
+        const ctx = SillyTavern.getContext();
+        const oai = ctx.chatCompletionSettings;
+
+        const callLLM = async (sysPrompt, userMsg) => {
+            const r = await fetch('/api/backends/chat-completions/generate', {
+                method: 'POST',
+                headers: ctx.getRequestHeaders(),
+                body: JSON.stringify({
+                    type: 'quiet',
+                    chat_completion_source: oai.chat_completion_source,
+                    model: ctx.getChatCompletionModel(),
+                    messages: [
+                        { role: 'system', content: sysPrompt },
+                        { role: 'user',   content: userMsg   },
+                    ],
+                    max_tokens: oai.openai_max_tokens || 2000,
+                    temperature: 0.3,
+                    stream: false,
+                }),
+            });
+            if (!r.ok) throw new Error(`API ${r.status}`);
+            const d = await r.json();
+            return d?.choices?.[0]?.message?.content || d?.choices?.[0]?.text || '';
+        };
+
+        // ── Pass 1: Chat digest ──────────────────────────────────
+        setLabel('⟳ Pass 1…');
+        const fileName = fileNode.properties?.fileName ?? '';
+        const chatResp = await fetch('/getchat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...ctx.getRequestHeaders() },
+            body: JSON.stringify({
+                ch_name: _char?.name ?? '',
+                file_name: fileName.replace(/\.jsonl$/, ''),
+                avatar_url: _char?.avatar ?? '',
+            }),
+        });
+        if (!chatResp.ok) throw new Error(`Failed to load chat: HTTP ${chatResp.status}`);
+        const chatLines = await chatResp.json();
+        const messages  = Array.isArray(chatLines) ? chatLines : (chatLines?.chat ?? []);
+        const chatText  = messages
+            .filter(m => m.mes || m.content)
+            .map(m => `${m.name ?? m.role ?? 'Unknown'}: ${m.mes ?? m.content}`)
+            .join('\n\n');
+        if (!chatText) throw new Error('Chat file is empty or could not be read.');
+
+        let digest = await callLLM(getPrompt('chat-digest'), `Chat history:\n${chatText}`);
+
+        // ── Pass 1.5: Digest refinement (optional, up to 3 rounds) ──
+        const refinePrompt = getPrompt('digest-refine');
+        if (refinePrompt) {
+            for (let round = 0; round < 3; round++) {
+                setLabel(`⟳ Refine ${round + 1}/3…`);
+                const refined = await callLLM(refinePrompt, `Current digest:\n${digest}`);
+                if (!refined || refined.trim() === digest.trim()) break;
+                digest = refined;
+            }
+        }
+
+        // ── Pass 2: Entry analysis ───────────────────────────────
+        const results = [];
+        for (let i = 0; i < entryNodes.length; i++) {
+            const eNode = entryNodes[i];
+            const num   = eNode.properties?.num;
+            const entry = state.entries?.get(num);
+            if (!entry) continue;
+            setLabel(`⟳ Entry #${num} (${i + 1}/${entryNodes.length})…`);
+            const userMsg = `Chat digest:\n${digest}\n\n---\nEntry #${num}:\n${entry.content}`;
+            const raw     = await callLLM(getPrompt('entry-analysis'), userMsg);
+            results.push({ num, raw });
+        }
+
+        _showRunResults(fileName, digest, results);
+
+    } catch (err) {
+        console.error('[SE] Analysis error:', err);
+        _showRunError(err.message);
+    } finally {
+        _refreshRunBtn();
+    }
+}
+
+function _showRunResults(fileName, digest, results) {
+    document.getElementById('se-cfm-an-results-dlg')?.remove();
+
+    const dlg = document.createElement('div');
+    dlg.id = 'se-cfm-an-results-dlg';
+    dlg.className = 'se-cfm-an-results-dlg';
+    dlg.innerHTML =
+        `<div class="se-cfm-an-run-hdr">` +
+        `<span>Analysis Results — ${escHtml(fileName)}</span>` +
+        `<button class="se-close-circle se-cfm-an-results-close">&times;</button></div>` +
+        `<div class="se-cfm-an-results-digest">` +
+        `<div class="se-cfm-an-results-dlbl">Chat Digest</div>` +
+        `<pre class="se-cfm-an-results-pre">${escHtml(digest)}</pre></div>` +
+        `<div class="se-cfm-an-results-entries">` +
+        (results.length
+            ? results.map(r =>
+                `<div class="se-cfm-an-result-item">` +
+                `<div class="se-cfm-an-result-num">#${r.num}</div>` +
+                `<pre class="se-cfm-an-results-pre">${escHtml(r.raw)}</pre></div>`
+              ).join('')
+            : '<div class="se-cfm-hint">No entries analysed.</div>') +
+        `</div>`;
+
+    document.body.appendChild(dlg);
+    _centerDialog(dlg);
+    _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
+    dlg.querySelector('.se-cfm-an-results-close').addEventListener('click', () => dlg.remove());
+}
+
+function _showRunError(msg) {
+    document.getElementById('se-cfm-an-results-dlg')?.remove();
+    const dlg = document.createElement('div');
+    dlg.id = 'se-cfm-an-results-dlg';
+    dlg.className = 'se-cfm-an-results-dlg';
+    dlg.innerHTML =
+        `<div class="se-cfm-an-run-hdr" style="background:#3a1018;">` +
+        `<span style="color:#f92672;">Analysis Error</span>` +
+        `<button class="se-close-circle se-cfm-an-results-close">&times;</button></div>` +
+        `<div class="se-cfm-an-results-entries" style="padding:14px;color:#f8b0b0;font-size:12px;">${escHtml(msg)}</div>`;
+    document.body.appendChild(dlg);
+    _centerDialog(dlg);
+    _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
+    dlg.querySelector('.se-cfm-an-results-close').addEventListener('click', () => dlg.remove());
+}
+
+// ─── Tooltip widget ───────────────────────────────────────────
+
+function _initTooltips(toolbar) {
+    if (!toolbar) return;
+    if (!_tipEl) {
+        _tipEl = document.createElement('div');
+        _tipEl.className = 'se-cfm-an-tip';
+        document.body.appendChild(_tipEl);
+    }
+    toolbar.querySelectorAll('[data-tip]').forEach(btn => {
+        btn.addEventListener('mouseenter', () => {
+            _tipEl.textContent = btn.dataset.tip;
+            _tipEl.style.display = 'block';
+            _tipEl.style.visibility = 'hidden';
+            requestAnimationFrame(() => {
+                const r  = btn.getBoundingClientRect();
+                const tw = _tipEl.offsetWidth;
+                _tipEl.style.left = `${Math.max(4, Math.min(window.innerWidth - tw - 4, r.left + r.width / 2 - tw / 2))}px`;
+                _tipEl.style.top  = `${r.bottom + 6}px`;
+                _tipEl.style.visibility = 'visible';
+            });
+        });
+        btn.addEventListener('mouseleave', () => { _tipEl.style.display = 'none'; });
+        btn.addEventListener('click',      () => { _tipEl.style.display = 'none'; });
     });
 }
 
@@ -681,6 +945,7 @@ function _clearCanvas() {
         b.classList.remove('added');
         b.textContent = '+';
     });
+    _refreshRunBtn();
 }
 
 function _bindEntryRefresh() {

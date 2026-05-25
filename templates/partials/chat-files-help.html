@@ -10,6 +10,7 @@
         <button class="se-cfm-an-help-nav-item" data-sec="toolbar">Toolbar</button>
         <button class="se-cfm-an-help-nav-item" data-sec="panels">Panels</button>
         <button class="se-cfm-an-help-nav-item" data-sec="prompts">Prompts</button>
+        <button class="se-cfm-an-help-nav-item" data-sec="analysis">Analysis</button>
     </nav>
     <div class="se-cfm-an-help-content">
 
@@ -85,8 +86,12 @@
                     <li><b>Origin</b> — reset the view to canvas origin (0, 0) at 100% zoom without moving nodes.</li>
                     <li><b>Gather</b> — snap all scattered nodes back into a compact grid near the canvas centre.</li>
                     <li><b>Layout</b> — auto-arrange all nodes into a uniform grid, then run Fit.</li>
-                    <li><b>Clear</b> — remove every node and connection from the canvas. This does not delete chat files or entries.</li>
+                    <li><b>Clear</b> — remove every node and connection from the canvas. Does not delete files or entries.</li>
+                    <li><b>&#9654; Run</b> — execute the 3-prompt analysis pipeline on all connected nodes. Greyed out until a connection exists. See the <b>Analysis</b> section for details.</li>
+                    <li><b>?</b> — open this help booklet.</li>
+                    <li><b>&#9881; Prompts</b> — edit the system prompts used by the analysis pipeline.</li>
                 </ul>
+                <p>Hover any button for a brief tooltip describing its action.</p>
             </div>
         </div>
 
@@ -112,6 +117,42 @@
                     <li><em class="se-cfm-an-help-tag purple">Entry Analysis — Pass 2</em> — analyses entries against the digest. Should return structured JSON with REWRITE / SPLIT / MERGE / NO_CHANGE actions.</li>
                 </ul>
                 <p>Changes save immediately. Prompts are also accessible from the main Prompts Hub.</p>
+            </div>
+        </div>
+
+        <div class="se-cfm-an-help-sec" data-sec="analysis" hidden>
+            <div class="se-cfm-an-help-page">
+                <h3>Running the Analysis</h3>
+                <p>The <b>&#9654; Run</b> button in the toolbar executes the full 3-prompt pipeline against all nodes connected on the canvas.</p>
+                <ul>
+                    <li>The button is <b>greyed out</b> until at least one connection exists between a Chat File node and an Entry node.</li>
+                    <li>Clicking <b>&#9654; Run</b> opens a confirmation dialog listing the file and entries that will be analysed, and the passes that will run.</li>
+                    <li>Click <b>Run</b> in the dialog to start. The button label shows live progress (<em>Pass 1…</em>, <em>Refine 1/3…</em>, <em>Entry #N…</em>).</li>
+                    <li>When complete, a <b>Results</b> dialog shows the generated digest and per-entry analysis output.</li>
+                </ul>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>Pass 1 — Chat Digest</h3>
+                <p>The <em class="se-cfm-an-help-tag green">Chat Digest</em> prompt is sent first.</p>
+                <ul>
+                    <li>The full chat file is loaded and formatted as a readable transcript.</li>
+                    <li>The prompt + transcript is sent to the LLM, which returns a structured <b>digest</b> — a condensed account of events, tone, and key details.</li>
+                    <li>This digest is the shared context for all subsequent passes.</li>
+                </ul>
+                <h3>Refinement (optional)</h3>
+                <p>If the <em class="se-cfm-an-help-tag cyan">Digest Refinement</em> prompt is set, the digest is fed back to the LLM in a feedback loop — up to <b>3 rounds</b> — each round replacing the previous digest with an improved version. The loop stops early if the output stops changing.</p>
+                <p>Leave this prompt empty to skip refinement entirely.</p>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>Pass 2 — Entry Analysis</h3>
+                <p>The <em class="se-cfm-an-help-tag purple">Entry Analysis</em> prompt is run once <b>per connected entry</b>, in graph order (following <em class="se-cfm-an-help-tag purple">ref</em> chains depth-first).</p>
+                <ul>
+                    <li>Each call receives the <b>digest</b> from Pass 1 and the <b>entry content</b> as the user message.</li>
+                    <li>The prompt should instruct the LLM to return structured JSON with a recommended action and a reason, for example:</li>
+                </ul>
+                <p><code>{ "action": "REWRITE", "reason": "Entry contradicts digest — character was not present." }</code></p>
+                <p>Valid actions: <b>REWRITE</b> · <b>SPLIT</b> · <b>MERGE</b> · <b>NO_CHANGE</b>.</p>
+                <p>Results are displayed in the Results dialog under each entry number. Edit prompts via <b>&#9881; Prompts</b> in the toolbar.</p>
             </div>
         </div>
 
