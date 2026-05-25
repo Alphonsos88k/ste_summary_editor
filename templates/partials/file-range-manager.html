@@ -21,7 +21,7 @@
         <div class="se-frm-summary" id="se-frm-summary"></div>
         <div class="se-frm-footer">
             <div class="se-frm-footer-left">
-                <button class="se-btn se-btn-sm se-frm-balance" id="se-frm-auto-balance" title="Redistribute entries evenly across all ranges">&#9878; Auto-balance</button>
+                <button class="se-btn se-btn-sm se-frm-balance" id="se-frm-auto-balance">&#9878; Auto-balance</button><span class="se-info-icon se-frm-balance-info" title="Auto-balance runs in 3 phases: (1) Evenly distribute entries by count across all files. (2) Move overflow entries from over-limit files to the smallest available later file, repeating until stable. (3) If a file still exceeds the size limit after phase 2, prompt you to name a new file for the overflow entries. Unassigned entries (not in any file) are also detected and you will be asked to name a file for them before balancing begins.">&#63;</span>
                 <button class="se-btn se-btn-sm" id="se-frm-new-file" title="Add a new empty output file">&#43; New File</button>
             </div>
             <button class="se-btn se-btn-sm se-frm-close-btn se-frm-close">Close</button>
