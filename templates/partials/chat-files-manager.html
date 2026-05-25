@@ -1,0 +1,68 @@
+<div class="se-cfm-header se-float-panel-header">
+    <span class="se-float-panel-title">&#x1F4AC; Chat Files &mdash; <span id="se-cfm-char-name"></span></span>
+    <input class="se-cfm-search" id="se-cfm-search" type="text" placeholder="Search files&hellip;" autocomplete="off" />
+    <button class="se-close-circle se-cfm-close" title="Close">&times;</button>
+</div>
+<div class="se-cfm-body">
+    <div class="se-cfm-sidebar">
+        <div class="se-cfm-file-list" id="se-cfm-file-list">
+            <div class="se-cfm-hint">Loading&hellip;</div>
+        </div>
+    </div>
+    <div class="se-cfm-right">
+        <div class="se-cfm-format-bar">
+            <div class="se-cfm-fmt-group">
+                <button class="se-cfm-fmt-btn active" data-align="left" title="Align left">&#8676;</button>
+                <button class="se-cfm-fmt-btn" data-align="center" title="Center">&#8677;</button>
+                <button class="se-cfm-fmt-btn" data-align="right" title="Align right">&#8678;</button>
+            </div>
+            <span class="se-cfm-fmt-sep"></span>
+            <div class="se-cfm-fmt-group">
+                <button class="se-cfm-fmt-btn active" data-font="mono" title="Monospace">Mono</button>
+                <button class="se-cfm-fmt-btn" data-font="sans" title="Sans-serif">Sans</button>
+                <button class="se-cfm-fmt-btn" data-font="serif" title="Serif">Serif</button>
+            </div>
+            <span class="se-cfm-fmt-sep"></span>
+            <div class="se-cfm-fmt-group">
+                <button class="se-cfm-fmt-btn active" data-theme="monokai" title="Monokai dark">MK</button>
+                <button class="se-cfm-fmt-btn" data-theme="light" title="Light">Lt</button>
+                <button class="se-cfm-fmt-btn" data-theme="contrast" title="High contrast">HC</button>
+            </div>
+            <span class="se-cfm-fmt-sep"></span>
+            <div class="se-cfm-fmt-group">
+                <button class="se-cfm-fmt-btn active" data-size="sm" title="Small">S</button>
+                <button class="se-cfm-fmt-btn" data-size="md" title="Medium">M</button>
+                <button class="se-cfm-fmt-btn" data-size="lg" title="Large">L</button>
+            </div>
+            <span class="se-cfm-fmt-sep"></span>
+            <button class="se-cfm-fmt-btn" id="se-cfm-spacing-btn" title="Toggle loose line spacing">&#8597; Spacing</button>
+            <div style="flex:1;"></div>
+            <span class="se-cfm-autosave-status" id="se-cfm-autosave-status"></span>
+            <button class="se-btn se-btn-sm se-btn-primary" id="se-cfm-save-btn" disabled>&#x1F4BE; Save</button>
+        </div>
+        <div class="se-cfm-editor-area">
+            <div class="se-cfm-empty-state" id="se-cfm-empty-state">Select a chat file from the sidebar</div>
+            <textarea class="se-cfm-textarea" id="se-cfm-textarea" style="display:none;" spellcheck="false"></textarea>
+            <div class="se-cfm-form-view" id="se-cfm-form-view" style="display:none;"></div>
+        </div>
+        <div class="se-cfm-status-bar">
+            <div class="se-cfm-path-row">
+                <input class="se-cfm-path-input" id="se-cfm-path-input" type="text" readonly placeholder="No file selected" />
+                <button class="se-cfm-path-copy" id="se-cfm-path-copy" title="Copy path to clipboard">&#x1F4CB;</button>
+            </div>
+            <div class="se-cfm-status-right">
+                <div class="se-cfm-view-group">
+                    <button class="se-cfm-view-btn active" data-view="jsonl" title="Raw JSONL &mdash; editable">JSONL</button>
+                    <button class="se-cfm-view-btn" data-view="plain" title="Plain text &mdash; read only">Plain</button>
+                    <button class="se-cfm-view-btn" data-view="yaml" title="YAML view &mdash; read only">YAML</button>
+                    <button class="se-cfm-view-btn" data-view="form" title="Form view &mdash; edit messages">Form</button>
+                </div>
+                <span class="se-cfm-status-divider"></span>
+                <span class="se-cfm-meta" id="se-cfm-tokens"></span>
+                <span class="se-cfm-meta" id="se-cfm-modified-date"></span>
+                <span class="se-cfm-status-divider"></span>
+                <button class="se-cfm-fmt-btn" id="se-cfm-wrap-btn" title="Toggle word wrap">&#x21B5; Wrap</button>
+            </div>
+        </div>
+    </div>
+</div>
