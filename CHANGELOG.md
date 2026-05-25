@@ -1,3 +1,11 @@
+## [1.12.1](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.12.0...v1.12.1) (2026-05-25)
+
+
+### Bug Fixes
+
+* remove popup header ! badge, add se-attn-circle to sidebar rows ([2101c86](https://github.com/Alphonsos88k/ste_summary_editor/commit/2101c86e99e52fee7e94c46e53a4c2757d1698a9))
+* replace ⓘ + duplicate orange badge with single orange ! in sidebar row ([8bd31d4](https://github.com/Alphonsos88k/ste_summary_editor/commit/8bd31d4e94f073c97519a0b1ec23ff11784531f9))
+
 # [1.12.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.11.1...v1.12.0) (2026-05-25)
 
 
