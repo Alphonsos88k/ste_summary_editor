@@ -7,7 +7,7 @@
 
 import { state } from '../core/state.js';
 import { escHtml } from '../core/utils.js';
-import { registerPrompt, openSystemPromptHub } from '../core/system-prompts.js';
+import { registerPrompt, getRegisteredPrompts, getPrompt, setPrompt } from '../core/system-prompts.js';
 
 // ─── Prompt registration ──────────────────────────────────────
 
@@ -28,7 +28,6 @@ let _edgeColorIdx = 0;
 let _typesReady   = false;
 
 const _CDN_LG     = 'https://cdn.jsdelivr.net/npm/litegraph.js/build/litegraph.min.js';
-const _CDN_LG_CSS = 'https://cdn.jsdelivr.net/npm/litegraph.js/css/litegraph.css';
 
 const _EDGE_PALETTE = ['#a6e22e', '#66d9e8', '#f92672', '#fd971f', '#ae81ff', '#e6db74', '#cfcfc2'];
 
@@ -47,7 +46,6 @@ export async function initAnalyser(panel, files) {
 
     _showMsg(container, 'Loading LiteGraph…');
     try {
-        await _loadStyle(_CDN_LG_CSS);
         await _loadScript(_CDN_LG, () => window.LiteGraph);
     } catch {
         _showMsg(container, 'Failed to load canvas library — check internet connection.');
@@ -449,7 +447,7 @@ function _bindToolbar() {
         _fitView();
     });
     p?.querySelector('#se-cfm-an-clear')?.addEventListener('click', _clearCanvas);
-    p?.querySelector('#se-cfm-an-prompts')?.addEventListener('click', () => openSystemPromptHub());
+    p?.querySelector('#se-cfm-an-prompts')?.addEventListener('click', e => _openAnalysePrompts(e.currentTarget));
 
     // Floating zoom pill
     const label = p?.querySelector('#se-cfm-an-zoom-label');
@@ -461,6 +459,44 @@ function _bindToolbar() {
         _lgc.ds.offset = [_lgCanvas.offsetWidth / 2, _lgCanvas.offsetHeight / 2];
         _lgc.setDirty(true, true);
     });
+}
+
+function _openAnalysePrompts(btn) {
+    const existing = document.getElementById('se-cfm-an-prompts-dlg');
+    if (existing) { existing.remove(); return; }
+
+    const prompts = getRegisteredPrompts().filter(p => p.location === 'Chat Files › Analyse tab');
+    if (!prompts.length) return;
+
+    const dlg = document.createElement('div');
+    dlg.id = 'se-cfm-an-prompts-dlg';
+    dlg.className = 'se-cfm-an-prompts-dlg';
+    dlg.innerHTML =
+        `<div class="se-cfm-an-pdlg-title">Analyse Prompts</div>` +
+        prompts.map(p =>
+            `<div class="se-cfm-an-pdlg-item">` +
+            `<label class="se-cfm-an-pdlg-label">${escHtml(p.label)}</label>` +
+            `<textarea class="se-cfm-an-pdlg-ta" data-pk="${escHtml(p.key)}" rows="5" spellcheck="false">${escHtml(getPrompt(p.key))}</textarea>` +
+            `</div>`
+        ).join('') +
+        `<div class="se-cfm-an-pdlg-footer"><button class="se-cfm-an-pdlg-close">Close</button></div>`;
+
+    const rect = btn?.getBoundingClientRect();
+    if (rect) {
+        dlg.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+        dlg.style.right  = `${window.innerWidth - rect.right}px`;
+    }
+    document.body.appendChild(dlg);
+
+    dlg.querySelectorAll('[data-pk]').forEach(ta => {
+        ta.addEventListener('input', () => setPrompt(ta.dataset.pk, ta.value));
+    });
+    dlg.querySelector('.se-cfm-an-pdlg-close').addEventListener('click', () => dlg.remove());
+
+    const onOutside = e => {
+        if (!dlg.contains(e.target) && e.target !== btn) { dlg.remove(); document.removeEventListener('mousedown', onOutside); }
+    };
+    setTimeout(() => document.addEventListener('mousedown', onOutside), 0);
 }
 
 function _stepZoom(delta) {
@@ -594,16 +630,5 @@ function _loadScript(src, check) {
         s.onload  = () => resolve();
         s.onerror = () => reject(new Error(`Failed to load ${src}`));
         document.head.appendChild(s);
-    });
-}
-
-function _loadStyle(href) {
-    return new Promise(resolve => {
-        if (document.querySelector(`link[href="${href}"]`)) { resolve(); return; }
-        const link  = document.createElement('link');
-        link.rel    = 'stylesheet';
-        link.href   = href;
-        link.onload = resolve;
-        document.head.appendChild(link);
     });
 }
