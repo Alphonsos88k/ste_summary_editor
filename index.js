@@ -1606,7 +1606,7 @@ function bindActsEvents() {
     $('#se-btn-minimap-fullscreen').on('click', () => {
         const $overlay = $('#se-minimap-overlay');
         const entering = $overlay.toggleClass('se-minimap-fullscreen').hasClass('se-minimap-fullscreen');
-        $('#se-btn-minimap-fullscreen').html(entering ? '&#x2B1C;' : '&#x26F6;')
+        $('#se-btn-minimap-fullscreen').html(entering ? '&#x2922;' : '&#x26F6;')
             .attr('title', entering ? 'Exit fullscreen' : 'Fullscreen');
     });
     $('#se-btn-story-context').on('click', openStoryContextPanel);
