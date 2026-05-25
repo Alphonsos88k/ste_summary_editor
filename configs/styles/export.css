@@ -1465,29 +1465,31 @@
     border-color: var(--se-pink);
 }
 
-/* Orange attention badge — used in sidebar drawer header and files panel header */
+/* Attention badge — oval, orange outline, transparent bg; white fill on hover */
 .se-attn-circle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-width: 24px;
-    height: 24px;
+    height: 22px;
     padding: 0 7px;
-    border-radius: 12px;
-    background: var(--se-orange);
-    color: #272822;
+    border-radius: 11px;
+    background: transparent;
+    color: var(--se-orange);
     font-size: 0.72em;
     font-weight: 800;
-    border: 2px solid transparent;
+    border: 2px solid var(--se-orange);
     cursor: pointer;
     white-space: nowrap;
     line-height: 1;
-    transition: box-shadow 0.12s, border-color 0.12s;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
     flex-shrink: 0;
     vertical-align: middle;
 }
 .se-attn-circle:hover {
-    box-shadow: 0 0 0 2px #fff;
+    background: #fff;
+    color: #272822;
+    border-color: #fff;
 }
 /* Close button sits at the right of its flex container (panel header).
    No absolute positioning needed — the header is a flex row. */
