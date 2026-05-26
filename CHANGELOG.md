@@ -1,3 +1,10 @@
+## [1.17.1](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.17.0...v1.17.1) (2026-05-26)
+
+
+### Bug Fixes
+
+* strengthen content fidelity guidance in chat-digest prompt ([1ee8623](https://github.com/Alphonsos88k/ste_summary_editor/commit/1ee862331809687f6489b5a45bf37d926b87d693))
+
 # [1.17.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.16.0...v1.17.0) (2026-05-26)
 
 
