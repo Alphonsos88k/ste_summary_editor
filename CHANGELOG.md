@@ -1,3 +1,15 @@
+# [1.17.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.16.0...v1.17.0) (2026-05-26)
+
+
+### Bug Fixes
+
+* replace deprecated getallchatsofcharacter with /api/characters/chats ([4df0c1a](https://github.com/Alphonsos88k/ste_summary_editor/commit/4df0c1a975f38195263d36b7b8b21490a0a22c7d))
+
+
+### Features
+
+* analyser MOVE action, prompt rewrites, UX bug fixes ([3a6b899](https://github.com/Alphonsos88k/ste_summary_editor/commit/3a6b899c8fbe4ccab73beddbd6e4693a8eab174e))
+
 # [1.16.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.15.0...v1.16.0) (2026-05-26)
 
 
