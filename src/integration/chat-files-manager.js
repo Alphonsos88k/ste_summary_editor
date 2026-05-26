@@ -11,13 +11,13 @@ import { TEMPLATES } from '../core/constants.js';
 import { bindEditorControls, selectFile } from './chat-files-editor.js';
 import { initAnalyser, destroyAnalyser, refreshEntries } from './chat-files-analyser.js';
 
-let _panel         = null;
-let _currentChar   = null;
-let _files         = [];
+let _panel = null;
+let _currentChar = null;
+let _files = [];
 let _analyserReady = false;
-let _popped        = false;
-let _dragAbort     = null;
-let _userHandle    = 'default-user';
+let _popped = false;
+let _dragAbort = null;
+let _userHandle = 'default-user';
 
 // ─── Public API ──────────────────────────────────────────────
 
@@ -47,8 +47,8 @@ export function closeChatFilesManager() {
     destroyAnalyser();
     _detachDrag();
     _panel?.remove();
-    _panel         = null;
-    _files         = [];
+    _panel = null;
+    _files = [];
     _analyserReady = false;
 }
 
@@ -61,26 +61,42 @@ function _attachDrag() {
     const header = _panel.querySelector('.se-cfm-header');
     let startX, startY, startLeft, startTop;
 
-    header.addEventListener('pointerdown', (e) => {
-        if (e.target.closest('button')) return;
-        startX = e.clientX;
-        startY = e.clientY;
-        const rect = _panel.getBoundingClientRect();
-        startLeft = rect.left;
-        startTop = rect.top;
-        header.setPointerCapture(e.pointerId);
-    }, { signal });
+    header.addEventListener(
+        'pointerdown',
+        (e) => {
+            if (e.target.closest('button')) return;
+            startX = e.clientX;
+            startY = e.clientY;
+            const rect = _panel.getBoundingClientRect();
+            startLeft = rect.left;
+            startTop = rect.top;
+            header.setPointerCapture(e.pointerId);
+        },
+        { signal }
+    );
 
-    header.addEventListener('pointermove', (e) => {
-        if (!header.hasPointerCapture(e.pointerId)) return;
-        const minV = 48;
-        _panel.style.left = Math.max(-((_panel.offsetWidth) - minV), Math.min(window.innerWidth - minV, startLeft + e.clientX - startX)) + 'px';
-        _panel.style.top  = Math.max(0, Math.min(window.innerHeight - minV, startTop  + e.clientY - startY)) + 'px';
-    }, { signal });
+    header.addEventListener(
+        'pointermove',
+        (e) => {
+            if (!header.hasPointerCapture(e.pointerId)) return;
+            const minV = 48;
+            _panel.style.left =
+                Math.max(
+                    -(_panel.offsetWidth - minV),
+                    Math.min(window.innerWidth - minV, startLeft + e.clientX - startX)
+                ) + 'px';
+            _panel.style.top = Math.max(0, Math.min(window.innerHeight - minV, startTop + e.clientY - startY)) + 'px';
+        },
+        { signal }
+    );
 
-    header.addEventListener('pointerup', (e) => {
-        if (header.hasPointerCapture(e.pointerId)) header.releasePointerCapture(e.pointerId);
-    }, { signal });
+    header.addEventListener(
+        'pointerup',
+        (e) => {
+            if (header.hasPointerCapture(e.pointerId)) header.releasePointerCapture(e.pointerId);
+        },
+        { signal }
+    );
 }
 
 function _detachDrag() {
@@ -88,7 +104,7 @@ function _detachDrag() {
     _dragAbort = null;
     if (_panel) {
         _panel.style.left = '';
-        _panel.style.top  = '';
+        _panel.style.top = '';
     }
 }
 
@@ -102,7 +118,9 @@ async function _fetchUserHandle() {
             const data = await resp.json();
             if (data?.handle) _userHandle = data.handle;
         }
-    } catch { /* fall back to default-user */ }
+    } catch {
+        /* fall back to default-user */
+    }
 }
 
 // ─── File List ───────────────────────────────────────────────
@@ -114,7 +132,7 @@ async function _loadFileList() {
 
     const ctx = SillyTavern.getContext();
     try {
-        const resp = await fetch('/getallchatsofcharacter', {
+        const resp = await fetch('/api/characters/chats', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...ctx.getRequestHeaders() },
             body: JSON.stringify({ avatar_url: _currentChar.avatar }),
@@ -136,9 +154,9 @@ function _renderFileList(chats) {
         return;
     }
 
-    listEl.innerHTML = _files.map(chat => _fileItemHtml(chat)).join('');
+    listEl.innerHTML = _files.map((chat) => _fileItemHtml(chat)).join('');
 
-    listEl.querySelectorAll('[data-cfm-file]').forEach(el => {
+    listEl.querySelectorAll('[data-cfm-file]').forEach((el) => {
         el.addEventListener('click', () => selectFile(el.dataset.cfmFile, _currentChar));
         _attachMarquee(el);
     });
@@ -147,14 +165,16 @@ function _renderFileList(chats) {
 const _LABEL_MAX = 52;
 
 function _fileItemHtml(chat) {
-    const name  = chat.file_name ?? '';
-    const base  = name.replace(/\.jsonl$/, '');
+    const name = chat.file_name ?? '';
+    const base = name.replace(/\.jsonl$/, '');
     const label = base.length > _LABEL_MAX ? `${base.slice(0, _LABEL_MAX)}…` : base;
-    const date  = _relDate(chat.last_mes);
-    return `<div class="se-cfm-file-item" data-cfm-file="${escHtml(name)}" title="${escHtml(name)}">` +
+    const date = _relDate(chat.last_mes);
+    return (
+        `<div class="se-cfm-file-item" data-cfm-file="${escHtml(name)}" title="${escHtml(name)}">` +
         `<span class="se-cfm-fname"><span class="se-cfm-fname-text">${escHtml(label)}</span></span>` +
         `<span class="se-cfm-fdate">${date}</span>` +
-        '</div>';
+        '</div>'
+    );
 }
 
 function _attachMarquee(item) {
@@ -166,12 +186,12 @@ function _attachMarquee(item) {
         if (overflow > 4) {
             const dur = Math.min(0.6 + overflow / 80, 3.5);
             inner.style.transition = `transform ${dur}s ease-in-out`;
-            inner.style.transform  = `translateX(-${overflow}px)`;
+            inner.style.transform = `translateX(-${overflow}px)`;
         }
     });
     item.addEventListener('mouseleave', () => {
         inner.style.transition = 'transform 0.25s ease';
-        inner.style.transform  = '';
+        inner.style.transform = '';
     });
 }
 
@@ -201,7 +221,7 @@ function _bindPanelEvents() {
 
     _panel.querySelector('#se-cfm-search')?.addEventListener('input', function () {
         const q = this.value.toLowerCase().trim();
-        _panel.querySelectorAll('.se-cfm-file-item').forEach(el => {
+        _panel.querySelectorAll('.se-cfm-file-item').forEach((el) => {
             el.style.display = !q || el.dataset.cfmFile.toLowerCase().includes(q) ? '' : 'none';
         });
     });
@@ -222,10 +242,10 @@ function _bindPanelEvents() {
             _popped = false;
         }
         this.innerHTML = isFull ? '&#x2922;' : '&#x26F6;';
-        this.title     = isFull ? 'Exit fullscreen' : 'Fullscreen';
+        this.title = isFull ? 'Exit fullscreen' : 'Fullscreen';
     });
 
-    const folder     = _currentChar?.avatar.replace(/\.[^.]+$/, '') ?? '';
+    const folder = _currentChar?.avatar.replace(/\.[^.]+$/, '') ?? '';
     _panel.querySelector('#se-cfm-folder-btn')?.addEventListener('click', () => {
         const path = `data/${_userHandle}/chats/${folder}/`;
         navigator.clipboard.writeText(path).catch(() => {});
@@ -238,16 +258,19 @@ function _bindPanelEvents() {
     });
 
     // Tab switching — Files / Analyse
-    _panel.querySelectorAll('.se-cfm-tab').forEach(tab => {
+    _panel.querySelectorAll('.se-cfm-tab').forEach((tab) => {
         tab.addEventListener('click', () => {
             const target = tab.dataset.tab;
-            _panel.querySelectorAll('.se-cfm-tab').forEach(t => t.classList.toggle('active', t === tab));
-            _panel.querySelector('#se-cfm-tab-files').style.display   = target === 'files'   ? '' : 'none';
+            _panel.querySelectorAll('.se-cfm-tab').forEach((t) => t.classList.toggle('active', t === tab));
+            _panel.querySelector('#se-cfm-tab-files').style.display = target === 'files' ? '' : 'none';
             _panel.querySelector('#se-cfm-tab-analyse').style.display = target === 'analyse' ? '' : 'none';
 
             if (target === 'analyse') {
                 if (_analyserReady) refreshEntries();
-                else { _analyserReady = true; initAnalyser(_panel, _files, _currentChar); }
+                else {
+                    _analyserReady = true;
+                    initAnalyser(_panel, _files, _currentChar);
+                }
             }
         });
     });
