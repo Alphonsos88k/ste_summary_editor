@@ -1115,6 +1115,10 @@
 .se-cfm-an-rc-status.swap { color: #e6db74; }
 .se-cfm-an-rc-status.move { color: #fd971f; }
 
+/* Rotating spinner — applied to inline spans wrapping ⟳ */
+@keyframes se-an-spin { to { transform: rotate(360deg); } }
+.se-an-spin { display: inline-block; animation: se-an-spin 0.75s linear infinite; }
+
 /* results dialog footer (Commit / Cancel) */
 .se-cfm-an-rc-footer {
     display: flex;
