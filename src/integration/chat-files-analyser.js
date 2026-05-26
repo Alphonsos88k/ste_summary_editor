@@ -578,6 +578,8 @@ function _openRunConfirm() {
         `<span class="se-cfm-an-run-val">${escHtml(fileName)}</span></div>` +
         `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Entries</span>` +
         `<span class="se-cfm-an-run-val">${escHtml(entryList)}</span></div>` +
+        `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Est. tokens</span>` +
+        `<span class="se-cfm-an-run-val" id="se-cfm-an-token-est"><span class="se-an-spin">&#x27F3;</span> Estimating&hellip;</span></div>` +
         `</div>` +
         `<div class="se-cfm-an-run-pipeline">` +
         `<div class="se-cfm-an-run-step"><em class="se-cfm-an-help-tag green">Pass 1</em>` +
@@ -603,6 +605,44 @@ function _openRunConfirm() {
         dlg.remove();
         await _runAnalysis(fileNode, entryNodes);
     });
+
+    _estimateChatTokens(fileName).then(info => {
+        const el = dlg.querySelector('#se-cfm-an-token-est');
+        if (!el || !document.contains(dlg)) return;
+        if (!info) { el.textContent = 'Could not estimate'; return; }
+        const ctx2 = SillyTavern.getContext();
+        const outLimit = ctx2.chatCompletionSettings?.openai_max_tokens || 2000;
+        const warn = outLimit < 2000;
+        el.innerHTML = `~${info.toLocaleString()} chat tokens &middot; output limit: ` +
+            (warn
+                ? `<span style="color:#fd971f">${outLimit.toLocaleString()} — consider increasing</span>`
+                : `${outLimit.toLocaleString()}`);
+    });
+}
+
+// ─── Token estimation ─────────────────────────────────────────
+
+async function _estimateChatTokens(fileName) {
+    try {
+        const ctx = SillyTavern.getContext();
+        const resp = await fetch('/getchat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...ctx.getRequestHeaders() },
+            body: JSON.stringify({
+                ch_name:    _char?.name   ?? '',
+                file_name:  fileName.replace(/\.jsonl$/, ''),
+                avatar_url: _char?.avatar ?? '',
+            }),
+        });
+        if (!resp.ok) return null;
+        const lines    = await resp.json();
+        const messages = Array.isArray(lines) ? lines : (lines?.chat ?? []);
+        const text     = messages
+            .filter(m => m.mes || m.content)
+            .map(m => `${m.name ?? m.role ?? 'Unknown'}: ${m.mes ?? m.content}`)
+            .join('\n\n');
+        return Math.ceil(text.length / 4);
+    } catch { return null; }
 }
 
 // ─── LLM helper ──────────────────────────────────────────────
@@ -642,14 +682,18 @@ async function _callLLMWithRetry(sysPrompt, userMsg) {
 
 async function _runAnalysis(fileNode, entryNodes) {
     const runBtn   = _panel?.querySelector('#se-cfm-an-run');
-    const setLabel = msg => { if (runBtn) { runBtn.textContent = msg; runBtn.disabled = true; } };
+    const setLabel = (msg, spin = false) => {
+        if (!runBtn) return;
+        runBtn.innerHTML = spin ? `<span class="se-an-spin">&#x27F3;</span> ${msg}` : msg;
+        runBtn.disabled = true;
+    };
 
     try {
         const ctx      = SillyTavern.getContext();
         const fileName = fileNode.properties?.fileName ?? '';
 
         // ── Pass 1: Chat digest ──────────────────────────────────
-        setLabel('⟳ Pass 1…');
+        setLabel('Pass 1…', true);
         const chatResp = await fetch('/getchat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...ctx.getRequestHeaders() },
@@ -684,7 +728,7 @@ async function _runAnalysis(fileNode, entryNodes) {
             const num   = eNode.properties?.num;
             const entry = state.entries?.get(num);
             if (!entry) { updateEntry(num, ''); continue; }
-            setLabel(`⟳ Entry #${num} (${i + 1}/${entryNodes.length})…`);
+            setLabel(`Entry #${num} (${i + 1}/${entryNodes.length})…`, true);
             const userMsg = `Chat digest:\n${digest}\n\n---\nConnected entries:\n${_buildEntryContext(connectedNums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
             const raw     = await _callLLM(getPrompt('entry-analysis'), userMsg);
             updateEntry(num, raw);
@@ -1145,7 +1189,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         if (popout) popout.disabled = true;
         if (result) result.disabled = true;
         if (fb)     fb.disabled     = true;
-        if (status) { status.textContent = '⟳ Running…'; status.className = 'se-cfm-an-rc-status pending'; }
+        if (status) { status.innerHTML = '<span class="se-an-spin">&#x27F3;</span> Running…'; status.className = 'se-cfm-an-rc-status pending'; }
         try {
             let userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildContextWithRewrites()}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entryContent}`;
             if (feedbackVal) userMsg += `\n\n---\nFeedback on previous analysis:\n${feedbackVal}`;
@@ -1168,9 +1212,9 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         if (!entryContent) { _applyResult(num, ''); return; }
         const stEl = bodyEl.querySelector(`#se-cfm-an-rc-s-${num}`);
         const rlEl = bodyEl.querySelector(`#se-cfm-an-rc-r-${num}`);
-        if (stEl) { stEl.textContent = '⟳ Running…'; stEl.className = 'se-cfm-an-rc-status pending'; }
+        if (stEl) { stEl.innerHTML = '<span class="se-an-spin">&#x27F3;</span> Running…'; stEl.className = 'se-cfm-an-rc-status pending'; }
         if (rlEl) rlEl.disabled = true;
-        setLabel(`⟳ Entry #${num}…`);
+        setLabel(`Entry #${num}…`, true);
         const userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildContextWithRewrites()}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entryContent}`;
         try {
             const raw = await _callLLMWithRetry(getPrompt('entry-analysis'), userMsg);
@@ -1613,7 +1657,7 @@ function _openEntryDetail(num, digest, connectedNums, resultsByNum, confirmedRew
         const confB  = det.querySelector('.se-cfm-an-det-confirm');
         rerunB.disabled = confB.disabled = true;
         if (taEl) taEl.disabled = true;
-        if (stEl) { stEl.textContent = '⟳ Running…'; stEl.style.color = '#75715e'; }
+        if (stEl) { stEl.innerHTML = '<span class="se-an-spin">&#x27F3;</span> Running…'; stEl.style.color = '#75715e'; }
         try {
             const content2 = confirmedRewrites[num] ?? entry2.content;
             let userMsg = `Chat digest:\n${digest}\n\n---\nConnected entries:\n${_buildEntryContext(connectedNums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${content2}`;
