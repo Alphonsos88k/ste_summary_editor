@@ -1,3 +1,33 @@
+# [1.14.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.13.0...v1.14.0) (2026-05-26)
+
+
+### Bug Fixes
+
+* drop LiteGraph CSS, add toolbar button styles, scope Analyse prompts dialog ([07b2207](https://github.com/Alphonsos88k/ste_summary_editor/commit/07b22078b3224c4d4c2121432bcf70b3acf17104))
+* give analyse sidebar sections equal flex halves with overflow-y scroll ([233e8a6](https://github.com/Alphonsos88k/ste_summary_editor/commit/233e8a67870a98b0639139a7e1b34c2202fbcede))
+* include all entries in LLM context for entry analysis ([bff4233](https://github.com/Alphonsos88k/ste_summary_editor/commit/bff42338d495c742a75ea850c5364c395e80db17))
+* overlays render below toolbar, mutual exclusion, entries sync on delete/split ([b708245](https://github.com/Alphonsos88k/ste_summary_editor/commit/b7082459f2015a74ff23c532c62b1fd4c8c4af09))
+* remove branch grouping from chat files list — flat sort by last modified ([decc7b8](https://github.com/Alphonsos88k/ste_summary_editor/commit/decc7b8aadadee52cb260a8288b3aa9f00ec2f4d))
+* scope entry context to connected nodes only ([11be383](https://github.com/Alphonsos88k/ste_summary_editor/commit/11be3838bfc206945bc16c723d90a31be9e5c34a))
+* use exit-fullscreen icon (⤢) for both minimap and chat files fullscreen toggle ([83e1d3f](https://github.com/Alphonsos88k/ste_summary_editor/commit/83e1d3fcd9f7bcfbeb1e56711d7f5a76ab36d633))
+
+
+### Features
+
+* add Analyse tab with Cytoscape node canvas and character card portrait ([7d76890](https://github.com/Alphonsos88k/ste_summary_editor/commit/7d768909646a6a282daf9aaf948f8bddaf708966))
+* add fullscreen toggle button to Act Map overlay header ([270eca4](https://github.com/Alphonsos88k/ste_summary_editor/commit/270eca4b00d798c7b0fc6b00fc99def35971ac6a))
+* content-fidelity prompts — preserve visceral, explicit, and character-specific detail ([1963db3](https://github.com/Alphonsos88k/ste_summary_editor/commit/1963db3ba035aa10942d755ec8289aef07d7f2c4))
+* entry browser and proposed/original toggle in detail pop-out ([c768e82](https://github.com/Alphonsos88k/ste_summary_editor/commit/c768e829bc78222818f351884c5ad1538994a1ae)), closes [#7](https://github.com/Alphonsos88k/ste_summary_editor/issues/7) [#N](https://github.com/Alphonsos88k/ste_summary_editor/issues/N)
+* interactive digest review, card-based results, and sidebar two-column layout ([cf7238b](https://github.com/Alphonsos88k/ste_summary_editor/commit/cf7238b2a5abc71b5b793c7edd1dde1dc394624a))
+* node editor help booklet, canvas polish, and toolbar fixes ([7de5ace](https://github.com/Alphonsos88k/ste_summary_editor/commit/7de5ace831ed8742e0b5f1001f1499f263168bd7))
+* node editor toolbar polish, zoom label fix, DPR canvas fix, help booklet, draggable prompts dialog ([2a4af22](https://github.com/Alphonsos88k/ste_summary_editor/commit/2a4af22b410344db8e2d60df6cfee987cc38b5b8))
+* paginated results, per-entry pop-out detail, action badges, shift banner, and refine tooltip ([6e7309b](https://github.com/Alphonsos88k/ste_summary_editor/commit/6e7309b76abaf14b57f00fbda0b4242fd28d6b2f))
+* redesign chat files panel as inline overlay with syntax highlighting ([dd29c1a](https://github.com/Alphonsos88k/ste_summary_editor/commit/dd29c1a895ae5b48432bedbe5dcbb5bff7263ce2))
+* replace Cytoscape with LiteGraph for ComfyUI-style node canvas ([5d3372f](https://github.com/Alphonsos88k/ste_summary_editor/commit/5d3372fb2c70fdbcbab361a2af2bf82487557642))
+* Run Analysis button with 3-prompt pipeline, tooltips, and help docs ([f03d474](https://github.com/Alphonsos88k/ste_summary_editor/commit/f03d47466182e037871a0b885517ae2519b43489))
+* staged structural apply (SWAP/MERGE/SPLIT) with Commit/Cancel ([62f1fb2](https://github.com/Alphonsos88k/ste_summary_editor/commit/62f1fb2135f0f41eaf1edb59a9c30bd14bf3071f))
+* XY coords overlay, entry chaining, and updated connection docs ([3cd49a5](https://github.com/Alphonsos88k/ste_summary_editor/commit/3cd49a5df72995502b8c349200f5319091b52145))
+
 # [1.13.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.12.3...v1.13.0) (2026-05-25)
 
 
