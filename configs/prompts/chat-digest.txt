@@ -5,43 +5,55 @@ Treat messages where is_user is true as the human side of the exchange.
 
 CONTENT FIDELITY — apply this before anything else:
 - Preserve specific names, places, objects, and actions exactly as they appear in the source.
-- Retain all graphic violence, visceral detail, explicit content, and NSFW/NSFL material faithfully. Do not soften, euphemise, or sanitise. A character who kills with brutal, specific methods must be described with that same brutality. A creature that ate a character's arm must be described with that visceral specificity.
-- Preserve the emotional register of every scene. If something is horrifying, tender, erotic, or brutal, the digest must carry that same register — do not flatten it into neutral summary language.
-- Reuse the source's own vocabulary where it carries weight. Replacing precise, evocative words with generic ones cheapens the character and story.
+- Retain all graphic violence, visceral detail, explicit content, and NSFW/NSFL material faithfully. Do not soften, euphemise, or sanitise.
+- Preserve the emotional register of every scene. If something is horrifying, tender, erotic, or brutal, the digest must carry that same register.
+- Reuse the source's own vocabulary where it carries weight.
 
 ---
 
-STEP 1 — ANOMALY SCAN (complete before writing anything else):
-Read the entire conversation and list every issue found. Output these under ⚠ ANOMALIES & FLAGS first.
-Format each as: ⚠ [TYPE]: [one sentence description]
-Types: CONTEXT_JUMP | TIMELINE | OOC | CONTRADICTION | DROPPED_THREAD | ARTIFACT
-- CONTEXT_JUMP: abrupt scene change with no transition
-- TIMELINE: event referenced before it occurred
-- OOC: message appears to be an out-of-character correction, retry, or regeneration artifact
-- CONTRADICTION: contradicts a fact established earlier in this session
-- DROPPED_THREAD: setup with no payoff within this file
-- ARTIFACT: response seems to ignore or reset prior context without explanation
-If none found: "No significant anomalies detected."
+STEP 1 — FULL ANOMALY SCAN (mandatory — complete before writing anything else)
+
+Read every single exchange from start to finish without skipping. Identify every anomaly you find. Output them as a numbered bulleted list under the heading below. Be exhaustive — running this prompt twice on the same file must produce the same list.
+
+## ⚠ ANOMALY REPORT
+
+For each anomaly:
+`N. [CATEGORY] [STATUS] — Description (location: approximate message or scene)`
+
+CATEGORIES:
+- CONTEXT_JUMP — abrupt scene or topic change with no bridging transition
+- TIMELINE_SKIP — time passes without acknowledgement, or an event is referenced before it occurred
+- PLOT_HOLE — a setup, rule, or fact established earlier is contradicted or abandoned without explanation
+- LOCATION_SKIP — characters appear in a different place with no travel or explanation
+- DROPPED_THREAD — a subplot, promise, or setup receives no payoff within this file
+- CONTEXT_GAP — a response appears to ignore or reset prior context (regeneration artifact, retry, or OOC reset)
+- OOC — message is clearly out-of-character: a correction, a prompt fragment, a user aside
+- NONSENSE — response is incoherent, incomplete, or unrelated to the scene
+
+STATUS TAG (choose one):
+- [UNRESOLVED] — no explanation given anywhere in the log
+- [PARTIALLY RESOLVED] — acknowledged or worked around but not cleanly explained
+- [RESOLVED] — the log itself explains or accounts for it later
+
+If no anomalies are found, write: "No anomalies detected."
 
 ---
 
 STEP 2 — NARRATIVE SUMMARY
-2–4 paragraphs covering the arc of the session: what happened, how it developed, how it resolved or left off.
-Written in plain language — dense and readable, like a thoughtful chapter summary. Preserve the tone and intensity of the source material.
 
-PLOT BEATS
-- [beat 1]
-- [beat 2]
-(each beat ≤ 20 words; keep specific, visceral details intact)
+2–4 paragraphs covering the arc of the session: what happened, how it developed, how it resolved or left off. Written in dense, readable prose. Preserve the tone and intensity of the source.
 
-CHARACTER DEVELOPMENT
-- CharName: [what changed or was revealed — preserve character-specific details and methods]
+## PLOT BEATS
+- [beat] (≤ 20 words; keep specific, visceral details)
 
-TIMELINE / PACING
-- [markers, jumps, or gaps worth noting]
+## CHARACTER DEVELOPMENT
+- [CharName]: [what changed or was revealed]
 
-THEMES
-- [theme 1]
+## TIMELINE / PACING
+- [time markers, jumps, or gaps worth noting — cross-reference with anomaly list if relevant]
 
-UNRESOLVED THREADS
-- [thread left open at end of session]
+## THEMES
+- [theme]
+
+## UNRESOLVED THREADS
+- [thread left open at session end — cross-reference with DROPPED_THREAD anomalies above]

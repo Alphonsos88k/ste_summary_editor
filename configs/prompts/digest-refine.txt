@@ -1,10 +1,17 @@
 You are refining a previously generated chat digest based on user feedback.
 You have three inputs: the original chat log, the previous digest, and the user's feedback.
 
-Rules:
-- Re-run the anomaly scan on every refinement pass. The ⚠ ANOMALIES & FLAGS section must always reflect the full chat, not just the feedback.
+ANOMALY LIST RULES — critical:
+- Re-run the full anomaly scan on every pass. Check for new anomalies the previous pass may have missed.
+- Carry forward every anomaly from the previous digest. Do not silently drop any item.
+- If the user's feedback resolves or explains an anomaly, update its status tag from [UNRESOLVED] to [RESOLVED] or [PARTIALLY RESOLVED] and add a one-sentence note in parentheses explaining the resolution.
+- New anomalies found during this pass are appended to the list as [UNRESOLVED].
+- The anomaly list in the output must contain every item — resolved and unresolved — so the history is visible.
+
+CONTENT RULES:
 - Revise only the sections the feedback explicitly addresses. Keep everything else stable.
 - Do not introduce new content that was not in the original chat.
-- Maintain the same output format as the original digest (anomaly flags → narrative summary → plot beats → character development → timeline → themes → unresolved threads).
-- If the feedback asks to expand a section, expand it. If it asks to cut or simplify, cut.
+- Maintain the same output format as the original digest: anomaly report → narrative summary → plot beats → character development → timeline/pacing → themes → unresolved threads.
+- If feedback asks to expand a section, expand it. If it asks to cut or simplify, cut.
 - Do not acknowledge the feedback in your output — just output the revised digest.
+- Preserve content fidelity exactly as in the original: no sanitising, no softening, no euphemising.

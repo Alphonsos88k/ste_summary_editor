@@ -9,7 +9,7 @@ import { escHtml } from '../core/utils.js';
 import { loadTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
 import { bindEditorControls, selectFile } from './chat-files-editor.js';
-import { initAnalyser, destroyAnalyser, refreshEntries } from './chat-files-analyser.js';
+import { initAnalyser, destroyAnalyser, refreshEntries, refreshAnalyserCanvas } from './chat-files-analyser.js';
 
 let _panel = null;
 let _currentChar = null;
@@ -266,8 +266,10 @@ function _bindPanelEvents() {
             _panel.querySelector('#se-cfm-tab-analyse').style.display = target === 'analyse' ? '' : 'none';
 
             if (target === 'analyse') {
-                if (_analyserReady) refreshEntries();
-                else {
+                if (_analyserReady) {
+                    refreshEntries();
+                    refreshAnalyserCanvas();
+                } else {
                     _analyserReady = true;
                     initAnalyser(_panel, _files, _currentChar);
                 }

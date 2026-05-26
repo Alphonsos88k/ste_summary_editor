@@ -1111,8 +1111,9 @@
 /* plan note text span (allows flex layout alongside Apply button) */
 .se-cfm-an-rc-plan-txt { flex: 1; }
 
-/* SWAP action badge */
+/* SWAP / MOVE action badges */
 .se-cfm-an-rc-status.swap { color: #e6db74; }
+.se-cfm-an-rc-status.move { color: #fd971f; }
 
 /* results dialog footer (Commit / Cancel) */
 .se-cfm-an-rc-footer {
