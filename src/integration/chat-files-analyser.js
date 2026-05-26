@@ -628,7 +628,7 @@ async function _callLLM(sysPrompt, userMsg) {
 // ─── Analysis pipeline ────────────────────────────────────────
 
 async function _runAnalysis(fileNode, entryNodes) {
-    const runBtn  = _panel?.querySelector('#se-cfm-an-run');
+    const runBtn   = _panel?.querySelector('#se-cfm-an-run');
     const setLabel = msg => { if (runBtn) { runBtn.textContent = msg; runBtn.disabled = true; } };
 
     try {
@@ -657,13 +657,14 @@ async function _runAnalysis(fileNode, entryNodes) {
 
         const digestP1 = await _callLLM(getPrompt('chat-digest'), `Chat history:\n${chatText}`);
 
-        // ── Stage 2: Digest review + optional user-driven refinement ──
+        // ── Stages 2 + 3: Unified pipeline dialog ─────────────────
         setLabel('✓ Pass 1');
-        const { proceed, digest } = await _showDigestReviewDialog(digestP1);
-        if (!proceed) { _refreshRunBtn(); return; }
+        const result = await _showPipelineDialog(fileName, digestP1, entryNodes, setLabel);
+        if (!result.proceed) { _refreshRunBtn(); return; }
 
-        // ── Pass 2: Entry analysis — results dialog updates in real-time ──
-        const { updateEntry } = _createResultsDialog(fileName, digest, entryNodes);
+        // ── Pass 2: Entry analysis — pipeline dialog updates in real-time ──
+        const { digest, updateEntry } = result;
+        const connectedNums = entryNodes.map(n => n.properties?.num);
 
         for (let i = 0; i < entryNodes.length; i++) {
             const eNode = entryNodes[i];
@@ -671,13 +672,12 @@ async function _runAnalysis(fileNode, entryNodes) {
             const entry = state.entries?.get(num);
             if (!entry) { updateEntry(num, ''); continue; }
             setLabel(`⟳ Entry #${num} (${i + 1}/${entryNodes.length})…`);
-            const connectedNums = entryNodes.map(n => n.properties?.num);
             const userMsg = `Chat digest:\n${digest}\n\n---\nConnected entries:\n${_buildEntryContext(connectedNums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
             const raw     = await _callLLM(getPrompt('entry-analysis'), userMsg);
             updateEntry(num, raw);
         }
 
-        setLabel('✓ Done');
+        setLabel('↺ Re-run');
         setTimeout(() => _refreshRunBtn(), 1200);
 
     } catch (err) {
@@ -685,84 +685,6 @@ async function _runAnalysis(fileNode, entryNodes) {
         _showRunError(err.message);
         _refreshRunBtn();
     }
-}
-
-// ─── Digest review dialog (Stage 2) ──────────────────────────
-
-function _showDigestReviewDialog(initialDigest) {
-    return new Promise(resolve => {
-        document.getElementById('se-cfm-an-digest-dlg')?.remove();
-        const hasRefine = !!getPrompt('digest-refine');
-
-        const dlg = document.createElement('div');
-        dlg.id = 'se-cfm-an-digest-dlg';
-        dlg.className = 'se-cfm-an-digest-dlg';
-        dlg.innerHTML =
-            `<div class="se-cfm-an-run-hdr">` +
-            `<span>Pass 1 &mdash; Digest Review</span>` +
-            `<button class="se-close-circle se-cfm-an-digest-x">&times;</button></div>` +
-            `<div class="se-cfm-an-digest-body">` +
-            `<div class="se-cfm-an-digest-sec">` +
-            `<div class="se-cfm-an-results-dlbl">Generated digest <em class="se-cfm-an-digest-status"></em></div>` +
-            `<textarea class="se-cfm-an-digest-ta" spellcheck="false"></textarea>` +
-            `</div>` +
-            (hasRefine
-                ? `<div class="se-cfm-an-digest-sec">` +
-                  `<div class="se-cfm-an-results-dlbl">Refinement feedback <span style="color:#444;font-weight:400;">(optional)</span></div>` +
-                  `<textarea class="se-cfm-an-digest-fb" placeholder="Describe what to improve…" spellcheck="false"></textarea>` +
-                  `</div>`
-                : '') +
-            `</div>` +
-            `<div class="se-cfm-an-run-foot">` +
-            `<button class="se-cfm-an-run-cancel-btn se-cfm-an-digest-cancel">Cancel</button>` +
-            (hasRefine
-                ? `<span class="se-cfm-an-digest-refine-wrap">` +
-                  `<button class="se-cfm-an-digest-refine-btn">&#8634;&ensp;Refine</button>` +
-                  `<span class="se-cfm-an-help-pip" tabindex="0" aria-label="What is Refine?">?` +
-                  `<span class="se-cfm-an-pip-tip">Sends the digest back to the LLM with your feedback to improve it ` +
-                  `(fill in missing context, fix inaccuracies, etc.) before Pass 2 runs. ` +
-                  `You can refine as many times as you like.</span></span></span>`
-                : '') +
-            `<button class="se-cfm-an-run-go-btn se-cfm-an-digest-proceed">Pass 2 &rsaquo;</button>` +
-            `</div>`;
-
-        document.body.appendChild(dlg);
-        _centerDialog(dlg);
-        _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
-
-        const ta     = dlg.querySelector('.se-cfm-an-digest-ta');
-        const fb     = dlg.querySelector('.se-cfm-an-digest-fb');
-        const status = dlg.querySelector('.se-cfm-an-digest-status');
-        ta.value = initialDigest;
-
-        const lock = msg => {
-            dlg.querySelectorAll('button, textarea').forEach(el => { el.disabled = true; });
-            if (status) status.textContent = ` — ${msg}`;
-        };
-        const unlock = () => {
-            dlg.querySelectorAll('button, textarea').forEach(el => { el.disabled = false; });
-            if (status) status.textContent = '';
-        };
-        const close = proceed => { dlg.remove(); resolve({ proceed, digest: ta?.value ?? initialDigest }); };
-
-        dlg.querySelector('.se-cfm-an-digest-x').addEventListener('click',      () => close(false));
-        dlg.querySelector('.se-cfm-an-digest-cancel').addEventListener('click',  () => close(false));
-        dlg.querySelector('.se-cfm-an-digest-proceed').addEventListener('click', () => close(true));
-
-        dlg.querySelector('.se-cfm-an-digest-refine-btn')?.addEventListener('click', async () => {
-            const feedback = fb?.value.trim() ?? '';
-            const current  = ta.value;
-            lock('Refining…');
-            try {
-                const userMsg = `Current digest:\n${current}` + (feedback ? `\n\nUser feedback:\n${feedback}` : '');
-                const refined = await _callLLM(getPrompt('digest-refine'), userMsg);
-                if (refined) { ta.value = refined; if (fb) fb.value = ''; }
-            } catch (err) {
-                if (status) status.textContent = ` — Error: ${err.message}`;
-            }
-            unlock();
-        });
-    });
 }
 
 // ─── Results dialog — card-based (Stage 3) ────────────────────
@@ -916,56 +838,41 @@ function _cardHtml(num, snippet) {
         `</div></div></div>`;
 }
 
-function _createResultsDialog(fileName, digest, entryNodes) {
-    document.getElementById('se-cfm-an-results-dlg')?.remove();
+function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
+    document.getElementById('se-cfm-an-pipeline-dlg')?.remove();
 
-    // Snapshot state at dialog open — restored on Cancel
-    const _snap = snapshotState();
-    let _staged = false;   // true once at least one structural Apply has run
+    // Deferred resolver — avoids wrapping all logic inside Promise callback
+    let _pipeResolve;
+    const promise = new Promise(r => { _pipeResolve = r; });
 
-    const dlg = document.createElement('div');
-    dlg.id = 'se-cfm-an-results-dlg';
-    dlg.className = 'se-cfm-an-results-dlg';
-
-    const nums = entryNodes.map(n => n.properties?.num);
+    const nums         = entryNodes.map(n => n.properties?.num);
+    const _snap        = snapshotState();
     const resultsByNum = {};
+    let _staged        = false;
+    let _receivedCount = 0;
+    let _isRunning     = false;
+    let _resolved      = false;
+    let _visitedS3     = false;
+    let _currentDigest = digestP1;
 
-    const allCardsHtml = nums.map(num => {
-        const entry   = state.entries?.get(num);
-        const snippet = entry ? String(entry.content ?? '').slice(0, 280) : '';
-        return _cardHtml(num, snippet + (snippet.length >= 280 ? '…' : ''));
-    }).join('');
-
-    let page = 0;
-    const totalPages = Math.ceil(nums.length / _RC_PER_PAGE);
-
+    // ── Dialog shell ─────────────────────────────────────────────
+    const dlg = document.createElement('div');
+    dlg.id        = 'se-cfm-an-pipeline-dlg';
+    dlg.className = 'se-cfm-an-pipeline-dlg';
     dlg.innerHTML =
-        `<div class="se-cfm-an-run-hdr">` +
-        `<span>Analysis Results &mdash; ${escHtml(fileName)}</span>` +
-        `<button class="se-close-circle se-cfm-an-results-x">&times;</button></div>` +
-        `<div id="se-cfm-an-shift-wrap"></div>` +
-        `<div class="se-cfm-an-results-cards" id="se-cfm-an-rc-list">${allCardsHtml}</div>` +
-        (totalPages > 1
-            ? `<div class="se-cfm-an-rc-pager">` +
-              `<button class="se-cfm-an-rc-page-btn" id="se-cfm-an-rc-prev" disabled>&#8249; Prev</button>` +
-              `<span class="se-cfm-an-rc-page-lbl" id="se-cfm-an-rc-page-lbl">1 / ${totalPages}</span>` +
-              `<button class="se-cfm-an-rc-page-btn" id="se-cfm-an-rc-next">Next &#8250;</button>` +
-              `</div>`
-            : '') +
-        `<div class="se-cfm-an-rc-footer">` +
-        `<span class="se-cfm-an-rc-footer-hint" id="se-cfm-an-rc-footer-hint"></span>` +
-        `<button class="se-cfm-an-run-cancel-btn se-cfm-an-rc-cancel">Cancel</button>` +
-        `<button class="se-cfm-an-run-go-btn se-cfm-an-rc-commit">&#10003;&ensp;Commit changes</button>` +
-        `</div>`;
+        `<div class="se-cfm-an-run-hdr" id="se-cfm-an-pl-hdr">` +
+        `<span id="se-cfm-an-pl-title">Pass 1 — Digest Review</span>` +
+        `<button class="se-close-circle se-cfm-an-pl-x">&times;</button></div>` +
+        `<div class="se-cfm-an-pl-body"></div>`;
 
     document.body.appendChild(dlg);
     _centerDialog(dlg);
-    _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
+    _makeDraggable(dlg, dlg.querySelector('#se-cfm-an-pl-hdr'));
 
-    const hintEl = dlg.querySelector('#se-cfm-an-rc-footer-hint');
-    const _setHint = msg => { if (hintEl) hintEl.textContent = msg; };
+    const bodyEl  = dlg.querySelector('.se-cfm-an-pl-body');
+    const titleEl = dlg.querySelector('#se-cfm-an-pl-title');
 
-    // ── Cancel: revert all staged changes ────────────────────────
+    // ── Cancel (any stage) ────────────────────────────────────────
     const _cancel = () => {
         if (_staged) {
             restoreSnapshot(_snap);
@@ -973,85 +880,118 @@ function _createResultsDialog(fileName, digest, entryNodes) {
             document.dispatchEvent(new CustomEvent('se:entries-changed'));
         }
         dlg.remove();
+        if (!_resolved) _pipeResolve({ proceed: false });
+    };
+    dlg.querySelector('.se-cfm-an-pl-x').addEventListener('click', _cancel);
+
+    // ── Actions task-list panel ───────────────────────────────────
+    const _refreshActionsPanel = () => {
+        const btn   = /** @type {HTMLButtonElement|null} */ (bodyEl.querySelector('#se-cfm-an-actions-btn'));
+        const panel = /** @type {HTMLElement|null} */ (bodyEl.querySelector('#se-cfm-an-actions-panel'));
+        const list  = bodyEl.querySelector('#se-cfm-an-actions-list');
+        if (!btn) return;
+
+        const actionItems = nums.map(n => {
+            const p = _parseAction(resultsByNum[n] ?? '');
+            if (!p || !['SPLIT', 'MERGE', 'SWAP'].includes(p.action)) return null;
+            const cardApply = bodyEl.querySelector(`[data-apply-num="${n}"]`);
+            if (cardApply?.classList.contains('applied')) return null;
+            return { num: n, parsed: p };
+        }).filter(Boolean);
+
+        const count = actionItems.length;
+        btn.hidden = count === 0;
+        btn.textContent = `⚡ Actions (${count})`;
+        if (count === 0 && panel) panel.hidden = true;
+        if (!list) return;
+
+        list.innerHTML = actionItems.map(({ num: n, parsed: p }) => {
+            const icon   = p.action === 'SPLIT' ? '✂' : p.action === 'MERGE' ? '⧫' : '⇄';
+            const target = p.target ?? p.with;
+            const desc   = p.action === 'SPLIT'
+                ? `Split #${n} into ${p.parts?.length ?? '?'} entries`
+                : p.action === 'MERGE'
+                ? `Merge #${n} + #${target ?? (n + 1)}`
+                : `Swap #${n} ↔ #${target}`;
+            return `<li class="se-cfm-an-action-item">` +
+                `<span class="se-cfm-an-action-icon">${icon}</span>` +
+                `<span class="se-cfm-an-action-lbl">${escHtml(desc)}</span>` +
+                `<button class="se-cfm-an-action-apply" data-action-num="${n}">Apply</button>` +
+                `</li>`;
+        }).join('');
     };
 
-    // ── Commit: persist staged changes ───────────────────────────
-    const _commit = () => {
-        if (_staged) {
-            persistState();
-            document.dispatchEvent(new CustomEvent('se:entries-changed'));
+    const _handleActionPanelClick = e => {
+        const applyBtn = /** @type {HTMLButtonElement|null} */ (e.target.closest('.se-cfm-an-action-apply'));
+        if (!applyBtn || applyBtn.disabled) return;
+        const num    = Number(applyBtn.dataset.actionNum);
+        const parsed = _parseAction(resultsByNum[num] ?? '');
+        if (!parsed) return;
+        const hintEl = bodyEl.querySelector('#se-cfm-an-rc-footer-hint');
+        const hint   = msg => { if (hintEl) hintEl.textContent = msg; };
+        applyBtn.disabled = true;
+        try {
+            if (parsed.action === 'SWAP') {
+                const target = parsed.target ?? parsed.with;
+                _stageSwap(num, target);
+                hint(`⇄ Swapped #${num} ↔ #${target} — not yet saved`);
+            } else if (parsed.action === 'MERGE') {
+                const target = parsed.target ?? parsed.with ?? (num + 1);
+                _stageMerge(num, target);
+                hint(`⧫ Merged #${num} + #${target} — not yet saved`);
+            } else if (parsed.action === 'SPLIT') {
+                _stageSplit(num, parsed.parts);
+                hint(`✂ Split #${num} into ${parsed.parts.length} entries — not yet saved`);
+            }
+            _staged = true;
+            const cardApply = /** @type {HTMLButtonElement|null} */ (bodyEl.querySelector(`[data-apply-num="${num}"]`));
+            if (cardApply) { cardApply.textContent = '✓ Applied'; cardApply.disabled = true; cardApply.classList.add('applied'); }
+            _refreshActionsPanel();
+        } catch (err) {
+            applyBtn.disabled = false;
+            hint(`Error: ${err.message}`);
         }
-        dlg.remove();
     };
 
-    dlg.querySelector('.se-cfm-an-results-x').addEventListener('click',  _cancel);
-    dlg.querySelector('.se-cfm-an-rc-cancel').addEventListener('click',   _cancel);
-    dlg.querySelector('.se-cfm-an-rc-commit').addEventListener('click',   _commit);
-
-    // ── Pagination ────────────────────────────────────────────────
-    const showPage = p => {
-        page = p;
-        const start = p * _RC_PER_PAGE;
-        dlg.querySelectorAll('.se-cfm-an-rc').forEach((card, i) => {
-            card.style.display = (i >= start && i < start + _RC_PER_PAGE) ? '' : 'none';
-        });
-        const lbl = dlg.querySelector('#se-cfm-an-rc-page-lbl');
-        if (lbl) lbl.textContent = `${p + 1} / ${totalPages}`;
-        const prev = dlg.querySelector('#se-cfm-an-rc-prev');
-        const next = dlg.querySelector('#se-cfm-an-rc-next');
-        if (prev) prev.disabled = p === 0;
-        if (next) next.disabled = p >= totalPages - 1;
-    };
-
-    if (totalPages > 1) {
-        showPage(0);
-        dlg.querySelector('#se-cfm-an-rc-prev')?.addEventListener('click', () => showPage(page - 1));
-        dlg.querySelector('#se-cfm-an-rc-next')?.addEventListener('click', () => showPage(page + 1));
-    }
-
-    // ── Apply result to card ──────────────────────────────────────
+    // ── _applyResult ──────────────────────────────────────────────
     const _applyResult = (num, raw) => {
         resultsByNum[num] = raw;
-        const result = dlg.querySelector(`#se-cfm-an-rc-r-${num}`);
-        const status = dlg.querySelector(`#se-cfm-an-rc-s-${num}`);
-        const rerun  = dlg.querySelector(`[data-rc-num="${num}"]`);
-        const popout = dlg.querySelector(`[data-rc-pop="${num}"]`);
-        const planEl = dlg.querySelector(`#se-cfm-an-rc-plan-${num}`);
-
+        const result = bodyEl.querySelector(`#se-cfm-an-rc-r-${num}`);
+        const status = bodyEl.querySelector(`#se-cfm-an-rc-s-${num}`);
+        const rerun  = bodyEl.querySelector(`[data-rc-num="${num}"]`);
+        const popout = bodyEl.querySelector(`[data-rc-pop="${num}"]`);
+        const planEl = bodyEl.querySelector(`#se-cfm-an-rc-plan-${num}`);
         if (result) { result.value = raw; result.disabled = false; }
-        if (rerun)  rerun.disabled = false;
+        if (rerun)  rerun.disabled  = false;
         if (popout) popout.disabled = false;
-
         const parsed = _parseAction(raw);
         const action = parsed?.action ?? null;
         if (status) {
             status.textContent = _ACTION_LABELS[action] ?? '✓ Done';
-            status.className = `se-cfm-an-rc-status ${_actionClass(action)}`;
+            status.className   = `se-cfm-an-rc-status ${_actionClass(action)}`;
         }
         if (planEl) planEl.innerHTML = _makePlanNote(parsed, num);
-
-        const shiftWrap = dlg.querySelector('#se-cfm-an-shift-wrap');
+        const shiftWrap = bodyEl.querySelector('#se-cfm-an-shift-wrap');
         if (shiftWrap) shiftWrap.innerHTML = _buildShiftBanner(nums, resultsByNum);
+        _refreshActionsPanel();
     };
 
-    // ── Re-run ────────────────────────────────────────────────────
+    // ── _doRerun ──────────────────────────────────────────────────
     const _doRerun = async (num, feedbackVal) => {
         const entry  = state.entries?.get(num);
         if (!entry) return;
-        const result = dlg.querySelector(`#se-cfm-an-rc-r-${num}`);
-        const fb     = dlg.querySelector(`#se-cfm-an-rc-f-${num}`);
-        const status = dlg.querySelector(`#se-cfm-an-rc-s-${num}`);
-        const rerun  = dlg.querySelector(`[data-rc-num="${num}"]`);
-        const popout = dlg.querySelector(`[data-rc-pop="${num}"]`);
-
-        if (rerun) rerun.disabled = true;
+        const result = bodyEl.querySelector(`#se-cfm-an-rc-r-${num}`);
+        const fb     = bodyEl.querySelector(`#se-cfm-an-rc-f-${num}`);
+        const status = bodyEl.querySelector(`#se-cfm-an-rc-s-${num}`);
+        const rerun  = bodyEl.querySelector(`[data-rc-num="${num}"]`);
+        const popout = bodyEl.querySelector(`[data-rc-pop="${num}"]`);
+        if (rerun)  rerun.disabled  = true;
         if (popout) popout.disabled = true;
         if (result) result.disabled = true;
-        if (fb) fb.disabled = true;
+        if (fb)     fb.disabled     = true;
         if (status) { status.textContent = '⟳ Running…'; status.className = 'se-cfm-an-rc-status pending'; }
-
         try {
-            let userMsg = `Chat digest:\n${digest}\n\n---\nConnected entries:\n${_buildEntryContext(nums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
+            let userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildEntryContext(nums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
             if (feedbackVal) userMsg += `\n\n---\nFeedback on previous analysis:\n${feedbackVal}`;
             const raw = await _callLLM(getPrompt('entry-analysis'), userMsg);
             _applyResult(num, raw);
@@ -1060,70 +1000,278 @@ function _createResultsDialog(fileName, digest, entryNodes) {
             if (status) { status.textContent = `Error: ${err.message}`; status.className = 'se-cfm-an-rc-status rewrite'; }
             if (fb) fb.disabled = false;
         } finally {
-            if (rerun) rerun.disabled = false;
+            if (rerun)  rerun.disabled  = false;
             if (popout) popout.disabled = false;
             if (result) result.disabled = false;
         }
     };
 
-    dlg.querySelectorAll('[data-rc-num]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const num = Number(btn.dataset.rcNum);
-            const fb  = dlg.querySelector(`#se-cfm-an-rc-f-${num}`);
-            _doRerun(num, fb?.value.trim() ?? '');
-        });
-    });
+    // ── _runOneForRerunAll — extracted to avoid deep nesting ──────
+    const _runOneForRerunAll = async num => {
+        const entry = state.entries?.get(num);
+        if (!entry) { _applyResult(num, ''); return; }
+        const stEl = bodyEl.querySelector(`#se-cfm-an-rc-s-${num}`);
+        const rlEl = bodyEl.querySelector(`#se-cfm-an-rc-r-${num}`);
+        if (stEl) { stEl.textContent = '⟳ Running…'; stEl.className = 'se-cfm-an-rc-status pending'; }
+        if (rlEl) rlEl.disabled = true;
+        setLabel(`⟳ Entry #${num}…`);
+        const userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildEntryContext(nums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
+        try {
+            const raw = await _callLLM(getPrompt('entry-analysis'), userMsg);
+            _applyResult(num, raw);
+        } catch (err) {
+            if (stEl) { stEl.textContent = `Error: ${err.message}`; stEl.className = 'se-cfm-an-rc-status rewrite'; }
+        }
+    };
 
-    // ── Pop-out per-entry detail ──────────────────────────────────
-    dlg.querySelectorAll('[data-rc-pop]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const num = Number(btn.dataset.rcPop);
-            _openEntryDetail(num, digest, nums, resultsByNum, dlg);
-        });
-    });
-
-    // ── Apply structural change buttons (event delegation) ────────
-    dlg.querySelector('#se-cfm-an-rc-list')?.addEventListener('click', e => {
+    // ── _handleApplyClick — extracted to avoid deep nesting ───────
+    const _handleApplyClick = e => {
         const applyBtn = e.target.closest('.se-cfm-an-rc-apply');
         if (!applyBtn || applyBtn.disabled) return;
         const num    = Number(applyBtn.dataset.applyNum);
         const parsed = _parseAction(resultsByNum[num] ?? '');
         if (!parsed) return;
+        const hintEl = bodyEl.querySelector('#se-cfm-an-rc-footer-hint');
+        const hint   = msg => { if (hintEl) hintEl.textContent = msg; };
         applyBtn.disabled = true;
         try {
             if (parsed.action === 'SWAP') {
                 const target = parsed.target ?? parsed.with;
                 _stageSwap(num, target);
-                _setHint(`⇄ Swapped #${num} ↔ #${target} — not yet saved`);
+                hint(`⇄ Swapped #${num} ↔ #${target} — not yet saved`);
             } else if (parsed.action === 'MERGE') {
                 const target = parsed.target ?? parsed.with ?? (num + 1);
                 _stageMerge(num, target);
-                _setHint(`⬡ Merged #${num} + #${target} — not yet saved`);
+                hint(`⧫ Merged #${num} + #${target} — not yet saved`);
             } else if (parsed.action === 'SPLIT') {
                 _stageSplit(num, parsed.parts);
-                _setHint(`✂ Split #${num} into ${parsed.parts.length} entries — not yet saved`);
+                hint(`✂ Split #${num} into ${parsed.parts.length} entries — not yet saved`);
             }
             _staged = true;
             applyBtn.textContent = '✓ Applied';
             applyBtn.classList.add('applied');
+            _refreshActionsPanel();
         } catch (err) {
             applyBtn.disabled = false;
-            _setHint(`Error: ${err.message}`);
+            hint(`Error: ${err.message}`);
         }
-    });
+    };
 
-    const updateEntry = (num, raw) => {
-        const fb = dlg.querySelector(`#se-cfm-an-rc-f-${num}`);
+    // ── Apply callback passed to _openEntryDetail ─────────────────
+    const _detApplyCallback = (num, parsed, rawVal) => {
+        resultsByNum[num] = rawVal;
+        if (parsed.action === 'SWAP') {
+            const target = parsed.target ?? parsed.with;
+            if (!target) throw new Error('No target entry for SWAP');
+            _stageSwap(num, target);
+        } else if (parsed.action === 'MERGE') {
+            const target = parsed.target ?? parsed.with ?? (num + 1);
+            _stageMerge(num, target);
+        } else if (parsed.action === 'SPLIT') {
+            const parts = parsed.parts ?? parsed.sections;
+            if (!Array.isArray(parts) || parts.length < 2) throw new Error('No valid parts for SPLIT');
+            _stageSplit(num, parts);
+        }
+        _staged = true;
+        const planEl = bodyEl.querySelector(`#se-cfm-an-rc-plan-${num}`);
+        if (planEl) planEl.innerHTML = _makePlanNote(_parseAction(rawVal), num);
+        const cardApply = /** @type {HTMLButtonElement|null} */ (bodyEl.querySelector(`[data-apply-num="${num}"]`));
+        if (cardApply) { cardApply.textContent = '✓ Applied'; cardApply.disabled = true; cardApply.classList.add('applied'); }
+        _refreshActionsPanel();
+    };
+
+    // ── updateEntry (exposed to _runAnalysis) ─────────────────────
+    const _updateEntry = (num, raw) => {
+        _receivedCount++;
+        _isRunning = _receivedCount < nums.length;
+        const backBtn = bodyEl.querySelector('.se-cfm-an-pl-back');
+        if (backBtn) backBtn.disabled = _isRunning;
+        const fb = bodyEl.querySelector(`#se-cfm-an-rc-f-${num}`);
         if (fb) fb.disabled = false;
         _applyResult(num, raw ?? '');
     };
 
-    return { updateEntry };
+    // ── Stage 2 renderer ──────────────────────────────────────────
+    const renderStage2 = () => {
+        const hasRefine = !!getPrompt('digest-refine');
+        titleEl.textContent = 'Pass 1 — Digest Review';
+        dlg.classList.remove('se-cfm-an-pl-wide');
+
+        bodyEl.innerHTML =
+            `<div class="se-cfm-an-digest-body">` +
+            `<div class="se-cfm-an-digest-sec">` +
+            `<div class="se-cfm-an-digest-lbl">Generated digest <em class="se-cfm-an-digest-status"></em></div>` +
+            `<textarea class="se-cfm-an-digest-ta" spellcheck="false"></textarea>` +
+            `</div>` +
+            (hasRefine
+                ? `<div class="se-cfm-an-digest-sec">` +
+                  `<div class="se-cfm-an-digest-lbl">Refinement feedback <span style="color:#555;font-weight:400;">(optional)</span></div>` +
+                  `<textarea class="se-cfm-an-digest-fb" placeholder="Describe what to improve…" spellcheck="false"></textarea>` +
+                  `</div>`
+                : '') +
+            `</div>` +
+            `<div class="se-cfm-an-run-foot">` +
+            `<button class="se-cfm-an-run-cancel-btn se-cfm-an-pl-s2-cancel">Cancel</button>` +
+            (hasRefine
+                ? `<span class="se-cfm-an-digest-refine-wrap">` +
+                  `<button class="se-cfm-an-digest-refine-btn">&#8634;&ensp;Refine</button>` +
+                  `<span class="se-cfm-an-help-pip" tabindex="0" aria-label="What is Refine?">?` +
+                  `<span class="se-cfm-an-pip-tip">Sends the digest back to the LLM with your feedback to improve it before Pass 2 runs. You can refine as many times as you like.</span></span></span>`
+                : '') +
+            `<button class="se-cfm-an-run-go-btn se-cfm-an-pl-proceed">Pass 2 &rsaquo;</button>` +
+            `</div>`;
+
+        const ta     = bodyEl.querySelector('.se-cfm-an-digest-ta');
+        const fb     = bodyEl.querySelector('.se-cfm-an-digest-fb');
+        const status = bodyEl.querySelector('.se-cfm-an-digest-status');
+        ta.value = _currentDigest;
+
+        const lock   = msg => { bodyEl.querySelectorAll('button,textarea').forEach(el => { el.disabled = true; }); if (status) status.textContent = ` — ${msg}`; };
+        const unlock = ()   => { bodyEl.querySelectorAll('button,textarea').forEach(el => { el.disabled = false; }); if (status) status.textContent = ''; };
+
+        bodyEl.querySelector('.se-cfm-an-pl-s2-cancel').addEventListener('click', _cancel);
+        bodyEl.querySelector('.se-cfm-an-pl-proceed').addEventListener('click', () => {
+            _currentDigest = ta.value;
+            renderStage3(/* preserveResults */ _resolved);
+            if (!_resolved) {
+                _resolved = true;
+                _pipeResolve({ proceed: true, digest: _currentDigest, updateEntry: _updateEntry });
+            }
+        });
+
+        bodyEl.querySelector('.se-cfm-an-digest-refine-btn')?.addEventListener('click', async () => {
+            const feedback = fb?.value.trim() ?? '';
+            const current  = ta.value;
+            lock('Refining…');
+            try {
+                const userMsg = `Current digest:\n${current}` + (feedback ? `\n\nUser feedback:\n${feedback}` : '');
+                const refined = await _callLLM(getPrompt('digest-refine'), userMsg);
+                if (refined) { ta.value = refined; if (fb) fb.value = ''; }
+            } catch (err) {
+                if (status) status.textContent = ` — Error: ${err.message}`;
+            }
+            unlock();
+        });
+    };
+
+    // ── Stage 3 renderer ──────────────────────────────────────────
+    const renderStage3 = preserveResults => {
+        titleEl.textContent = `Analysis Results — ${fileName}`;
+        dlg.classList.add('se-cfm-an-pl-wide');
+
+        const totalPages = Math.ceil(nums.length / _RC_PER_PAGE);
+        const page_      = { v: 0 };
+
+        const rerunBar = _visitedS3
+            ? `<div class="se-cfm-an-pl-rerun-bar">` +
+              `<span>Digest changed?&ensp;</span>` +
+              `<button class="se-cfm-an-pl-rerun-all">&#8634;&ensp;Re-run all entries</button>` +
+              `</div>`
+            : '';
+
+        const allCardsHtml = nums.map(num => {
+            const entry   = state.entries?.get(num);
+            const snippet = entry ? String(entry.content ?? '').slice(0, 280) : '';
+            return _cardHtml(num, snippet + (snippet.length >= 280 ? '…' : ''));
+        }).join('');
+
+        bodyEl.innerHTML =
+            rerunBar +
+            `<div id="se-cfm-an-shift-wrap"></div>` +
+            `<div class="se-cfm-an-actions-bar">` +
+            `<button class="se-cfm-an-actions-tog" id="se-cfm-an-actions-btn" hidden>&#9889;&ensp;Actions (0)</button>` +
+            `</div>` +
+            `<div class="se-cfm-an-actions-panel" id="se-cfm-an-actions-panel" hidden>` +
+            `<ul class="se-cfm-an-actions-list" id="se-cfm-an-actions-list"></ul>` +
+            `</div>` +
+            `<div class="se-cfm-an-results-cards" id="se-cfm-an-rc-list">${allCardsHtml}</div>` +
+            (totalPages > 1
+                ? `<div class="se-cfm-an-rc-pager">` +
+                  `<button class="se-cfm-an-rc-page-btn" id="se-cfm-an-rc-prev" disabled>&#8249; Prev</button>` +
+                  `<span class="se-cfm-an-rc-page-lbl" id="se-cfm-an-rc-page-lbl">1 / ${totalPages}</span>` +
+                  `<button class="se-cfm-an-rc-page-btn" id="se-cfm-an-rc-next">Next &#8250;</button>` +
+                  `</div>`
+                : '') +
+            `<div class="se-cfm-an-rc-footer">` +
+            `<span class="se-cfm-an-rc-footer-hint" id="se-cfm-an-rc-footer-hint"></span>` +
+            `<button class="se-cfm-an-run-cancel-btn se-cfm-an-pl-back"` +
+            ` title="Back to digest review"${_isRunning ? ' disabled' : ''}>&#8249; Back</button>` +
+            `<button class="se-cfm-an-run-cancel-btn se-cfm-an-pl-s3-cancel">Cancel</button>` +
+            `<button class="se-cfm-an-run-go-btn se-cfm-an-rc-commit">&#10003;&ensp;Commit changes</button>` +
+            `</div>`;
+
+        _visitedS3 = true;
+
+        if (preserveResults) {
+            for (const num of nums) {
+                if (resultsByNum[num] != null) _applyResult(num, resultsByNum[num]);
+            }
+        }
+
+        const showPage = p => {
+            page_.v = p;
+            const start = p * _RC_PER_PAGE;
+            const cards = bodyEl.querySelectorAll('.se-cfm-an-rc');
+            cards.forEach((card, i) => { card.style.display = (i >= start && i < start + _RC_PER_PAGE) ? '' : 'none'; });
+            const lbl = bodyEl.querySelector('#se-cfm-an-rc-page-lbl');
+            if (lbl) lbl.textContent = `${p + 1} / ${totalPages}`;
+            const prev = bodyEl.querySelector('#se-cfm-an-rc-prev');
+            const next = bodyEl.querySelector('#se-cfm-an-rc-next');
+            if (prev) prev.disabled = p === 0;
+            if (next) next.disabled = p >= totalPages - 1;
+        };
+        if (totalPages > 1) {
+            showPage(0);
+            bodyEl.querySelector('#se-cfm-an-rc-prev')?.addEventListener('click', () => showPage(page_.v - 1));
+            bodyEl.querySelector('#se-cfm-an-rc-next')?.addEventListener('click', () => showPage(page_.v + 1));
+        }
+
+        bodyEl.querySelector('.se-cfm-an-pl-back').addEventListener('click', () => { if (!_isRunning) renderStage2(); });
+        bodyEl.querySelector('.se-cfm-an-pl-s3-cancel').addEventListener('click', _cancel);
+        bodyEl.querySelector('.se-cfm-an-rc-commit').addEventListener('click', () => {
+            if (_staged) { persistState(); document.dispatchEvent(new CustomEvent('se:entries-changed')); }
+            dlg.remove();
+        });
+
+        bodyEl.querySelector('.se-cfm-an-pl-rerun-all')?.addEventListener('click', async () => {
+            const backBtn   = bodyEl.querySelector('.se-cfm-an-pl-back');
+            const rerunBtn  = bodyEl.querySelector('.se-cfm-an-pl-rerun-all');
+            if (rerunBtn) rerunBtn.disabled = true;
+            _isRunning = true;
+            if (backBtn) backBtn.disabled = true;
+            for (const num of nums) { await _runOneForRerunAll(num); }
+            _isRunning = false;
+            if (rerunBtn) rerunBtn.disabled = false;
+            if (backBtn)  backBtn.disabled  = false;
+            setLabel('↺ Re-run');
+            setTimeout(() => _refreshRunBtn(), 1200);
+        });
+
+        bodyEl.querySelectorAll('[data-rc-num]').forEach(btn => {
+            btn.addEventListener('click', () => _doRerun(Number(btn.dataset.rcNum), bodyEl.querySelector(`#se-cfm-an-rc-f-${btn.dataset.rcNum}`)?.value.trim() ?? ''));
+        });
+        bodyEl.querySelectorAll('[data-rc-pop]').forEach(btn => {
+            btn.addEventListener('click', () => _openEntryDetail(Number(btn.dataset.rcPop), _currentDigest, nums, resultsByNum, dlg, _detApplyCallback));
+        });
+
+        bodyEl.querySelector('#se-cfm-an-rc-list')?.addEventListener('click', _handleApplyClick);
+        bodyEl.querySelector('#se-cfm-an-actions-panel')?.addEventListener('click', _handleActionPanelClick);
+        bodyEl.querySelector('#se-cfm-an-actions-btn')?.addEventListener('click', () => {
+            const panel = /** @type {HTMLElement|null} */ (bodyEl.querySelector('#se-cfm-an-actions-panel'));
+            const btn   = /** @type {HTMLButtonElement|null} */ (bodyEl.querySelector('#se-cfm-an-actions-btn'));
+            if (!panel) return;
+            panel.hidden = !panel.hidden;
+            if (btn) btn.classList.toggle('active', !panel.hidden);
+        });
+    };
+
+    renderStage2();
+    return promise;
 }
 
 // ─── Entry detail pop-out ─────────────────────────────────────
 
-function _openEntryDetail(num, digest, connectedNums, resultsByNum, parentDlg) {
+function _openEntryDetail(num, digest, connectedNums, resultsByNum, parentDlg, applyCallback = null) {
     const existId = `se-cfm-an-entry-det-${num}`;
     document.getElementById(existId)?.remove();
 
@@ -1132,8 +1280,11 @@ function _openEntryDetail(num, digest, connectedNums, resultsByNum, parentDlg) {
     const raw            = resultsByNum[num] ?? '';
     const fbInit         = parentDlg?.querySelector(`#se-cfm-an-rc-f-${num}`)?.value ?? '';
 
-    // All entries for the reference browser
-    const allEntries = [...(state.entries?.values() ?? [])].toSorted((a, b) => a.num - b.num);
+    // Only show entries linked to the connected chat file
+    const allEntries = connectedNums
+        .map(n => state.entries?.get(n))
+        .filter(Boolean)
+        .toSorted((a, b) => a.num - b.num);
     const selOptions = allEntries.map(e => {
         const preview = String(e.content ?? '').slice(0, 44).replaceAll('\n', ' ');
         return `<option value="${e.num}" ${e.num === num ? 'selected' : ''}>#${e.num} — ${escHtml(preview)}…</option>`;
@@ -1165,6 +1316,7 @@ function _openEntryDetail(num, digest, connectedNums, resultsByNum, parentDlg) {
         `<div class="se-cfm-an-det-foot">` +
         `<span class="se-cfm-an-det-status" id="se-cfm-an-det-st-${num}"></span>` +
         `<button class="se-cfm-an-rc-rerun se-cfm-an-det-rerun" data-det-num="${num}">&#8634;&ensp;Re-run</button>` +
+        `<button class="se-cfm-an-det-struct-apply" id="se-cfm-an-det-apply-${num}" hidden>&#9889;&ensp;Apply</button>` +
         `<button class="se-cfm-an-digest-proceed-btn se-cfm-an-det-confirm" data-det-num="${num}">&#10003;&ensp;Confirm</button>` +
         `</div></div></div>`;
 
@@ -1208,6 +1360,39 @@ function _openEntryDetail(num, digest, connectedNums, resultsByNum, parentDlg) {
             : 'Switch to LLM-proposed rewrite';
         lblEl.textContent = showingProposed ? `Entry #${num} — proposed` : `Entry #${num}`;
     });
+
+    // ── Structural apply button ───────────────────────────────────
+    const structApplyBtn = /** @type {HTMLButtonElement|null} */ (det.querySelector(`#se-cfm-an-det-apply-${num}`));
+    const taEl2          = /** @type {HTMLTextAreaElement|null} */ (det.querySelector(`#se-cfm-an-det-ta-${num}`));
+    const stEl2          = /** @type {HTMLElement|null} */ (det.querySelector(`#se-cfm-an-det-st-${num}`));
+
+    const _updateStructApplyBtn = rawVal => {
+        if (!applyCallback || !structApplyBtn) return;
+        const p = _parseAction(rawVal);
+        const structural = p && (p.action === 'SPLIT' || p.action === 'MERGE' || p.action === 'SWAP');
+        structApplyBtn.hidden = !structural;
+        if (structural) structApplyBtn.textContent = `⚡ Apply ${p.action}`;
+    };
+
+    if (applyCallback) {
+        taEl2?.addEventListener('input', function () { _updateStructApplyBtn(this.value); });
+        _updateStructApplyBtn(raw);
+
+        structApplyBtn?.addEventListener('click', () => {
+            const currentRaw = taEl2?.value ?? '';
+            const p = _parseAction(currentRaw);
+            if (!p) return;
+            try {
+                applyCallback(num, p, currentRaw);
+                if (stEl2) { stEl2.textContent = `✓ Applied ${p.action}`; stEl2.style.color = '#a6e22e'; }
+                structApplyBtn.disabled = true;
+                structApplyBtn.textContent = '✓ Applied';
+                if (p.action === 'SPLIT' || p.action === 'MERGE') setTimeout(() => det.remove(), 900);
+            } catch (err) {
+                if (stEl2) { stEl2.textContent = `Error: ${err.message}`; stEl2.style.color = '#f92672'; }
+            }
+        });
+    }
 
     // ── Close ─────────────────────────────────────────────────────
     det.querySelector('.se-cfm-an-det-close').addEventListener('click', () => det.remove());
