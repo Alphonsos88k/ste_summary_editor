@@ -588,7 +588,8 @@
 }
 .se-cfm-an-tb-help:hover { background: #1a2c33; border-color: #66d9e8; color: #a0f0ff; }
 
-.se-cfm-an-tb-sep {
+.se-cfm-an-tb-sep,
+.se-cfm-an-tb-div {
     width: 1px;
     height: 16px;
     background: #3a3a30;

@@ -81,11 +81,21 @@
         <div class="se-cfm-an-help-sec" data-sec="toolbar" hidden>
             <div class="se-cfm-an-help-page">
                 <h3>Toolbar Actions</h3>
+                <p style="color:#75715e;margin-bottom:6px;">Buttons are grouped by what they affect. <b>View</b> buttons only move the camera — nodes stay where they are. <b>Arrange</b> buttons physically reposition nodes on the canvas.</p>
+                <p style="color:#ae81ff;font-size:10px;font-weight:600;letter-spacing:0.06em;margin-bottom:4px;">VIEW</p>
                 <ul>
-                    <li><b>Fit</b> — zoom and pan to fit all nodes inside the visible canvas area.</li>
-                    <li><b>Origin</b> — reset the view to canvas origin (0, 0) at 100% zoom without moving nodes.</li>
-                    <li><b>Gather</b> — snap all scattered nodes back into a compact grid near the canvas centre.</li>
-                    <li><b>Layout</b> — auto-arrange all nodes into a uniform grid, then run Fit.</li>
+                    <li><b>Fit</b> — zoom and pan the camera to fit all nodes inside the visible canvas area. Nodes are not moved.</li>
+                    <li><b>Origin</b> — reset the camera to canvas origin (0, 0) at 100% zoom. Nodes are not moved.</li>
+                </ul>
+                <p style="color:#ae81ff;font-size:10px;font-weight:600;letter-spacing:0.06em;margin-bottom:4px;margin-top:8px;">ARRANGE</p>
+                <ul>
+                    <li><b>Gather</b> — snap all scattered nodes into a compact two-column grid (files left, entries right), then fit.</li>
+                    <li><b>Layout</b> — arrange nodes into a uniform vertical grid then fit. Good starting point for a clean manual layout.</li>
+                    <li><b>Snake</b> — arrange entries in a zigzag sweep across the canvas (left-to-right on odd rows, right-to-left on even rows). Keeps large entry sets compact and within the viewport without a long vertical scroll.</li>
+                    <li><b>Line</b> — place all nodes in a single horizontal line sorted by entry number, with file nodes anchoring the left. Good for seeing the full sequence at a glance.</li>
+                </ul>
+                <p style="color:#ae81ff;font-size:10px;font-weight:600;letter-spacing:0.06em;margin-bottom:4px;margin-top:8px;">OTHER</p>
+                <ul>
                     <li><b>Clear</b> — remove every node and connection from the canvas. Does not delete files or entries.</li>
                     <li><b>&#9654; Run</b> — execute the 3-prompt analysis pipeline on all connected nodes. Greyed out until a connection exists. See the <b>Analysis</b> section for details.</li>
                     <li><b>?</b> — open this help booklet.</li>
