@@ -75,6 +75,12 @@ import {
 
 registerPrompt('gap-suggest', 'Gap Suggest');
 
+// Register analyser prompts eagerly so they appear in the Prompts Hub
+// regardless of whether the Analyse tab has been opened yet.
+registerPrompt('chat-digest',    'Chat Digest — Pass 1',    '', { location: 'Chat Files › Analyse tab' });
+registerPrompt('digest-refine',  'Chat Digest Refinement',  '', { location: 'Chat Files › Analyse tab' });
+registerPrompt('entry-analysis', 'Entry Analysis — Pass 2', '', { warnJson: true, location: 'Chat Files › Analyse tab' });
+
 // ─── Tailwind CDN & Libraries ───
 import { configureTailwind } from './lib/tailwind-config.js';
 import { closeColorPicker, isColorPickerOpen, cpRenderFields, cpApplyFields } from './src/arcs/color-picker.js';
