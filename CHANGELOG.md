@@ -1,3 +1,11 @@
+# [1.16.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.15.0...v1.16.0) (2026-05-26)
+
+
+### Features
+
+* analyse UX — real-time card re-render, bundled LiteGraph, externalized prompts, Analyze spelling ([df76af6](https://github.com/Alphonsos88k/ste_summary_editor/commit/df76af690cfdbd11aa50a5f77313c8ad3cfb8a77))
+* Snake and Line canvas layouts, toolbar view/arrange grouping ([14383ff](https://github.com/Alphonsos88k/ste_summary_editor/commit/14383ff736466e38fc514386f763f77b6123c006))
+
 # [1.15.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.14.0...v1.15.0) (2026-05-26)
 
 
