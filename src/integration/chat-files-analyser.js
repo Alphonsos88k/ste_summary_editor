@@ -684,7 +684,8 @@ async function _runAnalysis(fileNode, entryNodes) {
             const entry = state.entries?.get(num);
             if (!entry) { updateEntry(num, ''); continue; }
             setLabel(`⟳ Entry #${num} (${i + 1}/${entryNodes.length})…`);
-            const userMsg = `Chat digest:\n${digest}\n\n---\nAll entries:\n${_buildEntryContext()}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
+            const connectedNums = entryNodes.map(n => n.properties?.num);
+            const userMsg = `Chat digest:\n${digest}\n\n---\nConnected entries:\n${_buildEntryContext(connectedNums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
             const raw     = await _callLLM(getPrompt('entry-analysis'), userMsg);
             updateEntry(num, raw);
         }
@@ -1063,7 +1064,7 @@ function _createResultsDialog(fileName, digest, entryNodes) {
         if (status) { status.textContent = '⟳ Running…'; status.className = 'se-cfm-an-rc-status pending'; }
 
         try {
-            let userMsg = `Chat digest:\n${digest}\n\n---\nAll entries:\n${_buildEntryContext()}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
+            let userMsg = `Chat digest:\n${digest}\n\n---\nConnected entries:\n${_buildEntryContext(nums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
             if (feedbackVal) userMsg += `\n\n---\nFeedback on previous analysis:\n${feedbackVal}`;
             const raw = await _callLLM(getPrompt('entry-analysis'), userMsg);
             _applyResult(num, raw);
@@ -1090,7 +1091,7 @@ function _createResultsDialog(fileName, digest, entryNodes) {
     dlg.querySelectorAll('[data-rc-pop]').forEach(btn => {
         btn.addEventListener('click', () => {
             const num = Number(btn.dataset.rcPop);
-            _openEntryDetail(num, digest, resultsByNum, dlg);
+            _openEntryDetail(num, digest, nums, resultsByNum, dlg);
         });
     });
 
@@ -1135,7 +1136,7 @@ function _createResultsDialog(fileName, digest, entryNodes) {
 
 // ─── Entry detail pop-out ─────────────────────────────────────
 
-function _openEntryDetail(num, digest, resultsByNum, parentDlg) {
+function _openEntryDetail(num, digest, connectedNums, resultsByNum, parentDlg) {
     const existId = `se-cfm-an-entry-det-${num}`;
     document.getElementById(existId)?.remove();
 
@@ -1263,7 +1264,7 @@ function _openEntryDetail(num, digest, resultsByNum, parentDlg) {
         if (taEl) taEl.disabled = true;
         if (stEl) { stEl.textContent = '⟳ Running…'; stEl.style.color = '#75715e'; }
         try {
-            let userMsg = `Chat digest:\n${digest}\n\n---\nAll entries:\n${_buildEntryContext()}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry2.content}`;
+            let userMsg = `Chat digest:\n${digest}\n\n---\nConnected entries:\n${_buildEntryContext(connectedNums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry2.content}`;
             if (fbVal) userMsg += `\n\n---\nFeedback:\n${fbVal}`;
             const newRaw = await _callLLM(getPrompt('entry-analysis'), userMsg);
             if (taEl) taEl.value = newRaw;
@@ -1534,8 +1535,11 @@ function _bindEntryRefresh() {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-function _buildEntryContext() {
-    const entries = [...(state.entries?.values() ?? [])].toSorted((a, b) => a.num - b.num);
+function _buildEntryContext(nums) {
+    const entries = nums
+        .map(n => state.entries?.get(n))
+        .filter(Boolean)
+        .toSorted((a, b) => a.num - b.num);
     if (!entries.length) return '';
     return entries.map(e => `Entry #${e.num}:\n${e.content}`).join('\n\n---\n');
 }
