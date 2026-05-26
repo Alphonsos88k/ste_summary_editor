@@ -84,6 +84,10 @@ export function destroyAnalyser() {
     _edgeColorIdx = 0;
 }
 
+export function refreshAnalyserCanvas() {
+    _lgc?.setDirty(true, true);
+}
+
 export function refreshEntries() {
     const container = _popPanels.entries
         ? _popPanels.entries.panel.querySelector('#se-cfm-an-pop-entries')
@@ -627,6 +631,13 @@ async function _callLLM(sysPrompt, userMsg) {
     return d?.choices?.[0]?.message?.content || d?.choices?.[0]?.text || '';
 }
 
+async function _callLLMWithRetry(sysPrompt, userMsg) {
+    const raw = await _callLLM(sysPrompt, userMsg);
+    if (_parseAction(raw)) return raw;
+    const retryMsg = `[Your response must be a valid JSON object only — no prose before or after]\n\n${userMsg}`;
+    return _callLLM(sysPrompt, retryMsg);
+}
+
 // ─── Analysis pipeline ────────────────────────────────────────
 
 async function _runAnalysis(fileNode, entryNodes) {
@@ -699,20 +710,26 @@ function _parseAction(raw) {
         if (m) {
             const obj = JSON.parse(m[0]);
             const a = (obj.action ?? '').toUpperCase();
-            if (['REWRITE','SPLIT','MERGE','SWAP','NO_CHANGE'].includes(a)) return { ...obj, action: a };
+            if (['REWRITE','SPLIT','MERGE','SWAP','MOVE','NO_CHANGE'].includes(a)) return { ...obj, action: a };
         }
     } catch { /* not JSON */ }
-    for (const a of ['SPLIT','MERGE','SWAP','REWRITE','NO_CHANGE']) {
+    for (const a of ['SPLIT','MERGE','SWAP','MOVE','REWRITE','NO_CHANGE']) {
         if (raw.toUpperCase().includes(a)) return { action: a };
     }
     return null;
 }
 
 function _actionClass(action) {
-    return ({ REWRITE:'rewrite', SPLIT:'split', MERGE:'merge', SWAP:'swap', NO_CHANGE:'no-change' })[action] ?? 'pending';
+    return ({ REWRITE:'rewrite', SPLIT:'split', MERGE:'merge', SWAP:'swap', MOVE:'move', NO_CHANGE:'no-change' })[action] ?? 'pending';
 }
 
-const _ACTION_LABELS = { REWRITE:'↺ Rewrite', SPLIT:'✂ Split', MERGE:'⬡ Merge', SWAP:'⇄ Swap', NO_CHANGE:'✓ No change' };
+const _ACTION_LABELS = { REWRITE:'↺ Rewrite', SPLIT:'✂ Split', MERGE:'⬡ Merge', SWAP:'⇄ Swap', MOVE:'→ Move', NO_CHANGE:'✓ No change' };
+
+function _normaliseTarget(parsed) {
+    const raw = parsed.target ?? parsed.with ?? parsed.entry ?? parsed.to ?? null;
+    const n   = Number(raw);
+    return !isNaN(n) && raw !== null ? n : null;
+}
 
 function _makePlanNote(parsed, num) {
     if (!parsed) return '';
@@ -726,16 +743,28 @@ function _makePlanNote(parsed, num) {
         text     = `Split into ${into} entries — entries #${num + 1}+ shift down`;
         canApply = Array.isArray(parts) && parts.length >= 2;
     } else if (a === 'MERGE') {
-        const target = parsed.target ?? parsed.with ?? (num + 1);
+        const target = _normaliseTarget(parsed) ?? (num + 1);
         icon     = '&#x29EB;';
         text     = `Merge with entry #${target} — entries renumber`;
-        canApply = !!(parsed.target ?? parsed.with);
+        canApply = _normaliseTarget(parsed) !== null;
     } else if (a === 'SWAP') {
-        const target = parsed.target ?? parsed.with;
-        if (!target) return '';
-        icon     = '&#x21C4;';
-        text     = `Swap content with entry #${target}`;
-        canApply = true;
+        const target = _normaliseTarget(parsed);
+        icon = '&#x21C4;';
+        if (target === null) {
+            text = `Swap — re-run to get target entry`;
+        } else {
+            text     = `Swap content with entry #${target}`;
+            canApply = true;
+        }
+    } else if (a === 'MOVE') {
+        const target = _normaliseTarget(parsed);
+        icon = '&#x2192;';
+        if (target === null) {
+            text = `Move — re-run to get target position`;
+        } else {
+            text     = `Move #${num} to after entry #${target}`;
+            canApply = true;
+        }
     } else {
         return '';
     }
@@ -758,6 +787,29 @@ function _stageSwap(numA, numB) {
     [a.content, b.content] = [b.content, a.content];
     state.modified.add(numA);
     state.modified.add(numB);
+    renderTable();
+}
+
+function _stageMove(numFrom, numAfter) {
+    if (!state.entries.has(numFrom)) throw new Error(`Entry #${numFrom} not found`);
+    if (numFrom === numAfter || numFrom === numAfter + 1) return;
+    const moving = { ...state.entries.get(numFrom) };
+    if (numFrom < numAfter) {
+        for (let n = numFrom; n < numAfter; n++) {
+            const src = state.entries.get(n + 1);
+            if (src) { state.entries.set(n, { ...src, num: n }); state.modified.add(n); }
+        }
+        state.entries.set(numAfter, { ...moving, num: numAfter });
+        state.modified.add(numAfter);
+    } else {
+        for (let n = numFrom; n > numAfter + 1; n--) {
+            const src = state.entries.get(n - 1);
+            if (src) { state.entries.set(n, { ...src, num: n }); state.modified.add(n); }
+        }
+        state.entries.set(numAfter + 1, { ...moving, num: numAfter + 1 });
+        state.modified.add(numAfter + 1);
+    }
+    detectGaps();
     renderTable();
 }
 
@@ -847,10 +899,11 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
     let _pipeResolve;
     const promise = new Promise(r => { _pipeResolve = r; });
 
-    let _currentNums   = entryNodes.map(n => n.properties?.num);
-    const _origNums    = [..._currentNums];
-    const _snap        = snapshotState();
-    const resultsByNum = {};
+    let _currentNums       = entryNodes.map(n => n.properties?.num);
+    const _origNums        = [..._currentNums];
+    const _snap            = snapshotState();
+    const resultsByNum     = {};
+    const confirmedRewrites = {}; // num → confirmed proposed text, used in re-run context
     let _staged        = false;
     let _receivedCount = 0;
     let _isRunning     = false;
@@ -897,7 +950,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
 
         const actionItems = _currentNums.map(n => {
             const p = _parseAction(resultsByNum[n] ?? '');
-            if (!p || !['SPLIT', 'MERGE', 'SWAP'].includes(p.action)) return null;
+            if (!p || !['SPLIT', 'MERGE', 'SWAP', 'MOVE'].includes(p.action)) return null;
             return { num: n, parsed: p };
         }).filter(Boolean);
 
@@ -908,12 +961,14 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         if (!list) return;
 
         list.innerHTML = actionItems.map(({ num: n, parsed: p }) => {
-            const icon   = p.action === 'SPLIT' ? '✂' : p.action === 'MERGE' ? '⧫' : '⇄';
-            const target = p.target ?? p.with;
+            const icon   = p.action === 'SPLIT' ? '✂' : p.action === 'MERGE' ? '⧫' : p.action === 'MOVE' ? '→' : '⇄';
+            const target = _normaliseTarget(p);
             const desc   = p.action === 'SPLIT'
                 ? `Split #${n} into ${p.parts?.length ?? '?'} entries`
                 : p.action === 'MERGE'
                 ? `Merge #${n} + #${target ?? (n + 1)}`
+                : p.action === 'MOVE'
+                ? `Move #${n} to after #${target ?? '?'}`
                 : `Swap #${n} ↔ #${target}`;
             return `<li class="se-cfm-an-action-item">` +
                 `<span class="se-cfm-an-action-icon">${icon}</span>` +
@@ -936,6 +991,24 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         } else if (action === 'MERGE') {
             const target = parsed.target ?? parsed.with ?? (num + 1);
             _currentNums = _currentNums.filter(x => x !== target).map(x => x > target ? x - 1 : x);
+        } else if (action === 'MOVE') {
+            const target = _normaliseTarget(parsed);
+            if (target === null) return;
+            if (num < target) {
+                // moving forward: num disappears, entries [num+1..target] shift down, num lands at target
+                _currentNums = _currentNums.map(x => {
+                    if (x === num) return target;
+                    if (x > num && x <= target) return x - 1;
+                    return x;
+                });
+            } else if (num > target + 1) {
+                // moving backward: num disappears, entries [target+1..num-1] shift up, num lands at target+1
+                _currentNums = _currentNums.map(x => {
+                    if (x === num) return target + 1;
+                    if (x > target && x < num) return x + 1;
+                    return x;
+                });
+            }
         }
         // SWAP: nums don't change
     };
@@ -959,13 +1032,14 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         });
         listEl.querySelectorAll('[data-rc-pop]').forEach(btn => {
             btn.addEventListener('click', () => _openEntryDetail(
-                Number(btn.dataset.rcPop), _currentDigest, _currentNums, resultsByNum, dlg, _detApplyCallback
+                Number(btn.dataset.rcPop), _currentDigest, _currentNums, resultsByNum, confirmedRewrites, dlg, _detApplyCallback
             ));
         });
         const totalPages = Math.ceil(_currentNums.length / _RC_PER_PAGE);
         const pager = bodyEl.querySelector('.se-cfm-an-rc-pager');
         if (pager) pager.style.display = totalPages > 1 ? '' : 'none';
         if (totalPages > 1) _showCurrentPage?.(0);
+        _enableNewCards();
         _refreshActionsPanel();
     };
 
@@ -980,16 +1054,22 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         applyBtn.disabled = true;
         try {
             if (parsed.action === 'SWAP') {
-                const target = parsed.target ?? parsed.with;
+                const target = _normaliseTarget(parsed);
+                if (target === null) throw new Error('No target entry for SWAP');
                 _stageSwap(num, target);
                 hint(`⇄ Swapped #${num} ↔ #${target} — staged, not yet committed`);
             } else if (parsed.action === 'MERGE') {
-                const target = parsed.target ?? parsed.with ?? (num + 1);
+                const target = _normaliseTarget(parsed) ?? (num + 1);
                 _stageMerge(num, target);
                 hint(`⧫ Merged #${num} + #${target} — staged, not yet committed`);
             } else if (parsed.action === 'SPLIT') {
                 _stageSplit(num, parsed.parts);
                 hint(`✂ Split #${num} into ${parsed.parts.length} entries — staged, not yet committed`);
+            } else if (parsed.action === 'MOVE') {
+                const target = _normaliseTarget(parsed);
+                if (target === null) throw new Error('No target entry for MOVE');
+                _stageMove(num, target);
+                hint(`→ Moved #${num} to after #${target} — staged, not yet committed`);
             }
             _staged = true;
             resultsByNum[num] = JSON.stringify({ action: 'NO_CHANGE', reason: 'Applied' });
@@ -1024,10 +1104,38 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         _refreshActionsPanel();
     };
 
+    // ── Entry content helper — uses confirmed rewrite if available ─
+    const _entryText = num => confirmedRewrites[num] ?? state.entries?.get(num)?.content ?? '';
+
+    const _buildContextWithRewrites = () => {
+        const entries = _currentNums
+            .map(n => ({ num: n, content: _entryText(n) }))
+            .filter(e => e.content)
+            .sort((a, b) => a.num - b.num);
+        if (!entries.length) return '';
+        return entries.map(e => `Entry #${e.num}:\n${e.content}`).join('\n\n---\n');
+    };
+
+
+    // ── Enable controls for new (unanalysed) cards ────────────────
+    const _enableNewCards = () => {
+        for (const n of _currentNums) {
+            if (resultsByNum[n] != null) continue;
+            const rerun  = bodyEl.querySelector(`[data-rc-num="${n}"]`);
+            const fb     = bodyEl.querySelector(`#se-cfm-an-rc-f-${n}`);
+            const popout = bodyEl.querySelector(`[data-rc-pop="${n}"]`);
+            if (rerun)  rerun.disabled  = false;
+            if (fb)     fb.disabled     = false;
+            if (popout) popout.disabled = false;
+            const status = bodyEl.querySelector(`#se-cfm-an-rc-s-${n}`);
+            if (status) { status.textContent = '⏳ Waiting — click ↺ to analyse'; status.className = 'se-cfm-an-rc-status pending'; }
+        }
+    };
+
     // ── _doRerun ──────────────────────────────────────────────────
     const _doRerun = async (num, feedbackVal) => {
-        const entry  = state.entries?.get(num);
-        if (!entry) return;
+        const entryContent = _entryText(num);
+        if (!entryContent) return;
         const result = bodyEl.querySelector(`#se-cfm-an-rc-r-${num}`);
         const fb     = bodyEl.querySelector(`#se-cfm-an-rc-f-${num}`);
         const status = bodyEl.querySelector(`#se-cfm-an-rc-s-${num}`);
@@ -1039,9 +1147,9 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         if (fb)     fb.disabled     = true;
         if (status) { status.textContent = '⟳ Running…'; status.className = 'se-cfm-an-rc-status pending'; }
         try {
-            let userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildEntryContext(_currentNums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
+            let userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildContextWithRewrites()}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entryContent}`;
             if (feedbackVal) userMsg += `\n\n---\nFeedback on previous analysis:\n${feedbackVal}`;
-            const raw = await _callLLM(getPrompt('entry-analysis'), userMsg);
+            const raw = await _callLLMWithRetry(getPrompt('entry-analysis'), userMsg);
             _applyResult(num, raw);
             if (fb) { fb.value = ''; fb.disabled = false; }
         } catch (err) {
@@ -1056,16 +1164,16 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
 
     // ── _runOneForRerunAll — extracted to avoid deep nesting ──────
     const _runOneForRerunAll = async num => {
-        const entry = state.entries?.get(num);
-        if (!entry) { _applyResult(num, ''); return; }
+        const entryContent = _entryText(num);
+        if (!entryContent) { _applyResult(num, ''); return; }
         const stEl = bodyEl.querySelector(`#se-cfm-an-rc-s-${num}`);
         const rlEl = bodyEl.querySelector(`#se-cfm-an-rc-r-${num}`);
         if (stEl) { stEl.textContent = '⟳ Running…'; stEl.className = 'se-cfm-an-rc-status pending'; }
         if (rlEl) rlEl.disabled = true;
         setLabel(`⟳ Entry #${num}…`);
-        const userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildEntryContext(_currentNums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
+        const userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildContextWithRewrites()}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entryContent}`;
         try {
-            const raw = await _callLLM(getPrompt('entry-analysis'), userMsg);
+            const raw = await _callLLMWithRetry(getPrompt('entry-analysis'), userMsg);
             _applyResult(num, raw);
         } catch (err) {
             if (stEl) { stEl.textContent = `Error: ${err.message}`; stEl.className = 'se-cfm-an-rc-status rewrite'; }
@@ -1084,16 +1192,22 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         applyBtn.disabled = true;
         try {
             if (parsed.action === 'SWAP') {
-                const target = parsed.target ?? parsed.with;
+                const target = _normaliseTarget(parsed);
+                if (target === null) throw new Error('No target entry for SWAP');
                 _stageSwap(num, target);
-                hint(`⇄ Swapped #${num} ↔ #${target} — not yet saved`);
+                hint(`⇄ Swapped #${num} ↔ #${target} — staged, not yet committed`);
             } else if (parsed.action === 'MERGE') {
-                const target = parsed.target ?? parsed.with ?? (num + 1);
+                const target = _normaliseTarget(parsed) ?? (num + 1);
                 _stageMerge(num, target);
-                hint(`⧫ Merged #${num} + #${target} — not yet saved`);
+                hint(`⧫ Merged #${num} + #${target} — staged, not yet committed`);
             } else if (parsed.action === 'SPLIT') {
                 _stageSplit(num, parsed.parts);
-                hint(`✂ Split #${num} into ${parsed.parts.length} entries — not yet saved`);
+                hint(`✂ Split #${num} into ${parsed.parts.length} entries — staged, not yet committed`);
+            } else if (parsed.action === 'MOVE') {
+                const target = _normaliseTarget(parsed);
+                if (target === null) throw new Error('No target entry for MOVE');
+                _stageMove(num, target);
+                hint(`→ Moved #${num} to after #${target} — staged, not yet committed`);
             }
             _staged = true;
             resultsByNum[num] = JSON.stringify({ action: 'NO_CHANGE', reason: 'Applied' });
@@ -1106,19 +1220,22 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
     };
 
     // ── Apply callback passed to _openEntryDetail ─────────────────
-    const _detApplyCallback = (num, parsed, rawVal) => {
-        resultsByNum[num] = rawVal;
+    const _detApplyCallback = (num, parsed, _rawVal) => {
         if (parsed.action === 'SWAP') {
-            const target = parsed.target ?? parsed.with;
-            if (!target) throw new Error('No target entry for SWAP');
+            const target = _normaliseTarget(parsed);
+            if (target === null) throw new Error('No target entry for SWAP');
             _stageSwap(num, target);
         } else if (parsed.action === 'MERGE') {
-            const target = parsed.target ?? parsed.with ?? (num + 1);
+            const target = _normaliseTarget(parsed) ?? (num + 1);
             _stageMerge(num, target);
         } else if (parsed.action === 'SPLIT') {
             const parts = parsed.parts ?? parsed.sections;
             if (!Array.isArray(parts) || parts.length < 2) throw new Error('No valid parts for SPLIT');
             _stageSplit(num, parts);
+        } else if (parsed.action === 'MOVE') {
+            const target = _normaliseTarget(parsed);
+            if (target === null) throw new Error('No target entry for MOVE');
+            _stageMove(num, target);
         }
         _staged = true;
         resultsByNum[num] = JSON.stringify({ action: 'NO_CHANGE', reason: 'Applied' });
@@ -1298,7 +1415,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
             btn.addEventListener('click', () => _doRerun(Number(btn.dataset.rcNum), bodyEl.querySelector(`#se-cfm-an-rc-f-${btn.dataset.rcNum}`)?.value.trim() ?? ''));
         });
         bodyEl.querySelectorAll('[data-rc-pop]').forEach(btn => {
-            btn.addEventListener('click', () => _openEntryDetail(Number(btn.dataset.rcPop), _currentDigest, _currentNums, resultsByNum, dlg, _detApplyCallback));
+            btn.addEventListener('click', () => _openEntryDetail(Number(btn.dataset.rcPop), _currentDigest, _currentNums, resultsByNum, confirmedRewrites, dlg, _detApplyCallback));
         });
 
         bodyEl.querySelector('#se-cfm-an-rc-list')?.addEventListener('click', _handleApplyClick);
@@ -1318,7 +1435,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
 
 // ─── Entry detail pop-out ─────────────────────────────────────
 
-function _openEntryDetail(num, digest, connectedNums, resultsByNum, parentDlg, applyCallback = null) {
+function _openEntryDetail(num, digest, connectedNums, resultsByNum, confirmedRewrites, parentDlg, applyCallback = null) {
     const existId = `se-cfm-an-entry-det-${num}`;
     document.getElementById(existId)?.remove();
 
@@ -1395,7 +1512,18 @@ function _openEntryDetail(num, digest, connectedNums, resultsByNum, parentDlg, a
         }
     };
 
-    selEl.addEventListener('change', () => showEntry(Number(selEl.value)));
+    selEl.addEventListener('change', () => {
+        const n = Number(selEl.value);
+        showEntry(n);
+        // Update right-side analysis and feedback to match the selected entry
+        const ta = /** @type {HTMLTextAreaElement|null} */ (det.querySelector(`#se-cfm-an-det-ta-${num}`));
+        const fb = /** @type {HTMLTextAreaElement|null} */ (det.querySelector(`#se-cfm-an-det-fb-${num}`));
+        const hdr = det.querySelector('.se-cfm-an-run-hdr span');
+        if (ta) ta.value = resultsByNum[n] ?? '';
+        if (fb) fb.value = '';
+        if (hdr) hdr.textContent = `Entry #${n} — Full View`;
+        _updateStructApplyBtn(resultsByNum[n] ?? '');
+    });
 
     // ── Proposed/Original toggle ──────────────────────────────────
     origTog.addEventListener('click', () => {
@@ -1416,7 +1544,7 @@ function _openEntryDetail(num, digest, connectedNums, resultsByNum, parentDlg, a
     const _updateStructApplyBtn = rawVal => {
         if (!applyCallback || !structApplyBtn) return;
         const p = _parseAction(rawVal);
-        const structural = p && (p.action === 'SPLIT' || p.action === 'MERGE' || p.action === 'SWAP');
+        const structural = p && (p.action === 'SPLIT' || p.action === 'MERGE' || p.action === 'SWAP' || p.action === 'MOVE');
         structApplyBtn.hidden = !structural;
         if (structural) structApplyBtn.textContent = `⚡ Apply ${p.action}`;
     };
@@ -1446,24 +1574,28 @@ function _openEntryDetail(num, digest, connectedNums, resultsByNum, parentDlg, a
 
     // ── Confirm: write back to card ───────────────────────────────
     det.querySelector('.se-cfm-an-det-confirm').addEventListener('click', () => {
+        const activeNum = refEntryNum;
         const taVal  = det.querySelector(`#se-cfm-an-det-ta-${num}`)?.value ?? '';
         const fbVal  = det.querySelector(`#se-cfm-an-det-fb-${num}`)?.value ?? '';
-        const cardFb = parentDlg?.querySelector(`#se-cfm-an-rc-f-${num}`);
-        const cardRl = parentDlg?.querySelector(`#se-cfm-an-rc-r-${num}`);
-        if (cardRl) { cardRl.value = taVal; resultsByNum[num] = taVal; }
+        const cardFb = parentDlg?.querySelector(`#se-cfm-an-rc-f-${activeNum}`);
+        const cardRl = parentDlg?.querySelector(`#se-cfm-an-rc-r-${activeNum}`);
+        if (cardRl) { cardRl.value = taVal; resultsByNum[activeNum] = taVal; }
         if (cardFb) { cardFb.value = fbVal; cardFb.disabled = false; }
+        // Store confirmed rewrite for use in future re-runs
+        const parsed = _parseAction(taVal);
+        if (parsed?.proposed) confirmedRewrites[activeNum] = parsed.proposed;
         const st = det.querySelector(`#se-cfm-an-det-st-${num}`);
         if (st) { st.textContent = '✓ Confirmed'; st.style.color = '#a6e22e'; }
-        // ✓ fb badge on card
-        let badge = parentDlg?.querySelector(`#se-cfm-an-rc-fb-badge-${num}`);
+        // Feedback badge on card
+        let badge = parentDlg?.querySelector(`#se-cfm-an-rc-fb-badge-${activeNum}`);
         if (!badge) {
-            const statusRow = parentDlg?.querySelector(`#se-cfm-an-rc-s-${num}`)?.parentElement;
+            const statusRow = parentDlg?.querySelector(`#se-cfm-an-rc-s-${activeNum}`)?.parentElement;
             if (statusRow) {
                 badge = document.createElement('span');
-                badge.id = `se-cfm-an-rc-fb-badge-${num}`;
+                badge.id = `se-cfm-an-rc-fb-badge-${activeNum}`;
                 badge.className = 'se-cfm-an-rc-fb-badge';
-                badge.title = 'Feedback confirmed from detail view';
-                badge.textContent = '✓ fb';
+                badge.title = 'Feedback written back to card from detail view';
+                badge.textContent = '✓ Feedback';
                 statusRow.appendChild(badge);
             }
         }
@@ -1483,9 +1615,10 @@ function _openEntryDetail(num, digest, connectedNums, resultsByNum, parentDlg, a
         if (taEl) taEl.disabled = true;
         if (stEl) { stEl.textContent = '⟳ Running…'; stEl.style.color = '#75715e'; }
         try {
-            let userMsg = `Chat digest:\n${digest}\n\n---\nConnected entries:\n${_buildEntryContext(connectedNums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry2.content}`;
+            const content2 = confirmedRewrites[num] ?? entry2.content;
+            let userMsg = `Chat digest:\n${digest}\n\n---\nConnected entries:\n${_buildEntryContext(connectedNums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${content2}`;
             if (fbVal) userMsg += `\n\n---\nFeedback:\n${fbVal}`;
-            const newRaw = await _callLLM(getPrompt('entry-analysis'), userMsg);
+            const newRaw = await _callLLMWithRetry(getPrompt('entry-analysis'), userMsg);
             if (taEl) taEl.value = newRaw;
             resultsByNum[num] = newRaw;
 
