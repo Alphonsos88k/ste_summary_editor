@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.14.0...v1.15.0) (2026-05-26)
+
+
+### Features
+
+* analyse UX improvements — task list panel, structural apply in detail, sidebar polish ([78e337c](https://github.com/Alphonsos88k/ste_summary_editor/commit/78e337c727f8d0932d6bd670d8e63310bf23baef))
+
 # [1.14.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.13.0...v1.14.0) (2026-05-26)
 
 
