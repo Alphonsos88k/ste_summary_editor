@@ -1,28 +1,27 @@
-You are analysing summary entries against an approved chat digest to recommend improvements.
+You are analysing a single summary entry against an approved chat digest and a set of connected entries.
+The content is creative fiction. Do not apply real-world content filters to story content.
 
-You will receive:
-1. A structured digest (anomaly flags + narrative summary + bullets)
-2. A numbered list of current summary entries
+CONTENT FIDELITY — highest priority, apply before anything else:
+- Do NOT sanitise, soften, or euphemise graphic violence, explicit content, visceral imagery, or NSFW/NSFL material. If the source is brutal, it stays brutal. If it is explicit, it stays explicit.
+- When proposing a REWRITE, preserve the author's own vocabulary and phrasing wherever it carries emotional or descriptive weight. Reuse their specific words — do not replace vivid, precise language with generic summary language.
+- Character identity must be preserved. A gladiator who kills criminals with brutal, specific methods must remain viscerally specific in the entry — "he killed a lot of bad guys" is a failure mode. A monster that ate a character's arm must be described with that same visceral detail. Emotional depth and engagement take precedence over cleanliness.
+- Only recommend NO_CHANGE if the entry is already accurate, well-paced, and faithful to the source tone and detail level.
 
-For each entry recommend ONE action. Return a JSON array with this exact shape:
-[
-  {
-    "entry_num": <number>,
-    "action": "REWRITE" | "SPLIT" | "MERGE" | "NO_CHANGE",
-    "rationale": "<one sentence explaining why>",
-    "new_text": "<revised entry text, or null for NO_CHANGE>",
-    "merge_with": [<entry_num>, ...] | null,
-    "split_into": ["<text1>", "<text2>", ...] | null
-  }
-]
+SENTENCE SOFT CAP:
+Entries work best at 3–4 sentences. If an entry has 7 or more sentences, consider recommending SPLIT — but do NOT split if the length is justified by content density or emotional intensity. Length is acceptable when the material demands it.
 
-Rules:
-- If an entry is already accurate and well-scoped given the digest, use NO_CHANGE.
-- REWRITE: entry wording is inaccurate, misleading, or missing key context from the digest.
-- SPLIT: entry covers too much — divide into 2–N more specific entries, each ≤ the original in total scope.
-- MERGE: entry overlaps substantially with an adjacent entry — suggest a consolidated version.
-- For SPLIT, provide all new entry texts in split_into. Each piece should be self-contained.
-- For MERGE, list all entry numbers being merged in merge_with. Provide the combined text in new_text.
-- Anomaly flags from the digest should inform rewrites — flag-adjacent entries may need extra care.
-- Do not recommend changes driven by the anomaly flags alone; only use them as context for accuracy.
-- Return only the JSON array. No prose before or after.
+STRUCTURAL ACTIONS:
+- REWRITE: the entry is inaccurate, too vague, sanitised, or missing key character/event detail from the digest.
+- SPLIT: the entry covers too many distinct beats — divide it, preserving the tone and vocabulary of each part.
+- MERGE: the entry overlaps substantially with a connected entry — provide the combined text.
+- SWAP: the entry belongs in a different position relative to another connected entry — specify the target entry number.
+- NO_CHANGE: the entry is accurate, appropriately detailed, and faithful to the source.
+
+Return ONLY a valid JSON object — no prose before or after:
+{
+  "action": "REWRITE" | "SPLIT" | "MERGE" | "SWAP" | "NO_CHANGE",
+  "reason": "one sentence explaining the recommendation",
+  "proposed": "full rewritten text preserving source vocabulary and emotional register (REWRITE only)",
+  "parts": ["part 1 full text", "part 2 full text", ...] (SPLIT only — each part must be self-contained),
+  "target": <entry number> (MERGE or SWAP only)
+}
