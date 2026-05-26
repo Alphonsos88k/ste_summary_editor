@@ -34,7 +34,7 @@ let _edgeColorIdx = 0;
 let _typesReady   = false;
 let _tipEl        = null;   // shared tooltip DOM element
 
-const _CDN_LG     = 'https://cdn.jsdelivr.net/npm/litegraph.js/build/litegraph.min.js';
+const _LG_SRC     = '/scripts/extensions/third-party/summary-editor/lib/litegraph.min.js';
 
 const _EDGE_PALETTE = ['#a6e22e', '#66d9e8', '#f92672', '#fd971f', '#ae81ff', '#e6db74', '#cfcfc2'];
 
@@ -52,11 +52,11 @@ export async function initAnalyser(panel, files, char) {
     const container = _panel.querySelector('#se-cfm-an-canvas');
     if (!container) return;
 
-    _showMsg(container, 'Loading LiteGraph…');
+    _showMsg(container, 'Loading canvas library…');
     try {
-        await _loadScript(_CDN_LG, () => window.LiteGraph);
+        await _loadScript(_LG_SRC, () => window.LiteGraph);
     } catch {
-        _showMsg(container, 'Failed to load canvas library — check internet connection.');
+        _showMsg(container, 'Failed to load canvas library.');
         return;
     }
 
@@ -845,7 +845,8 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
     let _pipeResolve;
     const promise = new Promise(r => { _pipeResolve = r; });
 
-    const nums         = entryNodes.map(n => n.properties?.num);
+    let _currentNums   = entryNodes.map(n => n.properties?.num);
+    const _origNums    = [..._currentNums];
     const _snap        = snapshotState();
     const resultsByNum = {};
     let _staged        = false;
@@ -854,6 +855,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
     let _resolved      = false;
     let _visitedS3     = false;
     let _currentDigest = digestP1;
+    let _showCurrentPage = null;
 
     // ── Dialog shell ─────────────────────────────────────────────
     const dlg = document.createElement('div');
@@ -891,11 +893,9 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         const list  = bodyEl.querySelector('#se-cfm-an-actions-list');
         if (!btn) return;
 
-        const actionItems = nums.map(n => {
+        const actionItems = _currentNums.map(n => {
             const p = _parseAction(resultsByNum[n] ?? '');
             if (!p || !['SPLIT', 'MERGE', 'SWAP'].includes(p.action)) return null;
-            const cardApply = bodyEl.querySelector(`[data-apply-num="${n}"]`);
-            if (cardApply?.classList.contains('applied')) return null;
             return { num: n, parsed: p };
         }).filter(Boolean);
 
@@ -921,6 +921,52 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         }).join('');
     };
 
+    // ── Mutable entry list helpers ────────────────────────────────
+    const _updateCurrentNums = (action, num, parsed) => {
+        if (action === 'SPLIT') {
+            const n = parsed.parts?.length ?? 0;
+            if (n < 2) return;
+            _currentNums = _currentNums.flatMap(x => {
+                if (x === num) return Array.from({ length: n }, (_, i) => num + i);
+                if (x > num) return [x + n - 1];
+                return [x];
+            });
+        } else if (action === 'MERGE') {
+            const target = parsed.target ?? parsed.with ?? (num + 1);
+            _currentNums = _currentNums.filter(x => x !== target).map(x => x > target ? x - 1 : x);
+        }
+        // SWAP: nums don't change
+    };
+
+    const _rerenderCards = () => {
+        const listEl = /** @type {HTMLElement|null} */ (bodyEl.querySelector('#se-cfm-an-rc-list'));
+        if (!listEl) return;
+        listEl.innerHTML = _currentNums.map(n => {
+            const entry   = state.entries?.get(n);
+            const snippet = entry ? String(entry.content ?? '').slice(0, 280) : '';
+            return _cardHtml(n, snippet + (snippet.length >= 280 ? '…' : ''));
+        }).join('');
+        for (const n of _currentNums) {
+            if (resultsByNum[n] != null) _applyResult(n, resultsByNum[n]);
+        }
+        listEl.querySelectorAll('[data-rc-num]').forEach(btn => {
+            btn.addEventListener('click', () => _doRerun(
+                Number(btn.dataset.rcNum),
+                listEl.querySelector(`#se-cfm-an-rc-f-${btn.dataset.rcNum}`)?.value.trim() ?? ''
+            ));
+        });
+        listEl.querySelectorAll('[data-rc-pop]').forEach(btn => {
+            btn.addEventListener('click', () => _openEntryDetail(
+                Number(btn.dataset.rcPop), _currentDigest, _currentNums, resultsByNum, dlg, _detApplyCallback
+            ));
+        });
+        const totalPages = Math.ceil(_currentNums.length / _RC_PER_PAGE);
+        const pager = bodyEl.querySelector('.se-cfm-an-rc-pager');
+        if (pager) pager.style.display = totalPages > 1 ? '' : 'none';
+        if (totalPages > 1) _showCurrentPage?.(0);
+        _refreshActionsPanel();
+    };
+
     const _handleActionPanelClick = e => {
         const applyBtn = /** @type {HTMLButtonElement|null} */ (e.target.closest('.se-cfm-an-action-apply'));
         if (!applyBtn || applyBtn.disabled) return;
@@ -934,19 +980,19 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
             if (parsed.action === 'SWAP') {
                 const target = parsed.target ?? parsed.with;
                 _stageSwap(num, target);
-                hint(`⇄ Swapped #${num} ↔ #${target} — not yet saved`);
+                hint(`⇄ Swapped #${num} ↔ #${target} — staged, not yet committed`);
             } else if (parsed.action === 'MERGE') {
                 const target = parsed.target ?? parsed.with ?? (num + 1);
                 _stageMerge(num, target);
-                hint(`⧫ Merged #${num} + #${target} — not yet saved`);
+                hint(`⧫ Merged #${num} + #${target} — staged, not yet committed`);
             } else if (parsed.action === 'SPLIT') {
                 _stageSplit(num, parsed.parts);
-                hint(`✂ Split #${num} into ${parsed.parts.length} entries — not yet saved`);
+                hint(`✂ Split #${num} into ${parsed.parts.length} entries — staged, not yet committed`);
             }
             _staged = true;
-            const cardApply = /** @type {HTMLButtonElement|null} */ (bodyEl.querySelector(`[data-apply-num="${num}"]`));
-            if (cardApply) { cardApply.textContent = '✓ Applied'; cardApply.disabled = true; cardApply.classList.add('applied'); }
-            _refreshActionsPanel();
+            resultsByNum[num] = JSON.stringify({ action: 'NO_CHANGE', reason: 'Applied' });
+            _updateCurrentNums(parsed.action, num, parsed);
+            _rerenderCards();
         } catch (err) {
             applyBtn.disabled = false;
             hint(`Error: ${err.message}`);
@@ -972,7 +1018,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         }
         if (planEl) planEl.innerHTML = _makePlanNote(parsed, num);
         const shiftWrap = bodyEl.querySelector('#se-cfm-an-shift-wrap');
-        if (shiftWrap) shiftWrap.innerHTML = _buildShiftBanner(nums, resultsByNum);
+        if (shiftWrap) shiftWrap.innerHTML = _buildShiftBanner(_currentNums, resultsByNum);
         _refreshActionsPanel();
     };
 
@@ -991,7 +1037,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         if (fb)     fb.disabled     = true;
         if (status) { status.textContent = '⟳ Running…'; status.className = 'se-cfm-an-rc-status pending'; }
         try {
-            let userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildEntryContext(nums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
+            let userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildEntryContext(_currentNums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
             if (feedbackVal) userMsg += `\n\n---\nFeedback on previous analysis:\n${feedbackVal}`;
             const raw = await _callLLM(getPrompt('entry-analysis'), userMsg);
             _applyResult(num, raw);
@@ -1015,7 +1061,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         if (stEl) { stEl.textContent = '⟳ Running…'; stEl.className = 'se-cfm-an-rc-status pending'; }
         if (rlEl) rlEl.disabled = true;
         setLabel(`⟳ Entry #${num}…`);
-        const userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildEntryContext(nums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
+        const userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildEntryContext(_currentNums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
         try {
             const raw = await _callLLM(getPrompt('entry-analysis'), userMsg);
             _applyResult(num, raw);
@@ -1048,9 +1094,9 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
                 hint(`✂ Split #${num} into ${parsed.parts.length} entries — not yet saved`);
             }
             _staged = true;
-            applyBtn.textContent = '✓ Applied';
-            applyBtn.classList.add('applied');
-            _refreshActionsPanel();
+            resultsByNum[num] = JSON.stringify({ action: 'NO_CHANGE', reason: 'Applied' });
+            _updateCurrentNums(parsed.action, num, parsed);
+            _rerenderCards();
         } catch (err) {
             applyBtn.disabled = false;
             hint(`Error: ${err.message}`);
@@ -1073,17 +1119,15 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
             _stageSplit(num, parts);
         }
         _staged = true;
-        const planEl = bodyEl.querySelector(`#se-cfm-an-rc-plan-${num}`);
-        if (planEl) planEl.innerHTML = _makePlanNote(_parseAction(rawVal), num);
-        const cardApply = /** @type {HTMLButtonElement|null} */ (bodyEl.querySelector(`[data-apply-num="${num}"]`));
-        if (cardApply) { cardApply.textContent = '✓ Applied'; cardApply.disabled = true; cardApply.classList.add('applied'); }
-        _refreshActionsPanel();
+        resultsByNum[num] = JSON.stringify({ action: 'NO_CHANGE', reason: 'Applied' });
+        _updateCurrentNums(parsed.action, num, parsed);
+        _rerenderCards();
     };
 
     // ── updateEntry (exposed to _runAnalysis) ─────────────────────
     const _updateEntry = (num, raw) => {
         _receivedCount++;
-        _isRunning = _receivedCount < nums.length;
+        _isRunning = _receivedCount < _origNums.length;
         const backBtn = bodyEl.querySelector('.se-cfm-an-pl-back');
         if (backBtn) backBtn.disabled = _isRunning;
         const fb = bodyEl.querySelector(`#se-cfm-an-rc-f-${num}`);
@@ -1159,7 +1203,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         titleEl.textContent = `Analysis Results — ${fileName}`;
         dlg.classList.add('se-cfm-an-pl-wide');
 
-        const totalPages = Math.ceil(nums.length / _RC_PER_PAGE);
+        const totalPages = Math.ceil(_currentNums.length / _RC_PER_PAGE);
         const page_      = { v: 0 };
 
         const rerunBar = _visitedS3
@@ -1169,7 +1213,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
               `</div>`
             : '';
 
-        const allCardsHtml = nums.map(num => {
+        const allCardsHtml = _currentNums.map(num => {
             const entry   = state.entries?.get(num);
             const snippet = entry ? String(entry.content ?? '').slice(0, 280) : '';
             return _cardHtml(num, snippet + (snippet.length >= 280 ? '…' : ''));
@@ -1203,7 +1247,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         _visitedS3 = true;
 
         if (preserveResults) {
-            for (const num of nums) {
+            for (const num of _currentNums) {
                 if (resultsByNum[num] != null) _applyResult(num, resultsByNum[num]);
             }
         }
@@ -1220,6 +1264,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
             if (prev) prev.disabled = p === 0;
             if (next) next.disabled = p >= totalPages - 1;
         };
+        _showCurrentPage = showPage;
         if (totalPages > 1) {
             showPage(0);
             bodyEl.querySelector('#se-cfm-an-rc-prev')?.addEventListener('click', () => showPage(page_.v - 1));
@@ -1239,7 +1284,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
             if (rerunBtn) rerunBtn.disabled = true;
             _isRunning = true;
             if (backBtn) backBtn.disabled = true;
-            for (const num of nums) { await _runOneForRerunAll(num); }
+            for (const num of _currentNums) { await _runOneForRerunAll(num); }
             _isRunning = false;
             if (rerunBtn) rerunBtn.disabled = false;
             if (backBtn)  backBtn.disabled  = false;
@@ -1251,7 +1296,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
             btn.addEventListener('click', () => _doRerun(Number(btn.dataset.rcNum), bodyEl.querySelector(`#se-cfm-an-rc-f-${btn.dataset.rcNum}`)?.value.trim() ?? ''));
         });
         bodyEl.querySelectorAll('[data-rc-pop]').forEach(btn => {
-            btn.addEventListener('click', () => _openEntryDetail(Number(btn.dataset.rcPop), _currentDigest, nums, resultsByNum, dlg, _detApplyCallback));
+            btn.addEventListener('click', () => _openEntryDetail(Number(btn.dataset.rcPop), _currentDigest, _currentNums, resultsByNum, dlg, _detApplyCallback));
         });
 
         bodyEl.querySelector('#se-cfm-an-rc-list')?.addEventListener('click', _handleApplyClick);
@@ -1522,7 +1567,7 @@ function _openAnalysePrompts() {
     dlg.className = 'se-cfm-an-prompts-dlg';
     dlg.innerHTML =
         `<div class="se-cfm-an-pdlg-hdr">` +
-        `<span class="se-cfm-an-pdlg-title">Analyse Prompts</span>` +
+        `<span class="se-cfm-an-pdlg-title">Analyze Prompts</span>` +
         `<button class="se-cfm-an-pdlg-close se-close-circle">&times;</button>` +
         `</div>` +
         `<div class="se-cfm-an-prompts-dlg-body">` +
@@ -1702,7 +1747,22 @@ function _clearCanvas() {
 }
 
 function _bindEntryRefresh() {
-    document.addEventListener('se:entries-changed', refreshEntries);
+    document.addEventListener('se:entries-changed', () => {
+        if (_graph) {
+            const stale = _graph._nodes.filter(n =>
+                n.type === 'se/entry' && !state.entries?.has(n.properties?.num)
+            );
+            stale.forEach(n => _graph.remove(n));
+            if (stale.length > 0) _refreshRunBtn();
+        }
+        _panel?.querySelectorAll('[data-an-add-entry]').forEach(b => {
+            const num = Number(b.dataset.anAddEntry);
+            const isAdded = !!_graph?._nodes.find(n => n.type === 'se/entry' && n.properties?.num === num);
+            b.classList.toggle('added', isAdded);
+            b.textContent = isAdded ? '✓' : '+';
+        });
+        refreshEntries();
+    });
 }
 
 // ─── Helpers ─────────────────────────────────────────────────

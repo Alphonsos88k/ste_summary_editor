@@ -19,14 +19,7 @@ import { seAlert, seConfirm } from '../core/dialogs.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 
 const PROMPT_KEY = 'timeline-editor';
-
-const _DEFAULT_REFINE =
-    'You are a story timeline editor. The user will provide their current timeline notes and the full story summary entries. ' +
-    'Rewrite the timeline to be more precise, chronologically accurate, and internally consistent with the story entries. ' +
-    'Preserve all events. Fix vague durations, unclear ordering, and contradictions. ' +
-    'Return only the improved timeline text. No commentary, no headings.';
-
-registerPrompt(PROMPT_KEY, 'Timeline Editor — Refine/Generate', _DEFAULT_REFINE, { location: 'Edit › Timeline Editor' });
+registerPrompt(PROMPT_KEY, 'Timeline Editor — Refine/Generate', '', { location: 'Edit › Timeline Editor' });
 
 /** @type {HTMLElement|null} */
 let _panel = null;

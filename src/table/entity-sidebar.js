@@ -26,13 +26,7 @@ import { escHtml, escAttr, spawnPanel } from '../core/utils.js';
 import { registerPrompt, getPrompt } from '../core/system-prompts.js';
 
 const PROMPT_KEY = 'entity-panel';
-const _DEFAULT_PROMPT =
-    'You are a story analyst. Extract named entities from the provided story entries and return a JSON array of category sections. ' +
-    'Each section has the shape: { "key": string, "title": string, "items": [{"name": string}] }. ' +
-    'Create sections for: Key Topics, Weapons/Items/Potions, Factions/Groups, and any other relevant categories you identify. ' +
-    'Do NOT include character names — those are extracted separately. ' +
-    'Return only valid JSON. No markdown fences, no commentary.';
-registerPrompt(PROMPT_KEY, 'Story Index — Entity Generation', _DEFAULT_PROMPT, { warnJson: true, location: 'Utils › Story Index' });
+registerPrompt(PROMPT_KEY, 'Story Index — Entity Generation', '', { warnJson: true, location: 'Utils › Story Index' });
 
 const STOP_WORDS = new Set([
     'the','a','an','in','on','at','to','for','of','and','or','but','with',
