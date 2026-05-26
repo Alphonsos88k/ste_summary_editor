@@ -492,6 +492,8 @@ function _bindToolbar() {
         _lgc.setDirty(true, true);
         _fitView();
     });
+    p?.querySelector('#se-cfm-an-snake')?.addEventListener('click', _snakeLayout);
+    p?.querySelector('#se-cfm-an-line')?.addEventListener('click', _lineLayout);
     p?.querySelector('#se-cfm-an-clear')?.addEventListener('click', _clearCanvas);
     p?.querySelector('#se-cfm-an-prompts')?.addEventListener('click', _openAnalysePrompts);
 
@@ -1730,6 +1732,45 @@ function _gatherNodes() {
     const entryNodes = allNodes.filter(n => n.type === 'se/entry');
     fileNodes.forEach((n, i)  => { n.pos = [GRID * 2,  (2 + i * 6) * GRID]; });
     entryNodes.forEach((n, i) => { n.pos = [GRID * 14, (2 + i * 6) * GRID]; });
+    _lgc.setDirty(true, true);
+    _fitView();
+}
+
+function _snakeLayout() {
+    if (!_lgc || !_graph) return;
+    const allNodes = _graph._nodes;
+    if (!allNodes.length) return;
+    const fileNodes  = allNodes.filter(n => n.type === 'se/chat_file');
+    const entryNodes = allNodes.filter(n => n.type === 'se/entry')
+        .sort((a, b) => (a.properties?.num ?? 0) - (b.properties?.num ?? 0));
+    const COL_W   = 240;
+    const ROW_H   = 110;
+    const COLS    = Math.max(3, Math.ceil(Math.sqrt(entryNodes.length)));
+    const START_X = 40;
+    const START_Y = fileNodes.length ? 160 : 40;
+    fileNodes.forEach((n, i) => { n.pos = [START_X + i * COL_W, 40]; });
+    entryNodes.forEach((n, i) => {
+        const row = Math.floor(i / COLS);
+        const col = row % 2 === 0 ? i % COLS : COLS - 1 - (i % COLS);
+        n.pos = [START_X + col * COL_W, START_Y + row * ROW_H];
+    });
+    _lgc.setDirty(true, true);
+    _fitView();
+}
+
+function _lineLayout() {
+    if (!_lgc || !_graph) return;
+    const allNodes = _graph._nodes;
+    if (!allNodes.length) return;
+    const fileNodes  = allNodes.filter(n => n.type === 'se/chat_file');
+    const entryNodes = allNodes.filter(n => n.type === 'se/entry')
+        .sort((a, b) => (a.properties?.num ?? 0) - (b.properties?.num ?? 0));
+    const GAP   = 30;
+    const NODE_W = 200;
+    let x = 40;
+    fileNodes.forEach(n => { n.pos = [x, 80]; x += NODE_W + GAP; });
+    if (fileNodes.length) x += 40;
+    entryNodes.forEach(n => { n.pos = [x, 80]; x += NODE_W + GAP; });
     _lgc.setDirty(true, true);
     _fitView();
 }

@@ -102,10 +102,14 @@
     </div>
     <div class="se-cfm-an-right">
         <div class="se-cfm-an-toolbar">
-            <button class="se-cfm-an-tb-btn" id="se-cfm-an-fit"    data-tip="Zoom and pan to fit all nodes on screen">Fit</button>
-            <button class="se-cfm-an-tb-btn" id="se-cfm-an-origin" data-tip="Reset view to origin at 100% zoom">Origin</button>
-            <button class="se-cfm-an-tb-btn" id="se-cfm-an-gather" data-tip="Snap scattered nodes into a compact grid">Gather</button>
-            <button class="se-cfm-an-tb-btn" id="se-cfm-an-layout" data-tip="Auto-arrange all nodes then fit">Layout</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-fit"    data-tip="Zoom and pan to fit all nodes on screen — nodes stay put">Fit</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-origin" data-tip="Reset view to canvas origin at 100% zoom — nodes stay put">Origin</button>
+            <span class="se-cfm-an-tb-div"></span>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-gather" data-tip="Snap scattered nodes into a compact two-column grid">Gather</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-layout" data-tip="Arrange nodes into a uniform grid then fit">Layout</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-snake"  data-tip="Arrange entries in a zigzag sweep across the canvas — good for large sets">Snake</button>
+            <button class="se-cfm-an-tb-btn" id="se-cfm-an-line"   data-tip="Place all nodes in a single horizontal line sorted by entry number">Line</button>
+            <span class="se-cfm-an-tb-div"></span>
             <button class="se-cfm-an-tb-btn" id="se-cfm-an-clear"  data-tip="Remove every node and connection">Clear</button>
             <button class="se-cfm-an-tb-btn se-cfm-an-tb-run" id="se-cfm-an-run" data-tip="Run analysis pipeline on connected nodes" disabled>&#9654;&ensp;Run</button>
             <button class="se-cfm-an-tb-btn se-cfm-an-tb-help" id="se-cfm-an-help" data-tip="Help — how to use the node editor">?</button>
