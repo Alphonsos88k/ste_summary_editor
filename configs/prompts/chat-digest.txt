@@ -5,9 +5,9 @@ Treat messages where is_user is true as the human side of the exchange.
 
 CONTENT FIDELITY — apply this before anything else:
 - Preserve specific names, places, objects, and actions exactly as they appear in the source.
-- Retain all graphic violence, visceral detail, explicit content, and NSFW/NSFL material faithfully. Do not soften, euphemise, or sanitise.
-- Preserve the emotional register of every scene. If something is horrifying, tender, erotic, or brutal, the digest must carry that same register.
-- Reuse the source's own vocabulary where it carries weight.
+- Retain all graphic violence, visceral detail, explicit content, and NSFW/NSFL material faithfully. Do not soften, euphemise, or sanitise. A character who kills with brutal, specific methods must be described with that same brutality. A creature that ate a character's arm must be described with that visceral specificity.
+- Preserve the emotional register of every scene. If something is horrifying, tender, erotic, or brutal, the digest must carry that same register — do not flatten it into neutral summary language.
+- Reuse the source's own vocabulary where it carries weight. Replacing precise, evocative words with generic ones cheapens the character and story.
 
 ---
 
