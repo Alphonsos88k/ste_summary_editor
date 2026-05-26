@@ -18,20 +18,7 @@ import { detectGaps } from '../ingest/gap-detection.js';
 
 registerPrompt('chat-digest',    'Chat Digest — Pass 1',    '', { location: 'Chat Files › Analyse tab' });
 registerPrompt('digest-refine',  'Chat Digest Refinement',  '', { location: 'Chat Files › Analyse tab' });
-registerPrompt('entry-analysis', 'Entry Analysis — Pass 2',
-`Analyse the provided summary entry against the chat digest and the full entry list.
-
-Sentence soft cap: entries work best at 3–4 sentences. If an entry has 7 or more sentences, consider recommending SPLIT — but this is not required for contextually dense passages where length is justified.
-
-Return ONLY a valid JSON object:
-{
-  "action": "REWRITE" | "SPLIT" | "MERGE" | "SWAP" | "NO_CHANGE",
-  "reason": "brief explanation",
-  "proposed": "full rewritten text (REWRITE only)",
-  "parts": ["part 1 text", "part 2 text", ...] (SPLIT only — include full text for each new entry),
-  "target": <entry number> (MERGE or SWAP only)
-}`,
-{ warnJson: true, location: 'Chat Files › Analyse tab' });
+registerPrompt('entry-analysis', 'Entry Analysis — Pass 2', '', { warnJson: true, location: 'Chat Files › Analyse tab' });
 
 // ─── Module state ─────────────────────────────────────────────
 
