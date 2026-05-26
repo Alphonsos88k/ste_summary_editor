@@ -1199,10 +1199,12 @@
 }
 .se-cfm-an-rc-plan-icon { font-size: 12px; flex-shrink: 0; }
 
-/* actions task-list toggle bar */
+/* actions task-list toggle bar — position:relative anchors the dropdown */
 .se-cfm-an-actions-bar {
     padding: 5px 14px;
     flex-shrink: 0;
+    position: relative;
+    z-index: 10;
 }
 .se-cfm-an-actions-tog {
     background: #1a1208;
@@ -1217,14 +1219,19 @@
 .se-cfm-an-actions-tog:hover { background: #2a1c0a; }
 .se-cfm-an-actions-tog.active { background: #2a1c0a; border-color: #a6e22e; color: #a6e22e; }
 
-/* actions collapsible panel */
+/* actions floating dropdown — overlays the card list, does not shift layout */
 .se-cfm-an-actions-panel {
+    position: absolute;
+    top: 100%;
+    left: 14px;
+    right: 14px;
+    z-index: 200;
     background: #141210;
-    border-top: 1px solid #3a2a10;
-    border-bottom: 1px solid #3a2a10;
-    flex-shrink: 0;
+    border: 1px solid #4a3010;
+    border-radius: 4px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6);
     overflow-y: auto;
-    max-height: 180px;
+    max-height: 200px;
 }
 .se-cfm-an-actions-list {
     list-style: none;
