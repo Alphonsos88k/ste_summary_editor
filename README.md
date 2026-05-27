@@ -36,7 +36,8 @@
 | **Fuzzy Search** | Find & Replace has an optional fuzzy mode (Fuse.js) with an adjustable threshold slider and inline examples |
 | **AI Diff View** | Content Editor, Bulk Refine, and Gap Suggest show a side-by-side diff (red original / green editable) before accepting AI output |
 | **Bulk Refine** | Select multiple entries → run LLM revision on all sequentially; accept or discard each result individually |
-| **Chat File Analysis** | Browse SillyTavern JSONL chat files in a node canvas; connect a chat file to summary entries; run a two-pass LLM pipeline — Pass 1 generates a structured digest (editable, refineable), Pass 2 analyses each linked entry against the digest and recommends REWRITE / SPLIT / MERGE / SWAP / NO_CHANGE; structural recommendations shown in a collapsible task-list panel; changes are staged (undo-safe) and only committed on confirm |
+| **Chat File Analysis** | Browse SillyTavern JSONL chat files in a node canvas; connect a chat file to summary entries; run a two-pass LLM pipeline — Pass 1 generates a structured digest (editable, refineable), Pass 2 analyses each linked entry against the digest and recommends REWRITE / SPLIT / MERGE / SWAP / NO_CHANGE; structural recommendations shown in a collapsible task-list panel; changes are staged (undo-safe) and only committed on confirm; persistent response token override button in toolbar; input token estimate badge per file |
+| **Chat File Content Search** | Search box searches message content across all chat files for a character (debounced, cached); matching files show a message-count badge; clicking a match opens the file and auto-jumps to the first hit; floating find bar with ‹ › prev/next (Enter / Shift+Enter / Esc shortcuts); works in JSONL, Plain, YAML, and Form views; × clear button and Escape reset search |
 
 ---
 
