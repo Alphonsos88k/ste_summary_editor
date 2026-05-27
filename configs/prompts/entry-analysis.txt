@@ -10,13 +10,21 @@ CONTENT FIDELITY — highest priority, apply before anything else:
 SENTENCE SOFT CAP:
 Entries work best at 3–4 sentences. If an entry has 7 or more sentences, consider recommending SPLIT — but do NOT split if the length is justified by content density or emotional intensity.
 
+CHRONOLOGICAL AWARENESS — apply before recommending any structural action:
+- The digest reflects events in the order they actually occurred in the chat. Treat that order as ground truth.
+- Before recommending SWAP, MOVE, or MERGE, verify the chronological position of every entry involved. Only recommend repositioning if the source digest clearly places those events in a different order than the entries currently reflect.
+- Do not recommend SWAP or MOVE based on thematic similarity or prose flow alone — only on actual event sequence from the digest.
+- MERGE is only valid if both entries describe events that are genuinely adjacent in the digest timeline with no intervening beat between them.
+- If two entries are in the correct chronological order but feel disconnected, recommend REWRITE to improve the transition — not SWAP or MOVE.
+- Every reason field must name the specific digest event or location that justifies the action. Vague reasons like "better flow" or "fits better here" are not acceptable.
+
 STRUCTURAL ACTIONS:
-- REWRITE: the entry is inaccurate, too vague, sanitised, or missing key character/event detail from the digest.
-- MOVE: the entry is better fitted in a different spot, specify "target" entry to be moved after the target entry number.
-- SPLIT: the entry covers too many distinct beats — divide it, preserving tone and vocabulary.
-- MERGE: the entry overlaps substantially with a connected entry — provide the combined text. Always include a "target" field with the entry number to merge into.
-- SWAP: the entry belongs in a different position — specify "target" as the entry number to swap with.
-- NO_CHANGE: the entry is accurate, appropriately detailed, and faithful to the source.
+- REWRITE: the entry is inaccurate, too vague, sanitised, missing key detail, or misattributes an event to the wrong location or character.
+- MOVE: the entry is out of chronological order per the digest — specify "target" as the entry number to place it after.
+- SPLIT: the entry covers two or more distinct chronological beats — divide it, preserving tone and vocabulary.
+- MERGE: the entry overlaps with a directly adjacent entry in the digest timeline — provide the combined text. Always include a "target" field with the entry number to merge into.
+- SWAP: two entries are in the wrong chronological order relative to each other per the digest — specify "target" as the entry number to swap with.
+- NO_CHANGE: the entry is accurate, correctly ordered, appropriately detailed, and faithful to the source.
 
 FEEDBACK HANDLING:
 If a "Feedback" section is included in the user message, apply it silently when forming your recommendation. Feedback may change the action, the reason, or the proposed text. Regardless of what the feedback says, your output must always be a valid JSON object — never prose, never an explanation, never an acknowledgement. Apply the feedback and return JSON.
