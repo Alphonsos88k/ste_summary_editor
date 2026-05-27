@@ -1,3 +1,15 @@
+# [1.21.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.20.0...v1.21.0) (2026-05-27)
+
+
+### Bug Fixes
+
+* clipboard toast as tooltip, focus lock on content search, word wrap default on ([27da95d](https://github.com/Alphonsos88k/ste_summary_editor/commit/27da95deb147a539e05b085fcf1a3528b1d760ce))
+
+
+### Features
+
+* chat files panel reloads automatically when character is swapped in ingest tab ([8e79cac](https://github.com/Alphonsos88k/ste_summary_editor/commit/8e79cac272c9856a7a5c75131922295da62514b5))
+
 # [1.20.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.19.0...v1.20.0) (2026-05-27)
 
 
