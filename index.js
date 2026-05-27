@@ -358,6 +358,7 @@ jQuery(async () => {
         const char = e.detail;
         if (char) {
             $('#se-btn-chat-files').attr('title', `Chat files for ${char.name}`).show();
+            if (document.getElementById('se-cfm-panel')) openChatFilesManager(char);
         } else {
             $('#se-btn-chat-files').attr('title', '').hide();
             closeChatFilesManager();
