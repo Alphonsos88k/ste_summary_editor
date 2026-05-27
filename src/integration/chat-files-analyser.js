@@ -577,13 +577,27 @@ function _openRunConfirm() {
     if (!conn) return;
     const { fileNode, entryNodes } = conn;
 
-    const fileName  = fileNode.properties?.fileName ?? '';
-    const entryList = entryNodes.map(e => `#${e.properties?.num}`).join(', ');
-    const hasRefine = !!getPrompt('digest-refine');
-    const ctx0      = SillyTavern.getContext();
+    const fileName   = fileNode.properties?.fileName ?? '';
+    const entryList  = entryNodes.map(e => `#${e.properties?.num}`).join(', ');
+    const hasRefine  = !!getPrompt('digest-refine');
+    const ctx0       = SillyTavern.getContext();
     const defaultMax = ctx0.chatCompletionSettings?.openai_max_tokens ?? 2000;
     const cachedTk   = _fileTokens[fileName];
-    const tkText     = cachedTk ? `~${cachedTk.toLocaleString()} chat tokens` : 'Add file to canvas first';
+
+    // Colour-code the input token count by size
+    const tkHtml = cachedTk
+        ? (() => {
+            const color = cachedTk > 12000 ? '#f92672' : cachedTk > 6000 ? '#fd971f' : '#a6e22e';
+            return `<span style="color:${color};font-weight:600;">~${cachedTk >= 1000 ? `${(cachedTk / 1000).toFixed(1)}k` : cachedTk}</span> input tokens`;
+        })()
+        : `<span style="color:#555;">add file to canvas to estimate</span>`;
+
+    // Preset chips — nearest common values, with defaultMax pre-selected
+    const presets = [1600, 2400, 3200, 4096];
+    const activePreset = presets.includes(defaultMax) ? defaultMax : presets[1];
+    const chipsHtml = presets.map(v =>
+        `<button class="se-cfm-an-outlen-chip${v === activePreset ? ' active' : ''}" data-val="${v}">${v >= 1000 ? `${v / 1000}k` : v}</button>`
+    ).join('');
 
     const dlg = document.createElement('div');
     dlg.id = 'se-cfm-an-run-dlg';
@@ -598,8 +612,8 @@ function _openRunConfirm() {
         `<span class="se-cfm-an-run-val">${escHtml(fileName)}</span></div>` +
         `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Entries</span>` +
         `<span class="se-cfm-an-run-val">${escHtml(entryList)}</span></div>` +
-        `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Est. input</span>` +
-        `<span class="se-cfm-an-run-val">${escHtml(tkText)}</span></div>` +
+        `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Input size</span>` +
+        `<span class="se-cfm-an-run-val">${tkHtml}</span></div>` +
         `</div>` +
         `<div class="se-cfm-an-run-pipeline">` +
         `<div class="se-cfm-an-run-step"><em class="se-cfm-an-help-tag green">Pass 1</em>` +
@@ -610,10 +624,13 @@ function _openRunConfirm() {
             : '') +
         `<div class="se-cfm-an-run-step"><em class="se-cfm-an-help-tag purple">Pass 2</em>` +
         `<span>Entry Analysis — scores each entry against the digest</span></div>` +
-        `</div></div>` +
+        `</div>` +
+        `<div class="se-cfm-an-outlen-row">` +
+        `<span class="se-cfm-an-outlen-lbl">Output length</span>` +
+        `<div class="se-cfm-an-outlen-chips">${chipsHtml}</div>` +
+        `</div>` +
+        `</div>` +
         `<div class="se-cfm-an-run-foot">` +
-        `<label class="se-cfm-an-maxtk-lbl" title="Override the max output tokens for this run only">Max tokens` +
-        `<input class="se-cfm-an-maxtk-input" type="number" min="200" max="16000" step="100" value="${defaultMax}"></label>` +
         `<button class="se-cfm-an-run-cancel-btn">Cancel</button>` +
         `<button class="se-cfm-an-run-go-btn">&#9654;&ensp;Run</button></div>`;
 
@@ -621,11 +638,19 @@ function _openRunConfirm() {
     _centerDialog(dlg);
     _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
 
+    let _selectedMax = activePreset;
+    dlg.querySelectorAll('.se-cfm-an-outlen-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            dlg.querySelectorAll('.se-cfm-an-outlen-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            _selectedMax = Number(chip.dataset.val);
+        });
+    });
+
     dlg.querySelector('.se-cfm-an-run-close').addEventListener('click', () => dlg.remove());
     dlg.querySelector('.se-cfm-an-run-cancel-btn').addEventListener('click', () => dlg.remove());
     dlg.querySelector('.se-cfm-an-run-go-btn').addEventListener('click', async () => {
-        const override = Number(dlg.querySelector('.se-cfm-an-maxtk-input')?.value);
-        _runMaxTokens = override > 0 ? override : null;
+        _runMaxTokens = _selectedMax;
         dlg.remove();
         await _runAnalysis(fileNode, entryNodes);
         _runMaxTokens = null;

@@ -1128,26 +1128,37 @@
     flex-shrink: 0;
 }
 
-/* Max-tokens override label + input in run confirm footer */
-.se-cfm-an-maxtk-lbl {
+/* Output-length row inside run confirm dialog */
+.se-cfm-an-outlen-row {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 10px;
+    padding: 8px 14px 4px;
+    border-top: 1px solid #2a2a1e;
+}
+.se-cfm-an-outlen-lbl {
     font-size: 11px;
     color: #75715e;
-    margin-right: auto;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
-.se-cfm-an-maxtk-input {
-    width: 64px;
-    background: #1a1a12;
+.se-cfm-an-outlen-chips {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+.se-cfm-an-outlen-chip {
+    padding: 3px 10px;
+    border-radius: 12px;
     border: 1px solid #444;
-    border-radius: 3px;
-    color: #f0f0e8;
+    background: #1a1a12;
+    color: #a0a090;
     font-size: 11px;
-    padding: 2px 4px;
-    text-align: right;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
-.se-cfm-an-maxtk-input:focus { outline: none; border-color: #66d9e8; }
+.se-cfm-an-outlen-chip:hover { border-color: #66d9e8; color: #66d9e8; }
+.se-cfm-an-outlen-chip.active { border-color: #66d9e8; color: #66d9e8; background: #0e2228; font-weight: 600; }
 
 /* results dialog footer (Commit / Cancel) */
 .se-cfm-an-rc-footer {
