@@ -389,15 +389,26 @@ function _bindPanelEvents() {
     });
 
     const folder = _currentChar?.avatar.replace(/\.[^.]+$/, '') ?? '';
-    _panel.querySelector('#se-cfm-folder-btn')?.addEventListener('click', () => {
+    _panel.querySelector('#se-cfm-folder-btn')?.addEventListener('click', async () => {
         const path = `data/${_userHandle}/chats/${folder}/`;
-        navigator.clipboard.writeText(path).catch(() => {});
         const toast = _panel.querySelector('#se-cfm-folder-toast');
-        if (!toast) return;
-        toast.textContent = 'Copied!';
-        toast.classList.add('se-cfm-folder-toast-visible');
-        clearTimeout(toast._t);
-        toast._t = setTimeout(() => toast.classList.remove('se-cfm-folder-toast-visible'), 1800);
+        try {
+            await navigator.clipboard.writeText(path);
+            if (!toast) return;
+            toast.classList.add('se-cfm-folder-toast-visible');
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => toast.classList.remove('se-cfm-folder-toast-visible'), 1600);
+        } catch {
+            if (toast) {
+                toast.textContent = 'Failed';
+                toast.classList.add('se-cfm-folder-toast-visible', 'se-cfm-folder-toast-err');
+                clearTimeout(toast._t);
+                toast._t = setTimeout(() => {
+                    toast.classList.remove('se-cfm-folder-toast-visible', 'se-cfm-folder-toast-err');
+                    toast.textContent = 'Copied!';
+                }, 1600);
+            }
+        }
     });
 
     // Tab switching — Files / Analyse
