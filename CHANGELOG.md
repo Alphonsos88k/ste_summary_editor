@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.19.0...v1.20.0) (2026-05-27)
+
+
+### Features
+
+* content search across all chat files with in-file match navigation ([3a970cd](https://github.com/Alphonsos88k/ste_summary_editor/commit/3a970cd811f2b95242d1559ab3613c9c6a81a5e0))
+
 # [1.19.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.18.0...v1.19.0) (2026-05-27)
 
 
