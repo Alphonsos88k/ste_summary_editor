@@ -18,12 +18,19 @@ CHRONOLOGICAL AWARENESS — apply before recommending any structural action:
 - If two entries are in the correct chronological order but feel disconnected, recommend REWRITE to improve the transition — not SWAP or MOVE.
 - Every reason field must name the specific digest event or location that justifies the action. Vague reasons like "better flow" or "fits better here" are not acceptable.
 
-STRUCTURAL ACTIONS:
-- REWRITE: the entry is inaccurate, too vague, sanitised, missing key detail, or misattributes an event to the wrong location or character.
-- MOVE: the entry is out of chronological order per the digest — specify "target" as the entry number to place it after. If moving changes the entry's chronological context (e.g. it references events that will no longer have happened yet at the new position, or uses language like "after X" where X now comes later), include a "proposed" field with the entry text rewritten to fit its new position. If the content is position-neutral, omit "proposed".
-- SPLIT: the entry covers two or more distinct chronological beats — divide it, preserving tone and vocabulary.
-- MERGE: the entry overlaps with a directly adjacent entry in the digest timeline — provide the combined text. Always include a "target" field with the entry number to merge into.
-- SWAP: two entries are in the wrong chronological order relative to each other per the digest — specify "target" as the entry number to swap with.
+STRUCTURAL ACTIONS — content integrity after applying:
+Every structural action can shift what an entry's wording implies about surrounding events. Before proposing any action, consider whether the resulting text will still make chronological sense in its new context. Apply the following rules:
+
+- REWRITE: the entry is inaccurate, too vague, sanitised, missing key detail, or misattributes an event to the wrong location or character. The rewrite must be set at the entry's current position — do not write prose that assumes events from later entries have already happened.
+
+- MOVE: the entry is out of chronological order per the digest — specify "target" as the entry number to place it after. If the content references events that will not have happened yet at the new earlier position (e.g. "after the confrontation at the docks" when that scene comes later), include a "proposed" field with the entry text adjusted to fit its new context. If the wording is position-neutral, omit "proposed".
+
+- SPLIT: the entry covers two or more distinct chronological beats — divide it into self-contained parts. Each part must read as coherent prose anchored to its own beat, not dependent on the other part being adjacent. Preserve tone and vocabulary.
+
+- MERGE: the entry overlaps with a directly adjacent entry in the digest timeline with no intervening beat between them. The merged text must read in correct chronological order — earlier beat first, later beat second. Always include a "target" field. Do not merge entries that are adjacent only in entry number but separated in the digest.
+
+- SWAP: two entries are in the wrong chronological order relative to each other per the digest. After swapping, each entry must still make sense at its new position — if either entry's wording would become anachronistic (references events not yet reached), include a "proposed" field for that entry with adjusted text. Specify "target" as the entry to swap with.
+
 - NO_CHANGE: the entry is accurate, correctly ordered, appropriately detailed, and faithful to the source.
 
 FEEDBACK HANDLING:
@@ -33,7 +40,7 @@ OUTPUT FORMAT — return ONLY a valid JSON object, no text before or after:
 {
   "action": "REWRITE" | "MOVE" | "SPLIT" | "MERGE" | "SWAP" | "NO_CHANGE",
   "reason": "one sentence explaining the recommendation",
-  "proposed": "full rewritten text preserving source vocabulary and emotional register (REWRITE; also MOVE if content needs chronological adjustment for its new position)",
+  "proposed": "full rewritten text (required for REWRITE; optional for MOVE and SWAP when the content needs chronological adjustment for its new position)",
   "parts": ["part 1 full text", "part 2 full text", ...] (SPLIT only — each part must be self-contained),
   "target": <entry number as integer> (MERGE, SWAP, or MOVE only — required, must be a number; for MOVE this is the entry to move after)
 }
