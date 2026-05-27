@@ -1,3 +1,20 @@
+# [1.18.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.17.1...v1.18.0) (2026-05-27)
+
+
+### Bug Fixes
+
+* all structural actions now enforce chronological content integrity after apply ([972dc0f](https://github.com/Alphonsos88k/ste_summary_editor/commit/972dc0f67b240ac3b9377e43ad3a3d0891baedeb))
+* chronological grounding in entry-analysis — structural actions require digest-backed justification ([5066984](https://github.com/Alphonsos88k/ste_summary_editor/commit/5066984a5fa36fd782a669d97d1f366b3560e49b))
+* chronological grounding rules to prevent location/event misattribution in digest ([a46af69](https://github.com/Alphonsos88k/ste_summary_editor/commit/a46af696ca6f7190644e3cca08639eb624c651de))
+* MOVE applies proposed rewrite for chronological fit; digest-refine grounding rules ([4952f3f](https://github.com/Alphonsos88k/ste_summary_editor/commit/4952f3fabbff8f28994224be6ad2dd6c543fcfcd))
+
+
+### Features
+
+* redesign token estimate and output-length override UX ([305ff71](https://github.com/Alphonsos88k/ste_summary_editor/commit/305ff71e07507738a61dfcd0c6ebbe1b063ae6cf))
+* token estimate in run dialog, spinning ⟳ on all running states ([7a6beb0](https://github.com/Alphonsos88k/ste_summary_editor/commit/7a6beb033472a70d1e15381646de5ab2526a1d7f))
+* token estimate on file add, max-tokens override in run dialog, digest length target ([839c33d](https://github.com/Alphonsos88k/ste_summary_editor/commit/839c33d089fd9eb3563eeb9469c7642b5159f010))
+
 ## [1.17.1](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.17.0...v1.17.1) (2026-05-26)
 
 
