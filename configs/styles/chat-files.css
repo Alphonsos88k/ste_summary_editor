@@ -1119,6 +1119,36 @@
 @keyframes se-an-spin { to { transform: rotate(360deg); } }
 .se-an-spin { display: inline-block; animation: se-an-spin 0.75s linear infinite; }
 
+/* Token count badge shown on file list item when file is on canvas */
+.se-cfm-an-tk-badge {
+    font-size: 10px;
+    color: #75715e;
+    margin-right: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Max-tokens override label + input in run confirm footer */
+.se-cfm-an-maxtk-lbl {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: #75715e;
+    margin-right: auto;
+}
+.se-cfm-an-maxtk-input {
+    width: 64px;
+    background: #1a1a12;
+    border: 1px solid #444;
+    border-radius: 3px;
+    color: #f0f0e8;
+    font-size: 11px;
+    padding: 2px 4px;
+    text-align: right;
+}
+.se-cfm-an-maxtk-input:focus { outline: none; border-color: #66d9e8; }
+
 /* results dialog footer (Commit / Cancel) */
 .se-cfm-an-rc-footer {
     display: flex;

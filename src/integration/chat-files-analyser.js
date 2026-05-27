@@ -33,6 +33,8 @@ let _popPanels    = { files: null, entries: null };
 let _edgeColorIdx = 0;
 let _typesReady   = false;
 let _tipEl        = null;   // shared tooltip DOM element
+let _fileTokens   = {};     // fileName → estimated input token count (cached on file add)
+let _runMaxTokens = null;   // per-run max_tokens override set from run confirm dialog
 
 const _LG_SRC     = '/scripts/extensions/third-party/summary-editor/lib/litegraph.min.js';
 
@@ -82,6 +84,8 @@ export function destroyAnalyser() {
     _char         = null;
     _activeFile   = null;
     _edgeColorIdx = 0;
+    _fileTokens   = {};
+    _runMaxTokens = null;
 }
 
 export function refreshAnalyserCanvas() {
@@ -109,6 +113,13 @@ export function addFileNode(fileName) {
 
     _activeFile = fileName;
     _refreshFileButtons();
+
+    _estimateChatTokens(fileName).then(count => {
+        if (count != null) {
+            _fileTokens[fileName] = count;
+            _refreshFileButtons();
+        }
+    });
 }
 
 export function removeFileNode(fileName) {
@@ -337,9 +348,14 @@ function _renderFileListInto(container) {
         const label    = name.replace(/\.jsonl$/, '');
         const date     = _anRelDate(f.last_mes);
         const onCanvas = _activeFile === name;
+        const tkCount  = onCanvas && _fileTokens[name];
+        const tkBadge  = tkCount
+            ? `<span class="se-cfm-an-tk-badge">${tkCount >= 1000 ? `~${(tkCount / 1000).toFixed(1)}k` : `~${tkCount}`} tk</span>`
+            : (onCanvas ? `<span class="se-cfm-an-tk-badge se-cfm-an-tk-spin"><span class="se-an-spin">&#x27F3;</span></span>` : '');
         return `<div class="se-cfm-an-node-item">` +
             `<span class="se-cfm-an-node-date">${escHtml(date)}</span>` +
             `<span class="se-cfm-an-node-label" title="${escHtml(name)}">${escHtml(label)}</span>` +
+            tkBadge +
             `<button class="se-cfm-an-add-btn${onCanvas ? ' added' : ''}" data-an-add-file="${escHtml(name)}">${onCanvas ? '×' : '+'}</button>` +
             `</div>`;
     }).join('');
@@ -564,6 +580,10 @@ function _openRunConfirm() {
     const fileName  = fileNode.properties?.fileName ?? '';
     const entryList = entryNodes.map(e => `#${e.properties?.num}`).join(', ');
     const hasRefine = !!getPrompt('digest-refine');
+    const ctx0      = SillyTavern.getContext();
+    const defaultMax = ctx0.chatCompletionSettings?.openai_max_tokens ?? 2000;
+    const cachedTk   = _fileTokens[fileName];
+    const tkText     = cachedTk ? `~${cachedTk.toLocaleString()} chat tokens` : 'Add file to canvas first';
 
     const dlg = document.createElement('div');
     dlg.id = 'se-cfm-an-run-dlg';
@@ -578,8 +598,8 @@ function _openRunConfirm() {
         `<span class="se-cfm-an-run-val">${escHtml(fileName)}</span></div>` +
         `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Entries</span>` +
         `<span class="se-cfm-an-run-val">${escHtml(entryList)}</span></div>` +
-        `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Est. tokens</span>` +
-        `<span class="se-cfm-an-run-val" id="se-cfm-an-token-est"><span class="se-an-spin">&#x27F3;</span> Estimating&hellip;</span></div>` +
+        `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Est. input</span>` +
+        `<span class="se-cfm-an-run-val">${escHtml(tkText)}</span></div>` +
         `</div>` +
         `<div class="se-cfm-an-run-pipeline">` +
         `<div class="se-cfm-an-run-step"><em class="se-cfm-an-help-tag green">Pass 1</em>` +
@@ -589,9 +609,11 @@ function _openRunConfirm() {
               `<span>Digest Refinement — improves the digest in up to 3 feedback rounds</span></div>`
             : '') +
         `<div class="se-cfm-an-run-step"><em class="se-cfm-an-help-tag purple">Pass 2</em>` +
-        `<span>Entry Analysis — scores each entry against the digest. Returns REWRITE / SPLIT / MERGE / NO_CHANGE actions with reasons</span></div>` +
+        `<span>Entry Analysis — scores each entry against the digest</span></div>` +
         `</div></div>` +
         `<div class="se-cfm-an-run-foot">` +
+        `<label class="se-cfm-an-maxtk-lbl" title="Override the max output tokens for this run only">Max tokens` +
+        `<input class="se-cfm-an-maxtk-input" type="number" min="200" max="16000" step="100" value="${defaultMax}"></label>` +
         `<button class="se-cfm-an-run-cancel-btn">Cancel</button>` +
         `<button class="se-cfm-an-run-go-btn">&#9654;&ensp;Run</button></div>`;
 
@@ -602,21 +624,11 @@ function _openRunConfirm() {
     dlg.querySelector('.se-cfm-an-run-close').addEventListener('click', () => dlg.remove());
     dlg.querySelector('.se-cfm-an-run-cancel-btn').addEventListener('click', () => dlg.remove());
     dlg.querySelector('.se-cfm-an-run-go-btn').addEventListener('click', async () => {
+        const override = Number(dlg.querySelector('.se-cfm-an-maxtk-input')?.value);
+        _runMaxTokens = override > 0 ? override : null;
         dlg.remove();
         await _runAnalysis(fileNode, entryNodes);
-    });
-
-    _estimateChatTokens(fileName).then(info => {
-        const el = dlg.querySelector('#se-cfm-an-token-est');
-        if (!el || !document.contains(dlg)) return;
-        if (!info) { el.textContent = 'Could not estimate'; return; }
-        const ctx2 = SillyTavern.getContext();
-        const outLimit = ctx2.chatCompletionSettings?.openai_max_tokens || 2000;
-        const warn = outLimit < 2000;
-        el.innerHTML = `~${info.toLocaleString()} chat tokens &middot; output limit: ` +
-            (warn
-                ? `<span style="color:#fd971f">${outLimit.toLocaleString()} — consider increasing</span>`
-                : `${outLimit.toLocaleString()}`);
+        _runMaxTokens = null;
     });
 }
 
@@ -661,7 +673,7 @@ async function _callLLM(sysPrompt, userMsg) {
                 { role: 'system', content: sysPrompt },
                 { role: 'user',   content: userMsg   },
             ],
-            max_tokens: oai.openai_max_tokens || 2000,
+            max_tokens: _runMaxTokens ?? oai.openai_max_tokens ?? 2000,
             temperature: 0.3,
             stream: false,
         }),
