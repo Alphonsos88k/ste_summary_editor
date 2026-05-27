@@ -8,7 +8,7 @@
 import { escHtml } from '../core/utils.js';
 import { loadTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
-import { bindEditorControls, selectFile, applyFileSearch, clearFileSearch } from './chat-files-editor.js';
+import { bindEditorControls, selectFile, applyFileSearch, clearFileSearch, clearEditorSession } from './chat-files-editor.js';
 import { initAnalyser, destroyAnalyser, refreshEntries, refreshAnalyserCanvas } from './chat-files-analyser.js';
 
 let _panel = null;
@@ -21,6 +21,7 @@ let _userHandle = 'default-user';
 let _contentCache = {};   // fileName → messages[] (fetched on demand, lives for panel lifetime)
 let _searchGen    = 0;    // incremented on each new search to cancel stale async runs
 let _searchTimer  = null;
+let _focusLockAbort = null;
 
 // ─── Public API ──────────────────────────────────────────────
 
@@ -48,7 +49,9 @@ export async function openChatFilesManager(char) {
 
 export function closeChatFilesManager() {
     clearTimeout(_searchTimer);
+    _unlockSearchFocus();
     clearFileSearch();
+    clearEditorSession();
     destroyAnalyser();
     _detachDrag();
     _panel?.remove();
@@ -57,6 +60,42 @@ export function closeChatFilesManager() {
     _analyserReady = false;
     _contentCache  = {};
     _searchGen     = 0;
+}
+
+// ─── Search focus lock ────────────────────────────────────────
+// While a content-search debounce is pending, keep focus in the search
+// input so accidental Tab / clicks don't land in the editor area.
+// Released when the timer fires, the query is cleared, or the user
+// deliberately clicks an editable field or the find-bar nav buttons.
+
+function _lockSearchFocus() {
+    if (_focusLockAbort) return;
+    _focusLockAbort = new AbortController();
+    document.addEventListener('focusin', _onSearchFocusIn, { signal: _focusLockAbort.signal });
+}
+
+function _unlockSearchFocus() {
+    _focusLockAbort?.abort();
+    _focusLockAbort = null;
+}
+
+function _onSearchFocusIn(e) {
+    const t = e.target;
+    // Allowed: the search input itself and its clear button
+    if (t.id === 'se-cfm-search' || t.id === 'se-cfm-search-clear') return;
+    // Allowed + unlock: user intentionally clicked an editable content area
+    if (t.id === 'se-cfm-textarea' || t.classList?.contains('se-cfm-mes-field')) {
+        _unlockSearchFocus();
+        return;
+    }
+    // Allowed + unlock: find-bar nav / close buttons
+    if (t.closest?.('#se-cfm-find-bar')) {
+        _unlockSearchFocus();
+        return;
+    }
+    // Everything else: snap focus back to search input
+    const inp = document.getElementById('se-cfm-search');
+    if (inp) requestAnimationFrame(() => inp.focus());
 }
 
 // ─── Drag helpers ─────────────────────────────────────────────
@@ -312,7 +351,10 @@ function _bindPanelEvents() {
         ++_searchGen;
         if (q.length >= 2) {
             const gen = _searchGen;
-            _searchTimer = setTimeout(() => _runContentSearch(q, gen), 300);
+            _lockSearchFocus();
+            _searchTimer = setTimeout(() => { _unlockSearchFocus(); _runContentSearch(q, gen); }, 750);
+        } else {
+            _unlockSearchFocus();
         }
     });
 

@@ -18,6 +18,11 @@ let _searchQ       = '';
 let _searchMatches = [];
 let _searchIdx     = 0;
 
+const _undoStacks = {};  // { [fileName]: snapshot[] }
+const _redoStacks = {};  // { [fileName]: snapshot[] }
+const MAX_HISTORY = 10;
+let _undoKeyAttached = false;
+
 const _THEMES = {
     monokai: {
         bg: '#0e0e0e',
@@ -81,6 +86,14 @@ export function bindEditorControls(panel) {
         _doSave();
     });
 
+    panel.querySelector('#se-cfm-undo-btn')?.addEventListener('click', _doUndo);
+    panel.querySelector('#se-cfm-redo-btn')?.addEventListener('click', _doRedo);
+
+    if (!_undoKeyAttached) {
+        document.addEventListener('keydown', _undoKeyHandler);
+        _undoKeyAttached = true;
+    }
+
     panel.querySelector('#se-cfm-path-copy')?.addEventListener('click', () => {
         const val = document.getElementById('se-cfm-path-input')?.value;
         if (val) navigator.clipboard.writeText(val).catch(() => {});
@@ -136,10 +149,22 @@ export async function selectFile(fileName, char) {
         if (saveBtn) saveBtn.disabled = false;
         _setStatus('');
         _updateMeta();
+        _updateUndoRedoBtns();
         _renderView(_view);
     } catch (err) {
         _showEmpty(`Failed to load: ${escHtml(err.message)}`);
     }
+}
+
+// ─── Public: session cleanup ─────────────────────────────────
+
+export function clearEditorSession() {
+    if (_undoKeyAttached) {
+        document.removeEventListener('keydown', _undoKeyHandler);
+        _undoKeyAttached = false;
+    }
+    for (const k of Object.keys(_undoStacks)) delete _undoStacks[k];
+    for (const k of Object.keys(_redoStacks)) delete _redoStacks[k];
 }
 
 // ─── Public: search API ──────────────────────────────────────
@@ -293,9 +318,11 @@ async function _doSave() {
             body: JSON.stringify({ avatar_url: _char.avatar, file_name: _file.replace(/\.jsonl$/, ''), chat: updated }),
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        _pushUndoSnapshot(_file, _lines);
         _lines = updated;
         _dirty = false;
         _updateMeta();
+        _updateUndoRedoBtns();
         const active = ctx.characters?.[ctx.characterId];
         if (active?.avatar === _char.avatar) {
             _setStatus('Saved — reload chat to see changes');
@@ -305,6 +332,73 @@ async function _doSave() {
         }
     } catch (err) {
         _setStatus(`⚠ Save failed: ${err.message}`);
+    }
+}
+
+// ─── Undo / Redo ─────────────────────────────────────────────
+
+function _pushUndoSnapshot(fileName, snapshot) {
+    if (!fileName) return;
+    if (!_undoStacks[fileName]) _undoStacks[fileName] = [];
+    _undoStacks[fileName].push(JSON.parse(JSON.stringify(snapshot)));
+    if (_undoStacks[fileName].length > MAX_HISTORY) _undoStacks[fileName].shift();
+    _redoStacks[fileName] = [];
+}
+
+function _doUndo() {
+    if (!_file) return;
+    const undo = _undoStacks[_file] ?? [];
+    if (!undo.length) return;
+    if (!_redoStacks[_file]) _redoStacks[_file] = [];
+    _redoStacks[_file].push(JSON.parse(JSON.stringify(_lines)));
+    if (_redoStacks[_file].length > MAX_HISTORY) _redoStacks[_file].shift();
+    _lines = undo.pop();
+    _dirty = true;
+    _renderView(_view);
+    _setStatus('Restored — save to keep');
+    _updateUndoRedoBtns();
+}
+
+function _doRedo() {
+    if (!_file) return;
+    const redo = _redoStacks[_file] ?? [];
+    if (!redo.length) return;
+    if (!_undoStacks[_file]) _undoStacks[_file] = [];
+    _undoStacks[_file].push(JSON.parse(JSON.stringify(_lines)));
+    if (_undoStacks[_file].length > MAX_HISTORY) _undoStacks[_file].shift();
+    _lines = redo.pop();
+    _dirty = true;
+    _renderView(_view);
+    _setStatus('Restored — save to keep');
+    _updateUndoRedoBtns();
+}
+
+function _updateUndoRedoBtns() {
+    const undoN = (_undoStacks[_file] ?? []).length;
+    const redoN = (_redoStacks[_file] ?? []).length;
+    const undoBtn = /** @type {HTMLButtonElement} */ (document.getElementById('se-cfm-undo-btn'));
+    const redoBtn = /** @type {HTMLButtonElement} */ (document.getElementById('se-cfm-redo-btn'));
+    if (undoBtn) {
+        undoBtn.disabled = undoN === 0;
+        undoBtn.textContent = undoN > 0 ? `↶ ${undoN}` : '↶';
+        undoBtn.title = undoN > 0 ? `Undo to previous save (${undoN} available)` : 'Undo to previous save — nothing to undo';
+    }
+    if (redoBtn) {
+        redoBtn.disabled = redoN === 0;
+        redoBtn.textContent = redoN > 0 ? `↷ ${redoN}` : '↷';
+        redoBtn.title = redoN > 0 ? `Redo (${redoN} available)` : 'Redo — nothing to redo';
+    }
+}
+
+function _undoKeyHandler(e) {
+    if (!_file) return;
+    if (e.target instanceof Element && e.target.matches('textarea, input, [contenteditable]')) return;
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        _doUndo();
+    } else if ((e.ctrlKey || e.metaKey) && ((e.shiftKey && e.key === 'z') || e.key === 'y')) {
+        e.preventDefault();
+        _doRedo();
     }
 }
 
