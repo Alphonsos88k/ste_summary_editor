@@ -362,15 +362,41 @@
     margin-right: 4px;
 }
 
+.se-cfm-folder-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
 .se-cfm-folder-toast {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e2a14;
+    border: 1px solid #3a4a28;
+    border-radius: 4px;
+    padding: 3px 8px;
     font-size: 11px;
     color: var(--se-green);
-    opacity: 0;
-    transition: opacity 0.2s;
-    pointer-events: none;
     white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 200;
+}
+.se-cfm-folder-toast::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: #3a4a28;
 }
 .se-cfm-folder-toast-visible { opacity: 1; }
+.se-cfm-folder-toast-err { color: #f92672; background: #2a1018; border-color: #4a2028; }
+.se-cfm-folder-toast-err::after { border-top-color: #4a2028; }
 
 /* ─── Editor area ─────────────────────────────────────────────────────────── */
 
