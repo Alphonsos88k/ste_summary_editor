@@ -446,7 +446,11 @@
     z-index: 1;
 }
 .se-cfm-textarea[readonly] { cursor: default; }
-.se-cfm-textarea::selection { background: rgba(180,180,80,0.28); }
+.se-cfm-textarea::selection {
+    background: rgba(166, 226, 46, 0.35);
+    -webkit-text-fill-color: #f8f8f2;
+    color: #f8f8f2;
+}
 
 /* ─── Form view ──────────────────────────────────────────────────────────── */
 

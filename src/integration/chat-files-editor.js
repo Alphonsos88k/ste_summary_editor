@@ -12,7 +12,7 @@ let _lines = [];
 let _view = 'jsonl';
 let _dirty = false;
 let _saveTimer = null;
-const _fmt = { align: 'left', font: 'mono', theme: 'monokai', size: 'sm', spacing: false, wrap: false };
+const _fmt = { align: 'left', font: 'mono', theme: 'monokai', size: 'sm', spacing: false, wrap: true };
 
 let _searchQ       = '';
 let _searchMatches = [];
@@ -70,11 +70,13 @@ export function bindEditorControls(panel) {
         _applyFormatting();
     });
 
-    panel.querySelector('#se-cfm-wrap-btn')?.addEventListener('click', function () {
+    const wrapBtn = panel.querySelector('#se-cfm-wrap-btn');
+    wrapBtn?.addEventListener('click', function () {
         _fmt.wrap = !_fmt.wrap;
         this.classList.toggle('active', _fmt.wrap);
         _applyFormatting();
     });
+    if (wrapBtn) wrapBtn.classList.toggle('active', _fmt.wrap);
 
     panel
         .querySelectorAll('.se-cfm-seg[data-view]')
@@ -524,8 +526,13 @@ function _applyFormatting() {
     if (textarea) {
         textarea.style.textAlign = _fmt.align;
         textarea.style.whiteSpace = ws;
+        textarea.style.overflowWrap = _fmt.wrap ? 'break-word' : 'normal';
         textarea.style.overflowX = _fmt.wrap ? 'hidden' : 'auto';
         textarea.style.overflowY = 'auto';
+    }
+
+    if (pre) {
+        pre.style.overflowWrap = _fmt.wrap ? 'break-word' : 'normal';
     }
 
     if (formView) {
@@ -579,7 +586,8 @@ function _rebuildSearch() {
     _searchMatches = _buildSearchMatches();
     _searchIdx     = 0;
     _renderFindBar();
-    if (_searchMatches.length) _jumpToMatch(0);
+    // Scroll to first match but do NOT steal focus — search box must keep focus while typing
+    if (_searchMatches.length) _jumpToMatch(0, false);
 }
 
 function _buildSearchMatches() {
@@ -598,7 +606,40 @@ function _buildSearchMatches() {
     return hits;
 }
 
-function _jumpToMatch(idx) {
+// Measures the pixel offset of charPos inside a textarea by replicating its
+// text rendering in an off-screen mirror div. Works correctly with word wrap.
+function _getMatchTopPx(ta, charPos) {
+    const cs = getComputedStyle(ta);
+    const mirror = document.createElement('div');
+    Object.assign(mirror.style, {
+        position:     'fixed',
+        visibility:   'hidden',
+        top:          '-9999px',
+        left:         '-9999px',
+        width:        `${ta.clientWidth}px`,
+        fontFamily:   cs.fontFamily,
+        fontSize:     cs.fontSize,
+        fontWeight:   cs.fontWeight,
+        lineHeight:   cs.lineHeight,
+        letterSpacing: cs.letterSpacing,
+        whiteSpace:   cs.whiteSpace,
+        overflowWrap: cs.overflowWrap,
+        wordBreak:    cs.wordBreak,
+        padding:      cs.padding,
+        boxSizing:    cs.boxSizing,
+        border:       cs.border,
+    });
+    mirror.appendChild(document.createTextNode(ta.value.slice(0, charPos)));
+    const marker = document.createElement('span');
+    marker.textContent = '​';
+    mirror.appendChild(marker);
+    document.body.appendChild(mirror);
+    const top = marker.offsetTop;
+    mirror.remove();
+    return top;
+}
+
+function _jumpToMatch(idx, focusEditor = true) {
     if (!_searchMatches.length) return;
     _searchIdx = ((idx % _searchMatches.length) + _searchMatches.length) % _searchMatches.length;
     _updateFindBar();
@@ -608,20 +649,29 @@ function _jumpToMatch(idx) {
             document.querySelector(`#se-cfm-form-view .se-cfm-mes-field[data-line="${hit}"]`)
         );
         if (!ta) return;
-        ta.closest('.se-cfm-msg-block')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        ta.closest('.se-cfm-msg-block')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         const mesLower = (ta.value ?? '').toLowerCase();
         const at = mesLower.indexOf(_searchQ);
-        if (at >= 0) { ta.focus(); ta.setSelectionRange(at, at + _searchQ.length); }
+        if (at >= 0) {
+            if (focusEditor) ta.focus();
+            ta.setSelectionRange(at, at + _searchQ.length);
+        }
     } else {
         const ta = /** @type {HTMLTextAreaElement} */ (document.getElementById('se-cfm-textarea'));
         if (!ta) return;
-        ta.focus();
+        if (focusEditor) ta.focus();
         ta.setSelectionRange(hit, hit + _searchQ.length);
-        const lh    = Number.parseFloat(getComputedStyle(ta).lineHeight) || 18;
-        const lines = ta.value.slice(0, hit).split('\n').length;
-        ta.scrollTop = Math.max(0, (lines - 3) * lh);
-        const pre = document.getElementById('se-cfm-highlight-pre');
-        if (pre) pre.scrollTop = ta.scrollTop;
+        // Use a mirror div to get the real pixel offset — works correctly with
+        // word wrap where logical-line × lineHeight is completely wrong.
+        requestAnimationFrame(() => {
+            const matchTop = _getMatchTopPx(ta, hit);
+            const lh = Number.parseFloat(getComputedStyle(ta).lineHeight) || 18;
+            // Center the match: subtract half the visible height, add half a line so
+            // the top of the matched line lands in the middle rather than its bottom.
+            ta.scrollTop = Math.max(0, matchTop - ta.clientHeight / 2 + lh / 2);
+            const pre = document.getElementById('se-cfm-highlight-pre');
+            if (pre) pre.scrollTop = ta.scrollTop;
+        });
     }
 }
 
