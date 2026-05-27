@@ -13,7 +13,8 @@
 <div class="se-cfm-body" id="se-cfm-tab-files">
     <div class="se-cfm-sidebar">
         <div class="se-cfm-search-wrap">
-            <input class="se-cfm-search" id="se-cfm-search" type="text" placeholder="Search files&hellip;" autocomplete="off" />
+            <input class="se-cfm-search" id="se-cfm-search" type="text" placeholder="Search files &amp; content&hellip;" autocomplete="off" />
+            <button class="se-cfm-search-clear" id="se-cfm-search-clear" title="Clear search" hidden>&times;</button>
         </div>
         <div class="se-cfm-file-list" id="se-cfm-file-list">
             <div class="se-cfm-hint">Loading&hellip;</div>
@@ -54,7 +55,7 @@
             <span class="se-cfm-autosave-status" id="se-cfm-autosave-status"></span>
             <button class="se-cfm-save-btn" id="se-cfm-save-btn" disabled>&#x1F4BE;&ensp;Save</button>
         </div>
-        <div class="se-cfm-editor-area">
+        <div class="se-cfm-editor-area" id="se-cfm-editor-area">
             <div class="se-cfm-empty-state" id="se-cfm-empty-state">Select a chat file from the sidebar</div>
             <div class="se-cfm-textarea-wrap" id="se-cfm-textarea-wrap" style="display:none;">
                 <pre class="se-cfm-highlight-pre" id="se-cfm-highlight-pre" aria-hidden="true"></pre>

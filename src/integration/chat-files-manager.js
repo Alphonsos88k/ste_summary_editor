@@ -8,7 +8,7 @@
 import { escHtml } from '../core/utils.js';
 import { loadTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
-import { bindEditorControls, selectFile } from './chat-files-editor.js';
+import { bindEditorControls, selectFile, applyFileSearch, clearFileSearch } from './chat-files-editor.js';
 import { initAnalyser, destroyAnalyser, refreshEntries, refreshAnalyserCanvas } from './chat-files-analyser.js';
 
 let _panel = null;
@@ -18,6 +18,9 @@ let _analyserReady = false;
 let _popped = false;
 let _dragAbort = null;
 let _userHandle = 'default-user';
+let _contentCache = {};   // fileName → messages[] (fetched on demand, lives for panel lifetime)
+let _searchGen    = 0;    // incremented on each new search to cancel stale async runs
+let _searchTimer  = null;
 
 // ─── Public API ──────────────────────────────────────────────
 
@@ -44,12 +47,16 @@ export async function openChatFilesManager(char) {
 }
 
 export function closeChatFilesManager() {
+    clearTimeout(_searchTimer);
+    clearFileSearch();
     destroyAnalyser();
     _detachDrag();
     _panel?.remove();
-    _panel = null;
-    _files = [];
+    _panel         = null;
+    _files         = [];
     _analyserReady = false;
+    _contentCache  = {};
+    _searchGen     = 0;
 }
 
 // ─── Drag helpers ─────────────────────────────────────────────
@@ -214,16 +221,110 @@ function _relDate(val) {
     return `${Math.floor(days / 30)}mo ago`;
 }
 
+// ─── Content search ──────────────────────────────────────────
+
+async function _runContentSearch(q, gen) {
+    const items = [...(_panel?.querySelectorAll('.se-cfm-file-item') ?? [])];
+    for (const chat of _files) {
+        if (gen !== _searchGen) return;
+        const name = chat.file_name ?? '';
+        const el   = items.find(x => x.dataset.cfmFile === name);
+        if (el) await _searchOneFile(el, name, q, gen);
+    }
+}
+
+async function _searchOneFile(el, name, q, gen) {
+    const nameMatch = name.toLowerCase().includes(q);
+    if (_contentCache[name] === undefined) {
+        const spin = document.createElement('span');
+        spin.className = 'se-cfm-match-badge se-cfm-match-spin';
+        spin.innerHTML = '<span class="se-an-spin">&#x27F3;</span>';
+        el.querySelector('.se-cfm-fdate')?.before(spin);
+        const msgs = await _fetchChatContent(name);
+        if (gen !== _searchGen) return;
+        _contentCache[name] = msgs ?? [];
+        spin.remove();
+    }
+    const matchCount = _contentCache[name].filter(
+        m => `${m.name ?? ''} ${m.mes ?? m.content ?? ''}`.toLowerCase().includes(q)
+    ).length;
+    el.querySelector('.se-cfm-match-badge')?.remove();
+    if (nameMatch || matchCount > 0) {
+        el.style.display = '';
+        if (matchCount > 0) {
+            const badge = document.createElement('span');
+            badge.className   = 'se-cfm-match-badge';
+            badge.textContent = `${matchCount} msg${matchCount === 1 ? '' : 's'}`;
+            el.querySelector('.se-cfm-fdate')?.before(badge);
+        }
+    } else {
+        el.style.display = 'none';
+    }
+}
+
+async function _fetchChatContent(fileName) {
+    try {
+        const ctx  = SillyTavern.getContext();
+        const resp = await fetch('/getchat', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', ...ctx.getRequestHeaders() },
+            body:    JSON.stringify({
+                ch_name:    _currentChar?.name   ?? '',
+                file_name:  fileName.replace(/\.jsonl$/, ''),
+                avatar_url: _currentChar?.avatar ?? '',
+            }),
+        });
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        return Array.isArray(data) ? data : (data?.chat ?? []);
+    } catch { return null; }
+}
+
 // ─── Panel-level events ──────────────────────────────────────
 
 function _bindPanelEvents() {
     _panel.querySelector('.se-cfm-close')?.addEventListener('click', closeChatFilesManager);
 
-    _panel.querySelector('#se-cfm-search')?.addEventListener('input', function () {
+    const searchInp  = _panel.querySelector('#se-cfm-search');
+    const searchClear = _panel.querySelector('#se-cfm-search-clear');
+
+    const _syncClearBtn = () => {
+        if (searchClear) searchClear.hidden = !searchInp?.value;
+    };
+
+    searchInp?.addEventListener('input', function () {
+        _syncClearBtn();
         const q = this.value.toLowerCase().trim();
-        _panel.querySelectorAll('.se-cfm-file-item').forEach((el) => {
+
+        // Instant: filename filter + clear stale badges
+        const items = [..._panel.querySelectorAll('.se-cfm-file-item')];
+        items.forEach(el => {
+            el.querySelector('.se-cfm-match-badge')?.remove();
             el.style.display = !q || el.dataset.cfmFile.toLowerCase().includes(q) ? '' : 'none';
         });
+
+        // Update editor search state immediately
+        if (q.length >= 2) applyFileSearch(q);
+        else clearFileSearch();
+
+        // Async content search (debounced)
+        clearTimeout(_searchTimer);
+        ++_searchGen;
+        if (q.length >= 2) {
+            const gen = _searchGen;
+            _searchTimer = setTimeout(() => _runContentSearch(q, gen), 300);
+        }
+    });
+
+    searchInp?.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            searchInp.value = '';
+            searchInp.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    });
+
+    searchClear?.addEventListener('click', () => {
+        if (searchInp) { searchInp.value = ''; searchInp.dispatchEvent(new Event('input', { bubbles: true })); }
     });
 
     _panel.querySelector('#se-cfm-btn-popout')?.addEventListener('click', () => {

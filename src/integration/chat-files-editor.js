@@ -14,6 +14,10 @@ let _dirty = false;
 let _saveTimer = null;
 const _fmt = { align: 'left', font: 'mono', theme: 'monokai', size: 'sm', spacing: false, wrap: false };
 
+let _searchQ       = '';
+let _searchMatches = [];
+let _searchIdx     = 0;
+
 const _THEMES = {
     monokai: {
         bg: '#0e0e0e',
@@ -138,6 +142,20 @@ export async function selectFile(fileName, char) {
     }
 }
 
+// ─── Public: search API ──────────────────────────────────────
+
+export function applyFileSearch(q) {
+    _searchQ = q && q.length >= 2 ? q.toLowerCase() : '';
+    _rebuildSearch();
+}
+
+export function clearFileSearch() {
+    _searchQ       = '';
+    _searchMatches = [];
+    _searchIdx     = 0;
+    _removeFindBar();
+}
+
 // ─── View rendering ──────────────────────────────────────────
 
 function _renderView(view) {
@@ -184,6 +202,7 @@ function _renderView(view) {
         _updateHighlight();
     }
     _applyFormatting();
+    _rebuildSearch();
 }
 
 function _buildFormView() {
@@ -457,6 +476,118 @@ function _showEmpty(msg) {
 function _setStatus(msg) {
     const el = document.getElementById('se-cfm-autosave-status');
     if (el) el.textContent = msg;
+}
+
+// ─── Search internals ────────────────────────────────────────
+
+function _rebuildSearch() {
+    if (!_searchQ || !_lines.length) { _removeFindBar(); return; }
+    _searchMatches = _buildSearchMatches();
+    _searchIdx     = 0;
+    _renderFindBar();
+    if (_searchMatches.length) _jumpToMatch(0);
+}
+
+function _buildSearchMatches() {
+    if (_view === 'form') {
+        return _lines.reduce((acc, l, i) => {
+            if (typeof l !== 'object' || !('mes' in l)) return acc;
+            if (`${l.name ?? ''} ${l.mes ?? ''}`.toLowerCase().includes(_searchQ)) acc.push(i);
+            return acc;
+        }, []);
+    }
+    const ta = /** @type {HTMLTextAreaElement} */ (document.getElementById('se-cfm-textarea'));
+    const text = (ta?.value ?? '').toLowerCase();
+    const hits = [];
+    let pos = 0;
+    while ((pos = text.indexOf(_searchQ, pos)) !== -1) { hits.push(pos); pos += _searchQ.length; }
+    return hits;
+}
+
+function _jumpToMatch(idx) {
+    if (!_searchMatches.length) return;
+    _searchIdx = ((idx % _searchMatches.length) + _searchMatches.length) % _searchMatches.length;
+    _updateFindBar();
+    const hit = _searchMatches[_searchIdx];
+    if (_view === 'form') {
+        const ta = /** @type {HTMLTextAreaElement} */ (
+            document.querySelector(`#se-cfm-form-view .se-cfm-mes-field[data-line="${hit}"]`)
+        );
+        if (!ta) return;
+        ta.closest('.se-cfm-msg-block')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const mesLower = (ta.value ?? '').toLowerCase();
+        const at = mesLower.indexOf(_searchQ);
+        if (at >= 0) { ta.focus(); ta.setSelectionRange(at, at + _searchQ.length); }
+    } else {
+        const ta = /** @type {HTMLTextAreaElement} */ (document.getElementById('se-cfm-textarea'));
+        if (!ta) return;
+        ta.focus();
+        ta.setSelectionRange(hit, hit + _searchQ.length);
+        const lh    = Number.parseFloat(getComputedStyle(ta).lineHeight) || 18;
+        const lines = ta.value.slice(0, hit).split('\n').length;
+        ta.scrollTop = Math.max(0, (lines - 3) * lh);
+        const pre = document.getElementById('se-cfm-highlight-pre');
+        if (pre) pre.scrollTop = ta.scrollTop;
+    }
+}
+
+function _renderFindBar() {
+    let bar = document.getElementById('se-cfm-find-bar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id        = 'se-cfm-find-bar';
+        bar.innerHTML =
+            `<span id="se-cfm-find-count"></span>` +
+            `<button id="se-cfm-find-prev" title="Previous match (Shift+Enter)">&#8249;</button>` +
+            `<button id="se-cfm-find-next" title="Next match (Enter)">&#8250;</button>` +
+            `<button id="se-cfm-find-close" title="Close find bar (Esc)">&times;</button>`;
+        document.getElementById('se-cfm-editor-area')?.appendChild(bar);
+        bar.querySelector('#se-cfm-find-prev')  .addEventListener('click', () => _jumpToMatch(_searchIdx - 1));
+        bar.querySelector('#se-cfm-find-next')  .addEventListener('click', () => _jumpToMatch(_searchIdx + 1));
+        bar.querySelector('#se-cfm-find-close') .addEventListener('click', () => {
+            clearFileSearch();
+            // also tell the manager to clear the search box
+            const inp = /** @type {HTMLInputElement} */ (document.getElementById('se-cfm-search'));
+            if (inp) { inp.value = ''; inp.dispatchEvent(new Event('input', { bubbles: true })); }
+        });
+        document.addEventListener('keydown', _findBarKeyHandler);
+    }
+    _updateFindBar();
+}
+
+function _findBarKeyHandler(e) {
+    if (!document.getElementById('se-cfm-find-bar')) {
+        document.removeEventListener('keydown', _findBarKeyHandler);
+        return;
+    }
+    if (e.key === 'Escape') {
+        clearFileSearch();
+        const inp = /** @type {HTMLInputElement} */ (document.getElementById('se-cfm-search'));
+        if (inp) { inp.value = ''; inp.dispatchEvent(new Event('input', { bubbles: true })); }
+    } else if (e.key === 'Enter' && (e.target?.id === 'se-cfm-textarea' || e.target?.closest?.('#se-cfm-find-bar'))) {
+        e.preventDefault();
+        e.shiftKey ? _jumpToMatch(_searchIdx - 1) : _jumpToMatch(_searchIdx + 1);
+    }
+}
+
+function _updateFindBar() {
+    const bar = document.getElementById('se-cfm-find-bar');
+    if (!bar) return;
+    const n    = _searchMatches.length;
+    const cEl  = bar.querySelector('#se-cfm-find-count');
+    if (cEl) {
+        cEl.textContent  = n === 0 ? 'No matches' : `${_searchIdx + 1} / ${n}`;
+        cEl.style.color  = n === 0 ? '#f92672' : '#a6e22e';
+    }
+    const prev = /** @type {HTMLButtonElement} */ (bar.querySelector('#se-cfm-find-prev'));
+    const next = /** @type {HTMLButtonElement} */ (bar.querySelector('#se-cfm-find-next'));
+    if (prev) prev.disabled = n === 0;
+    if (next) next.disabled = n === 0;
+}
+
+function _removeFindBar() {
+    document.removeEventListener('keydown', _findBarKeyHandler);
+    document.getElementById('se-cfm-find-bar')?.remove();
 }
 
 function _updateMeta() {
