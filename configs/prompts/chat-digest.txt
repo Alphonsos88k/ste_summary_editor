@@ -11,9 +11,17 @@ CONTENT FIDELITY — apply this before anything else:
 
 ---
 
+CHRONOLOGICAL GROUNDING — apply to every section you write:
+- Read the log in strict message order. Track the current location, who is present, and what has just happened as a running state. Update that state only when the text explicitly changes it.
+- Every event you describe must be anchored to where it actually occurred in the log. If the birthday cake appeared at the apartment, it happened at the apartment — do not place it elsewhere because a different scene involved a different location.
+- Do not infer, assume, or carry forward a setting from a previous scene unless the text explicitly continues it. When in doubt, quote or paraphrase the source message that establishes the detail.
+- If a detail is ambiguous (location unclear, speaker uncertain), flag it — do not guess.
+
+---
+
 STEP 1 — FULL ANOMALY SCAN (mandatory — complete before writing anything else)
 
-Read every single exchange from start to finish without skipping. Identify every anomaly you find. Output them as a numbered bulleted list under the heading below. Be exhaustive — running this prompt twice on the same file must produce the same list.
+Read every single exchange from start to finish without skipping. Track location and participants at each scene boundary. Identify every anomaly you find. Output them as a numbered bulleted list under the heading below. Be exhaustive — running this prompt twice on the same file must produce the same list.
 
 ## ⚠ ANOMALY REPORT
 
@@ -48,7 +56,7 @@ STEP 2 — NARRATIVE SUMMARY
 2–4 paragraphs covering the arc of the session: what happened, how it developed, how it resolved or left off. Written in dense, readable prose. Preserve the tone and intensity of the source.
 
 ## PLOT BEATS
-- [beat] (≤ 20 words; keep specific, visceral details)
+- [beat] — [location where it happened] (≤ 20 words; keep specific, visceral details; location must match the source)
 
 ## CHARACTER DEVELOPMENT
 - [CharName]: [what changed or was revealed]
