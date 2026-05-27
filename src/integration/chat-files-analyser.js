@@ -79,6 +79,7 @@ export function destroyAnalyser() {
     _popPanels    = { files: null, entries: null };
     _tipEl?.remove();
     _tipEl        = null;
+    document.getElementById('se-cfm-an-tok-drop')?.remove();
     _panel        = null;
     _files        = [];
     _char         = null;
@@ -490,8 +491,10 @@ function _attachPopDrag(pop, hdrSelector) {
 function _bindToolbar() {
     const p = _panel;
     p?.querySelector('#se-cfm-an-fit')?.addEventListener('click', _fitView);
-    p?.querySelector('#se-cfm-an-run')?.addEventListener('click', _openRunConfirm);
+    p?.querySelector('#se-cfm-an-run')?.addEventListener('click', _doRun);
+    p?.querySelector('#se-cfm-an-tok')?.addEventListener('click', _toggleTokDrop);
     p?.querySelector('#se-cfm-an-help')?.addEventListener('click', _openHelpDialog);
+    _updateTokBtn();
     _initTooltips(p?.querySelector('.se-cfm-an-toolbar'));
     p?.querySelector('#se-cfm-an-origin')?.addEventListener('click', () => {
         if (!_lgc) return;
@@ -567,94 +570,86 @@ function _getConnectedGraph() {
     return entryNodes.length > 0 ? { fileNode, entryNodes } : null;
 }
 
-// ─── Run confirmation dialog ──────────────────────────────────
+// ─── Run (direct) ────────────────────────────────────────────
 
-function _openRunConfirm() {
-    const existing = document.getElementById('se-cfm-an-run-dlg');
-    if (existing) { existing.remove(); return; }
-
+function _doRun() {
     const conn = _getConnectedGraph();
     if (!conn) return;
-    const { fileNode, entryNodes } = conn;
+    _runAnalysis(conn.fileNode, conn.entryNodes);
+}
 
-    const fileName   = fileNode.properties?.fileName ?? '';
-    const entryList  = entryNodes.map(e => `#${e.properties?.num}`).join(', ');
-    const hasRefine  = !!getPrompt('digest-refine');
-    const ctx0       = SillyTavern.getContext();
-    const defaultMax = ctx0.chatCompletionSettings?.openai_max_tokens ?? 2000;
-    const cachedTk   = _fileTokens[fileName];
+// ─── Token override button ────────────────────────────────────
 
-    // Colour-code the input token count by size
-    const tkHtml = cachedTk
-        ? (() => {
-            const color = cachedTk > 12000 ? '#f92672' : cachedTk > 6000 ? '#fd971f' : '#a6e22e';
-            return `<span style="color:${color};font-weight:600;">~${cachedTk >= 1000 ? `${(cachedTk / 1000).toFixed(1)}k` : cachedTk}</span> input tokens`;
-        })()
-        : `<span style="color:#555;">add file to canvas to estimate</span>`;
+function _updateTokBtn() {
+    const btn = _panel?.querySelector('#se-cfm-an-tok');
+    if (!btn) return;
+    const ctx = SillyTavern.getContext();
+    const def = ctx.chatCompletionSettings?.openai_max_tokens ?? 2000;
+    const val = _runMaxTokens ?? def;
+    btn.textContent = val >= 1000 ? `${+(val / 1000).toFixed(1)}k` : String(val);
+    btn.classList.toggle('active', _runMaxTokens !== null);
+}
 
-    // Preset chips — nearest common values, with defaultMax pre-selected
-    const presets = [1600, 2400, 3200, 4096];
-    const activePreset = presets.includes(defaultMax) ? defaultMax : presets[1];
-    const chipsHtml = presets.map(v =>
-        `<button class="se-cfm-an-outlen-chip${v === activePreset ? ' active' : ''}" data-val="${v}">${v >= 1000 ? `${v / 1000}k` : v}</button>`
-    ).join('');
+function _toggleTokDrop() {
+    const existing = document.getElementById('se-cfm-an-tok-drop');
+    if (existing) { existing.remove(); return; }
 
-    const dlg = document.createElement('div');
-    dlg.id = 'se-cfm-an-run-dlg';
-    dlg.className = 'se-cfm-an-run-dlg';
-    dlg.innerHTML =
-        `<div class="se-cfm-an-run-hdr">` +
-        `<span>Run Analysis</span>` +
-        `<button class="se-close-circle se-cfm-an-run-close">&times;</button></div>` +
-        `<div class="se-cfm-an-run-body">` +
-        `<div class="se-cfm-an-run-info">` +
-        `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Chat file</span>` +
-        `<span class="se-cfm-an-run-val">${escHtml(fileName)}</span></div>` +
-        `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Entries</span>` +
-        `<span class="se-cfm-an-run-val">${escHtml(entryList)}</span></div>` +
-        `<div class="se-cfm-an-run-row"><span class="se-cfm-an-run-lbl">Input size</span>` +
-        `<span class="se-cfm-an-run-val">${tkHtml}</span></div>` +
+    const btn = _panel?.querySelector('#se-cfm-an-tok');
+    if (!btn) return;
+
+    const ctx     = SillyTavern.getContext();
+    const def     = ctx.chatCompletionSettings?.openai_max_tokens ?? 2000;
+    const current = _runMaxTokens ?? def;
+
+    const drop = document.createElement('div');
+    drop.id        = 'se-cfm-an-tok-drop';
+    drop.className = 'se-cfm-an-tok-drop';
+    drop.innerHTML =
+        `<div class="se-cfm-an-tok-drop-lbl">Response token limit</div>` +
+        `<div class="se-cfm-an-tok-drop-row">` +
+        `<input class="se-cfm-an-tok-inp" type="number" min="256" max="32000" step="256" value="${current}">` +
+        `<button class="se-cfm-an-tok-set">Set</button>` +
         `</div>` +
-        `<div class="se-cfm-an-run-pipeline">` +
-        `<div class="se-cfm-an-run-step"><em class="se-cfm-an-help-tag green">Pass 1</em>` +
-        `<span>Chat Digest — reads the full chat file and generates a structured digest</span></div>` +
-        (hasRefine
-            ? `<div class="se-cfm-an-run-step"><em class="se-cfm-an-help-tag cyan">Refine</em>` +
-              `<span>Digest Refinement — improves the digest in up to 3 feedback rounds</span></div>`
-            : '') +
-        `<div class="se-cfm-an-run-step"><em class="se-cfm-an-help-tag purple">Pass 2</em>` +
-        `<span>Entry Analysis — scores each entry against the digest</span></div>` +
-        `</div>` +
-        `<div class="se-cfm-an-outlen-row">` +
-        `<span class="se-cfm-an-outlen-lbl">Output length</span>` +
-        `<div class="se-cfm-an-outlen-chips">${chipsHtml}</div>` +
-        `</div>` +
-        `</div>` +
-        `<div class="se-cfm-an-run-foot">` +
-        `<button class="se-cfm-an-run-cancel-btn">Cancel</button>` +
-        `<button class="se-cfm-an-run-go-btn">&#9654;&ensp;Run</button></div>`;
+        (_runMaxTokens !== null
+            ? `<button class="se-cfm-an-tok-reset">&#x2715; Reset to ST default (${def >= 1000 ? `${+(def / 1000).toFixed(1)}k` : def})</button>`
+            : `<div class="se-cfm-an-tok-hint">ST default: ${def >= 1000 ? `${+(def / 1000).toFixed(1)}k` : def}</div>`);
 
-    document.body.appendChild(dlg);
-    _centerDialog(dlg);
-    _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
+    const rect     = btn.getBoundingClientRect();
+    drop.style.top  = `${rect.bottom + 6}px`;
+    drop.style.left = `${rect.left}px`;
+    document.body.appendChild(drop);
 
-    let _selectedMax = activePreset;
-    dlg.querySelectorAll('.se-cfm-an-outlen-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-            dlg.querySelectorAll('.se-cfm-an-outlen-chip').forEach(c => c.classList.remove('active'));
-            chip.classList.add('active');
-            _selectedMax = Number(chip.dataset.val);
-        });
-    });
+    const inp = /** @type {HTMLInputElement} */ (drop.querySelector('.se-cfm-an-tok-inp'));
+    inp.focus();
+    inp.select();
 
-    dlg.querySelector('.se-cfm-an-run-close').addEventListener('click', () => dlg.remove());
-    dlg.querySelector('.se-cfm-an-run-cancel-btn').addEventListener('click', () => dlg.remove());
-    dlg.querySelector('.se-cfm-an-run-go-btn').addEventListener('click', async () => {
-        _runMaxTokens = _selectedMax;
-        dlg.remove();
-        await _runAnalysis(fileNode, entryNodes);
+    const _apply = () => {
+        const v = parseInt(inp.value, 10);
+        if (!isNaN(v) && v >= 256) {
+            _runMaxTokens = v;
+            drop.remove();
+            _updateTokBtn();
+        }
+    };
+
+    drop.querySelector('.se-cfm-an-tok-set').addEventListener('click', _apply);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') _apply(); });
+
+    drop.querySelector('.se-cfm-an-tok-reset')?.addEventListener('click', () => {
         _runMaxTokens = null;
+        drop.remove();
+        _updateTokBtn();
     });
+
+    setTimeout(() => {
+        const dismiss = e => {
+            if (!drop.contains(e.target) && e.target !== btn) {
+                drop.remove();
+                document.removeEventListener('mousedown', dismiss, { capture: true });
+            }
+        };
+        document.addEventListener('mousedown', dismiss, { capture: true });
+    }, 0);
 }
 
 // ─── Token estimation ─────────────────────────────────────────
