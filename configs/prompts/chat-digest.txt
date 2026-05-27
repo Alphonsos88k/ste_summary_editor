@@ -39,6 +39,10 @@ If no anomalies are found, write: "No anomalies detected."
 
 ---
 
+OUTPUT LENGTH TARGET: aim for 1,800–2,200 tokens total across the full response. Be thorough but do not pad. If the session is short, a tighter output is fine — do not inflate.
+
+---
+
 STEP 2 — NARRATIVE SUMMARY
 
 2–4 paragraphs covering the arc of the session: what happened, how it developed, how it resolved or left off. Written in dense, readable prose. Preserve the tone and intensity of the source.
