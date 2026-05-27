@@ -871,7 +871,7 @@ function _stageSwap(numA, numB) {
     renderTable();
 }
 
-function _stageMove(numFrom, numAfter) {
+function _stageMove(numFrom, numAfter, proposed = null) {
     if (!state.entries.has(numFrom)) throw new Error(`Entry #${numFrom} not found`);
     if (numFrom === numAfter || numFrom === numAfter + 1) return;
     const moving = { ...state.entries.get(numFrom) };
@@ -880,14 +880,18 @@ function _stageMove(numFrom, numAfter) {
             const src = state.entries.get(n + 1);
             if (src) { state.entries.set(n, { ...src, num: n }); state.modified.add(n); }
         }
-        state.entries.set(numAfter, { ...moving, num: numAfter });
+        const landed = { ...moving, num: numAfter };
+        if (proposed) landed.content = proposed;
+        state.entries.set(numAfter, landed);
         state.modified.add(numAfter);
     } else {
         for (let n = numFrom; n > numAfter + 1; n--) {
             const src = state.entries.get(n - 1);
             if (src) { state.entries.set(n, { ...src, num: n }); state.modified.add(n); }
         }
-        state.entries.set(numAfter + 1, { ...moving, num: numAfter + 1 });
+        const landed = { ...moving, num: numAfter + 1 };
+        if (proposed) landed.content = proposed;
+        state.entries.set(numAfter + 1, landed);
         state.modified.add(numAfter + 1);
     }
     detectGaps();
@@ -1149,8 +1153,8 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
             } else if (parsed.action === 'MOVE') {
                 const target = _normaliseTarget(parsed);
                 if (target === null) throw new Error('No target entry for MOVE');
-                _stageMove(num, target);
-                hint(`→ Moved #${num} to after #${target} — staged, not yet committed`);
+                _stageMove(num, target, parsed.proposed ?? null);
+                hint(`→ Moved #${num} to after #${target}${parsed.proposed ? ' + content adjusted' : ''} — staged, not yet committed`);
             }
             _staged = true;
             resultsByNum[num] = JSON.stringify({ action: 'NO_CHANGE', reason: 'Applied' });
@@ -1287,8 +1291,8 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
             } else if (parsed.action === 'MOVE') {
                 const target = _normaliseTarget(parsed);
                 if (target === null) throw new Error('No target entry for MOVE');
-                _stageMove(num, target);
-                hint(`→ Moved #${num} to after #${target} — staged, not yet committed`);
+                _stageMove(num, target, parsed.proposed ?? null);
+                hint(`→ Moved #${num} to after #${target}${parsed.proposed ? ' + content adjusted' : ''} — staged, not yet committed`);
             }
             _staged = true;
             resultsByNum[num] = JSON.stringify({ action: 'NO_CHANGE', reason: 'Applied' });
@@ -1316,7 +1320,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         } else if (parsed.action === 'MOVE') {
             const target = _normaliseTarget(parsed);
             if (target === null) throw new Error('No target entry for MOVE');
-            _stageMove(num, target);
+            _stageMove(num, target, parsed.proposed ?? null);
         }
         _staged = true;
         resultsByNum[num] = JSON.stringify({ action: 'NO_CHANGE', reason: 'Applied' });
