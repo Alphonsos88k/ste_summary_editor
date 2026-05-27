@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.18.0...v1.19.0) (2026-05-27)
+
+
+### Features
+
+* persistent response token override button in analyser toolbar ([f13a699](https://github.com/Alphonsos88k/ste_summary_editor/commit/f13a699f951943cef2d43e4ca17221d87534f986))
+
 # [1.18.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.17.1...v1.18.0) (2026-05-27)
 
 
