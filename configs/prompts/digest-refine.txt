@@ -8,6 +8,12 @@ ANOMALY LIST RULES — critical:
 - New anomalies found during this pass are appended to the list as [UNRESOLVED].
 - The anomaly list in the output must contain every item — resolved and unresolved — so the history is visible.
 
+CHRONOLOGICAL GROUNDING — apply to every correction you make:
+- Events must remain anchored to where and when they actually occurred in the chat log. Do not move an event to a different location or time to satisfy feedback unless the chat log itself supports that change.
+- If feedback says "X happened at Y location", verify it against the original chat before accepting it. If the chat log contradicts the feedback, flag it as an anomaly rather than silently adopting it.
+- When correcting a plot beat, re-read the source messages for that scene. Do not rely on memory or inference from surrounding beats.
+- Each plot beat must include its location as written in the source. If a correction removes or changes a location, the source must back that up.
+
 CONTENT RULES:
 - Revise only the sections the feedback explicitly addresses. Keep everything else stable.
 - Do not introduce new content that was not in the original chat.

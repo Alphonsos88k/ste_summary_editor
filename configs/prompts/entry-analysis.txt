@@ -20,7 +20,7 @@ CHRONOLOGICAL AWARENESS — apply before recommending any structural action:
 
 STRUCTURAL ACTIONS:
 - REWRITE: the entry is inaccurate, too vague, sanitised, missing key detail, or misattributes an event to the wrong location or character.
-- MOVE: the entry is out of chronological order per the digest — specify "target" as the entry number to place it after.
+- MOVE: the entry is out of chronological order per the digest — specify "target" as the entry number to place it after. If moving changes the entry's chronological context (e.g. it references events that will no longer have happened yet at the new position, or uses language like "after X" where X now comes later), include a "proposed" field with the entry text rewritten to fit its new position. If the content is position-neutral, omit "proposed".
 - SPLIT: the entry covers two or more distinct chronological beats — divide it, preserving tone and vocabulary.
 - MERGE: the entry overlaps with a directly adjacent entry in the digest timeline — provide the combined text. Always include a "target" field with the entry number to merge into.
 - SWAP: two entries are in the wrong chronological order relative to each other per the digest — specify "target" as the entry number to swap with.
@@ -33,7 +33,7 @@ OUTPUT FORMAT — return ONLY a valid JSON object, no text before or after:
 {
   "action": "REWRITE" | "MOVE" | "SPLIT" | "MERGE" | "SWAP" | "NO_CHANGE",
   "reason": "one sentence explaining the recommendation",
-  "proposed": "full rewritten text preserving source vocabulary and emotional register (REWRITE only)",
+  "proposed": "full rewritten text preserving source vocabulary and emotional register (REWRITE; also MOVE if content needs chronological adjustment for its new position)",
   "parts": ["part 1 full text", "part 2 full text", ...] (SPLIT only — each part must be self-contained),
   "target": <entry number as integer> (MERGE, SWAP, or MOVE only — required, must be a number; for MOVE this is the entry to move after)
 }
