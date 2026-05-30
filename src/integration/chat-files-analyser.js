@@ -108,6 +108,16 @@ export function setGraphState(data) {
     _lgc?.setDirty(true, true);
 }
 
+export function syncGraphActiveFile() {
+    if (!_graph) return;
+    const fileNode = _graph._nodes?.find(n => n.type === 'se/chat_file');
+    const fileName = fileNode?.properties?.fileName ?? null;
+    if (_activeFile === fileName) return;
+    _activeFile = fileName;
+    _refreshFileButtons();
+    if (fileName) _activeFileChangeListener?.(fileName);
+}
+
 export function onApiStateChange(cb) {
     _apiBusyListener = cb;
 }
