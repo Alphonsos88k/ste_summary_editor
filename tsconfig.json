@@ -4,12 +4,12 @@
         "allowJs": true,
         "noEmit": true,
         "strict": false,
-        "target": "ES2020",
+        "target": "ES2022",
         "module": "ESNext",
         "moduleResolution": "bundler",
-        "lib": ["ES2020", "DOM"],
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
         "skipLibCheck": true
     },
-    "include": ["src/**/*.js", "index.js"],
+    "include": ["src/**/*.js", "index.js", "types/**/*.d.ts"],
     "exclude": ["node_modules", "lib"]
 }
