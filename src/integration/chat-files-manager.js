@@ -17,7 +17,6 @@ let _files = [];
 let _analyserReady = false;
 let _popped = false;
 let _dragAbort = null;
-let _userHandle = 'default-user';
 let _contentCache = {};   // fileName → messages[] (fetched on demand, lives for panel lifetime)
 let _searchGen    = 0;    // incremented on each new search to cancel stale async runs
 let _searchTimer  = null;
@@ -39,7 +38,6 @@ export async function openChatFilesManager(char) {
     document.querySelector('#se-panel-arcs .se-acts-content').appendChild(_panel);
     _panel.querySelector('#se-cfm-char-name').textContent = char.name;
 
-    _fetchUserHandle();
     _bindPanelEvents();
     bindEditorControls(_panel);
     await _loadFileList();
@@ -154,20 +152,6 @@ function _detachDrag() {
     }
 }
 
-// ─── User handle (for folder path) ───────────────────────────
-
-async function _fetchUserHandle() {
-    try {
-        const ctx = SillyTavern.getContext();
-        const resp = await fetch('/api/users/me', { headers: ctx.getRequestHeaders() });
-        if (resp.ok) {
-            const data = await resp.json();
-            if (data?.handle) _userHandle = data.handle;
-        }
-    } catch {
-        /* fall back to default-user */
-    }
-}
 
 // ─── File List ───────────────────────────────────────────────
 
@@ -386,29 +370,6 @@ function _bindPanelEvents() {
         }
         this.innerHTML = isFull ? '&#x2922;' : '&#x26F6;';
         this.title = isFull ? 'Exit fullscreen' : 'Fullscreen';
-    });
-
-    const folder = _currentChar?.avatar.replace(/\.[^.]+$/, '') ?? '';
-    _panel.querySelector('#se-cfm-folder-btn')?.addEventListener('click', async () => {
-        const path = `data/${_userHandle}/chats/${folder}/`;
-        const toast = _panel.querySelector('#se-cfm-folder-toast');
-        try {
-            await navigator.clipboard.writeText(path);
-            if (!toast) return;
-            toast.classList.add('se-cfm-folder-toast-visible');
-            clearTimeout(toast._t);
-            toast._t = setTimeout(() => toast.classList.remove('se-cfm-folder-toast-visible'), 1600);
-        } catch {
-            if (toast) {
-                toast.textContent = 'Failed';
-                toast.classList.add('se-cfm-folder-toast-visible', 'se-cfm-folder-toast-err');
-                clearTimeout(toast._t);
-                toast._t = setTimeout(() => {
-                    toast.classList.remove('se-cfm-folder-toast-visible', 'se-cfm-folder-toast-err');
-                    toast.textContent = 'Copied!';
-                }, 1600);
-            }
-        }
     });
 
     // Tab switching — Files / Analyse
