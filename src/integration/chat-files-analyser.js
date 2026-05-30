@@ -28,13 +28,14 @@ let _lgCanvas     = null;   // <canvas> element inside container
 let _panel        = null;
 let _files        = [];
 let _char         = null;   // current ST character (for /getchat API)
-let _activeFile   = null;
-let _popPanels    = { files: null, entries: null };
-let _edgeColorIdx = 0;
-let _typesReady   = false;
-let _tipEl        = null;   // shared tooltip DOM element
-let _fileTokens   = {};     // fileName → estimated input token count (cached on file add)
-let _runMaxTokens = null;   // per-run max_tokens override set from run confirm dialog
+let _activeFile      = null;
+let _popPanels       = { files: null, entries: null };
+let _edgeColorIdx    = 0;
+let _typesReady      = false;
+let _tipEl           = null;   // shared tooltip DOM element
+let _fileTokens      = {};     // fileName → estimated input token count (cached on file add)
+let _runMaxTokens    = null;   // per-run max_tokens override set from run confirm dialog
+let _apiBusyListener = null;
 
 const _LG_SRC     = '/scripts/extensions/third-party/summary-editor/lib/litegraph.min.js';
 
@@ -91,6 +92,27 @@ export function destroyAnalyser() {
 
 export function refreshAnalyserCanvas() {
     _lgc?.setDirty(true, true);
+}
+
+export function getGraphState() {
+    return _graph ? _graph.serialize() : null;
+}
+
+export function setGraphState(data) {
+    if (!_graph || !data) return;
+    _graph.configure(data);
+    _lgc?.setDirty(true, true);
+}
+
+export function onApiStateChange(cb) {
+    _apiBusyListener = cb;
+}
+
+export function setRunButtonBlocked(blocked) {
+    const btn = _panel?.querySelector('#se-cfm-an-run');
+    if (!btn) return;
+    if (blocked) { btn.disabled = true; }
+    else { _refreshRunBtn(); }
 }
 
 export function refreshEntries() {
@@ -726,6 +748,8 @@ async function _runAnalysis(fileNode, entryNodes) {
         runBtn.disabled = true;
     };
 
+    _apiBusyListener?.(true);
+
     try {
         const ctx      = SillyTavern.getContext();
         const fileName = fileNode.properties?.fileName ?? '';
@@ -779,6 +803,8 @@ async function _runAnalysis(fileNode, entryNodes) {
         console.error('[SE] Analysis error:', err);
         _showRunError(err.message);
         _refreshRunBtn();
+    } finally {
+        _apiBusyListener?.(false);
     }
 }
 

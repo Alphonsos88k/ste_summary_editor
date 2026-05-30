@@ -684,6 +684,79 @@
     min-width: 0;
 }
 
+/* ─── Inner Analyse tab bar ─────────────────────────────────── */
+.se-cfm-an-inner-tab-bar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
+    background: #1a1a15;
+    border-bottom: 1px solid var(--se-border);
+    flex-shrink: 0;
+    min-height: 30px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.se-cfm-an-inner-tab-bar::-webkit-scrollbar { display: none; }
+
+.se-cfm-an-inner-tab-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 4px 4px 0 0;
+    border: 1px solid transparent;
+    border-bottom: none;
+    cursor: pointer;
+    font-size: 11px;
+    color: #777;
+    background: transparent;
+    max-width: 160px;
+    flex-shrink: 0;
+    transition: background 0.1s, color 0.1s;
+    user-select: none;
+}
+.se-cfm-an-inner-tab-item:hover { background: #252520; color: #aaa; }
+.se-cfm-an-inner-tab-item.active { background: #1e1e18; color: #ccc; border-color: var(--se-border); }
+.se-cfm-an-inner-tab-item.se-cfm-an-tab-busy { background: rgba(253,151,31,0.15); }
+.se-cfm-an-inner-tab-item.active.se-cfm-an-tab-busy { background: rgba(253,151,31,0.22); }
+
+.se-cfm-an-inner-tab-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+    max-width: 120px;
+}
+
+.se-cfm-an-inner-tab-close {
+    background: transparent;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0 2px;
+    flex-shrink: 0;
+    transition: color 0.1s;
+}
+.se-cfm-an-inner-tab-close:hover { color: #f92672; }
+
+.se-cfm-an-inner-tab-new {
+    background: transparent;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 2px 7px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    transition: color 0.1s, background 0.1s;
+}
+.se-cfm-an-inner-tab-new:hover { color: #a6e22e; background: #252520; }
+
 .se-cfm-an-toolbar {
     display: flex;
     align-items: center;
