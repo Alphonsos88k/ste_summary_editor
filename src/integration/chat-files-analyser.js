@@ -65,6 +65,9 @@ export async function initAnalyser(panel, files, char) {
     }
 
     _showMsg(container, null);
+    // Yield to browser so tab bar and container paint before heavy canvas init
+    await new Promise(r => requestAnimationFrame(r));
+    if (!_panel) return; // panel closed during yield — bail out
     _registerNodeTypes();
     _initCanvas(container);
     _bindToolbar();
@@ -222,21 +225,22 @@ function _initCanvas(container) {
     _lgc.connections_width     = 2;
     _lgc.default_link_color    = '#66d9e8';
 
-    // Dot-grid background drawn on canvas (not CSS — LG owns the canvas pixels)
+    // Dot-grid background — all dots batched into a single path for perf
     _lgc.onDrawBackground = function(ctx, visArea) {
         ctx.fillStyle = '#181812';
         ctx.fillRect(visArea[0], visArea[1], visArea[2], visArea[3]);
-        ctx.fillStyle = '#3a3a2c';
-        const G = 22;
+        const G  = 22;
         const sx = Math.floor(visArea[0] / G) * G;
         const sy = Math.floor(visArea[1] / G) * G;
+        ctx.fillStyle = '#3a3a2c';
+        ctx.beginPath();
         for (let x = sx; x < visArea[0] + visArea[2]; x += G) {
             for (let y = sy; y < visArea[1] + visArea[3]; y += G) {
-                ctx.beginPath();
+                ctx.moveTo(x + 1, y);
                 ctx.arc(x, y, 1, 0, Math.PI * 2);
-                ctx.fill();
             }
         }
+        ctx.fill();
     };
 
     // Disable canvas right-click "Add Node" menu — nodes come from sidebar only

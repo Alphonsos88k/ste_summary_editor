@@ -479,54 +479,77 @@ function _bindTabBarEvents() {
     });
     bar.querySelector('#se-cfm-an-tab-new')?.addEventListener('click', () => _createTab());
 
-    // ── Drag-to-reorder ──────────────────────────────────────────
-    let dragId = null;
+    // ── Drag-to-reorder ─────────────────────────────────────────
+    // Rects cached once on dragstart — no getBoundingClientRect() during drag.
+    // dragover updates throttled to one rAF per frame.
+    let dragId        = null;
+    let dragRects     = null; // [{el, id, left, mid, right}]
+    let dragOverEl    = null; // last highlighted element — avoids querySelectorAll
+    let rafPending    = false;
 
-    const _clearDragClasses = () =>
-        bar.querySelectorAll('.se-cfm-an-tab-drag-before, .se-cfm-an-tab-drag-after')
-           .forEach(el => el.classList.remove('se-cfm-an-tab-drag-before', 'se-cfm-an-tab-drag-after'));
+    const clearDrag = () => {
+        if (dragOverEl) {
+            dragOverEl.classList.remove('se-cfm-an-tab-drag-before', 'se-cfm-an-tab-drag-after');
+            dragOverEl = null;
+        }
+    };
 
     bar.addEventListener('dragstart', e => {
         const item = e.target.closest('.se-cfm-an-inner-tab-item');
         if (!item) return;
         dragId = Number(item.dataset.tabId);
         e.dataTransfer.effectAllowed = 'move';
+        dragRects = [...bar.querySelectorAll('.se-cfm-an-inner-tab-item')].map(el => {
+            const r = el.getBoundingClientRect();
+            return { el, id: Number(el.dataset.tabId), left: r.left, mid: r.left + r.width / 2, right: r.right };
+        });
     });
 
     bar.addEventListener('dragover', e => {
         e.preventDefault();
-        const item = e.target.closest('.se-cfm-an-inner-tab-item');
-        if (!item || Number(item.dataset.tabId) === dragId) return;
-        _clearDragClasses();
-        const rect = item.getBoundingClientRect();
-        item.classList.add(e.clientX < rect.left + rect.width / 2
-            ? 'se-cfm-an-tab-drag-before'
-            : 'se-cfm-an-tab-drag-after');
+        if (rafPending) return;
+        rafPending = true;
+        const clientX = e.clientX; // capture before rAF — event may be recycled
+        requestAnimationFrame(() => {
+            rafPending = false;
+            if (dragId === null || !dragRects) return;
+            const hit = dragRects.find(r => r.id !== dragId && clientX >= r.left && clientX <= r.right);
+            if (!hit) return;
+            const before = clientX < hit.mid;
+            if (dragOverEl === hit.el) {
+                hit.el.classList.toggle('se-cfm-an-tab-drag-before', before);
+                hit.el.classList.toggle('se-cfm-an-tab-drag-after', !before);
+                return;
+            }
+            clearDrag();
+            dragOverEl = hit.el;
+            hit.el.classList.add(before ? 'se-cfm-an-tab-drag-before' : 'se-cfm-an-tab-drag-after');
+        });
     });
 
     bar.addEventListener('dragleave', e => {
-        if (!bar.contains(e.relatedTarget)) _clearDragClasses();
+        if (!bar.contains(e.relatedTarget)) clearDrag();
     });
 
     bar.addEventListener('drop', e => {
         e.preventDefault();
         const item = e.target.closest('.se-cfm-an-inner-tab-item');
         const dropId = item ? Number(item.dataset.tabId) : null;
-        _clearDragClasses();
-        if (dragId === null || dropId === null || dragId === dropId) { dragId = null; return; }
+        clearDrag();
+        if (dragId === null || dropId === null || dragId === dropId) { dragId = null; dragRects = null; return; }
         const fromIdx = _tabs.findIndex(t => t.id === dragId);
-        const toIdx   = _tabs.findIndex(t => t.id === dropId);
-        if (fromIdx < 0 || toIdx < 0) { dragId = null; return; }
-        const rect = item.getBoundingClientRect();
-        const insertBefore = e.clientX < rect.left + rect.width / 2;
+        if (fromIdx < 0) { dragId = null; dragRects = null; return; }
+        const cached = dragRects?.find(r => r.id === dropId);
+        const insertBefore = cached ? e.clientX < cached.mid : false;
         const [moved] = _tabs.splice(fromIdx, 1);
         const newToIdx = _tabs.findIndex(t => t.id === dropId);
+        if (newToIdx < 0) { _tabs.splice(fromIdx, 0, moved); dragId = null; dragRects = null; return; }
         _tabs.splice(insertBefore ? newToIdx : newToIdx + 1, 0, moved);
-        dragId = null;
+        dragId = null; dragRects = null;
         _renderTabBar();
     });
 
-    bar.addEventListener('dragend', () => { _clearDragClasses(); dragId = null; });
+    bar.addEventListener('dragend', () => { clearDrag(); dragId = null; dragRects = null; rafPending = false; });
 }
 
 function _dedupeLabel(base, currentTabId) {
