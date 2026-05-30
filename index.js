@@ -768,6 +768,7 @@ function resetEditorState() {
     updateBulkActDropdown();
     persistState();
 
+    closeChatFilesManager();
     // Close the editor if it's open
     $('#se-modal-overlay').removeClass('active');
 }
@@ -793,6 +794,7 @@ async function handleClearAll() {
     state.sourceFileNames = [];
     state.fileRawContent.clear();
     closeIngestSplit();
+    closeChatFilesManager();
 
     pushUndo(`Cleared all (${entryCount} entries)`, () => {
         restoreSnapshot(snap);
