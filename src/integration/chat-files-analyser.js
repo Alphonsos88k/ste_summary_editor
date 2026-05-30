@@ -755,11 +755,11 @@ async function _callLLM(sysPrompt, userMsg, feature = 'Chat Analysis') {
     return text;
 }
 
-async function _callLLMWithRetry(sysPrompt, userMsg) {
-    const raw = await _callLLM(sysPrompt, userMsg);
+async function _callLLMWithRetry(sysPrompt, userMsg, feature = 'Chat Analysis') {
+    const raw = await _callLLM(sysPrompt, userMsg, feature);
     if (_parseAction(raw)) return raw;
     const retryMsg = `[Your response must be a valid JSON object only — no prose before or after]\n\n${userMsg}`;
-    return _callLLM(sysPrompt, retryMsg);
+    return _callLLM(sysPrompt, retryMsg, feature);
 }
 
 // ─── Analysis pipeline ────────────────────────────────────────
@@ -895,22 +895,14 @@ function _makePlanNote(parsed, num) {
         canApply = _normaliseTarget(parsed) !== null;
     } else if (a === 'SWAP') {
         const target = _normaliseTarget(parsed);
-        icon = '&#x21C4;';
-        if (target === null) {
-            text = `Swap — re-run to get target entry`;
-        } else {
-            text     = `Swap content with entry #${target}`;
-            canApply = true;
-        }
+        icon     = '&#x21C4;';
+        text     = target === null ? `Swap — re-run to get target entry` : `Swap content with entry #${target}`;
+        canApply = target !== null;
     } else if (a === 'MOVE') {
         const target = _normaliseTarget(parsed);
-        icon = '&#x2192;';
-        if (target === null) {
-            text = `Move — re-run to get target position`;
-        } else {
-            text     = `Move #${num} to after entry #${target}`;
-            canApply = true;
-        }
+        icon     = '&#x2192;';
+        text     = target === null ? `Move — re-run to get target position` : `Move #${num} to after entry #${target}`;
+        canApply = target !== null;
     } else {
         return '';
     }
@@ -922,6 +914,19 @@ function _makePlanNote(parsed, num) {
             ? `<button class="se-cfm-an-rc-apply" data-apply-num="${num}">Apply</button>`
             : '') +
         `</div>`;
+}
+
+// ─── Shared UI helpers ───────────────────────────────────────────
+
+/**
+ * Lock or unlock the interactive controls on a result card.
+ * Pass null for any element you don't want to touch.
+ */
+function _setRerunControlsBusy(rerun, popout, result, fb, busy) {
+    if (rerun)  rerun.disabled  = busy;
+    if (popout) popout.disabled = busy;
+    if (result) result.disabled = busy;
+    if (fb)     fb.disabled     = busy;
 }
 
 // ─── Structural apply operations (staged — caller owns persist/revert) ───────
@@ -1289,24 +1294,20 @@ async function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         const status = bodyEl.querySelector(`#se-cfm-an-rc-s-${num}`);
         const rerun  = bodyEl.querySelector(`[data-rc-num="${num}"]`);
         const popout = bodyEl.querySelector(`[data-rc-pop="${num}"]`);
-        if (rerun)  rerun.disabled  = true;
-        if (popout) popout.disabled = true;
-        if (result) result.disabled = true;
-        if (fb)     fb.disabled     = true;
+
+        _setRerunControlsBusy(rerun, popout, result, fb, true);
         if (status) { status.innerHTML = '<span class="se-an-spin">&#x27F3;</span> Running…'; status.className = 'se-cfm-an-rc-status pending'; }
         try {
             let userMsg = `Chat digest:\n${_currentDigest}\n\n---\nConnected entries:\n${_buildContextWithRewrites()}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entryContent}`;
             if (feedbackVal) userMsg += `\n\n---\nFeedback on previous analysis:\n${feedbackVal}`;
-            const raw = await _callLLMWithRetry(getPrompt('entry-analysis'), userMsg);
+            const raw = await _callLLMWithRetry(getPrompt('entry-analysis'), userMsg, `Entry Re-run #${num}`);
             _applyResult(num, raw);
             if (fb) { fb.value = ''; fb.disabled = false; }
         } catch (err) {
             if (status) { status.textContent = `Error: ${err.message}`; status.className = 'se-cfm-an-rc-status rewrite'; }
             if (fb) fb.disabled = false;
         } finally {
-            if (rerun)  rerun.disabled  = false;
-            if (popout) popout.disabled = false;
-            if (result) result.disabled = false;
+            _setRerunControlsBusy(rerun, popout, result, null, false);
         }
     };
 
