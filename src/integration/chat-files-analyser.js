@@ -34,8 +34,9 @@ let _edgeColorIdx    = 0;
 let _typesReady      = false;
 let _tipEl           = null;   // shared tooltip DOM element
 let _fileTokens      = {};     // fileName → estimated input token count (cached on file add)
-let _runMaxTokens    = null;   // per-run max_tokens override set from run confirm dialog
-let _apiBusyListener = null;
+let _runMaxTokens            = null;   // per-run max_tokens override set from run confirm dialog
+let _apiBusyListener         = null;
+let _activeFileChangeListener = null;
 
 const _LG_SRC     = '/scripts/extensions/third-party/summary-editor/lib/litegraph.min.js';
 
@@ -108,6 +109,10 @@ export function onApiStateChange(cb) {
     _apiBusyListener = cb;
 }
 
+export function onActiveFileChange(cb) {
+    _activeFileChangeListener = cb;
+}
+
 export function setRunButtonBlocked(blocked) {
     const btn = _panel?.querySelector('#se-cfm-an-run');
     if (!btn) return;
@@ -136,6 +141,7 @@ export function addFileNode(fileName) {
 
     _activeFile = fileName;
     _refreshFileButtons();
+    _activeFileChangeListener?.(fileName);
 
     _estimateChatTokens(fileName).then(count => {
         if (count != null) {
@@ -248,6 +254,7 @@ function _initCanvas(container) {
             if (_activeFile === node.properties?.fileName) {
                 _activeFile = null;
                 _refreshFileButtons();
+                _activeFileChangeListener?.(null);
             }
         } else if (node.type === 'se/entry') {
             _markAdded(`[data-an-add-entry="${node.properties?.num}"]`, false);
