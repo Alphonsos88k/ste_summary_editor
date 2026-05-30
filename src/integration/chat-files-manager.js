@@ -9,7 +9,7 @@ import { escHtml } from '../core/utils.js';
 import { loadTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
 import { bindEditorControls, selectFile, applyFileSearch, clearFileSearch, clearEditorSession } from './chat-files-editor.js';
-import { initAnalyser, destroyAnalyser, refreshEntries, refreshAnalyserCanvas, getGraphState, setGraphState, addFileNode, onApiStateChange, setRunButtonBlocked } from './chat-files-analyser.js';
+import { initAnalyser, destroyAnalyser, refreshEntries, refreshAnalyserCanvas, getGraphState, setGraphState, addFileNode, onApiStateChange, onActiveFileChange, setRunButtonBlocked } from './chat-files-analyser.js';
 
 let _panel = null;
 let _currentChar = null;
@@ -425,6 +425,7 @@ function _bindPanelEvents() {
                     _renderTabBar();
                     _bindTabBarEvents();
                     _registerBusyListener();
+                    _registerActiveFileListener();
                     await initAnalyser(_panel, _files, _currentChar);
                     const active = _tabs.find(t => t.id === _activeTabId);
                     if (active?.graphData) setGraphState(active.graphData);
@@ -496,11 +497,31 @@ function _bindTabBarEvents() {
     bar.querySelector('#se-cfm-an-tab-new')?.addEventListener('click', () => _createTab());
 }
 
+function _dedupeLabel(base, currentTabId) {
+    const others = new Set(_tabs.filter(t => t.id !== currentTabId).map(t => t.label));
+    if (!others.has(base)) return base;
+    let n = 2;
+    while (others.has(`${base} - ${n}`)) n++;
+    return `${base} - ${n}`;
+}
+
 function _registerBusyListener() {
     onApiStateChange(busy => {
         _busyTabId = busy ? _activeTabId : null;
         _renderTabBar();
         if (!busy && _busyTabId === null) setRunButtonBlocked(false);
+    });
+}
+
+function _registerActiveFileListener() {
+    onActiveFileChange(fileName => {
+        const tab = _tabs.find(t => t.id === _activeTabId);
+        if (!tab) return;
+        if (fileName) {
+            tab.label = _dedupeLabel(_fileTabLabel(fileName), _activeTabId);
+        }
+        _renderTabBar();
+        _saveTabState();
     });
 }
 
