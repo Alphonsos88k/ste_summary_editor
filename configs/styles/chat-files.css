@@ -705,10 +705,10 @@
     gap: 4px;
     padding: 3px 10px;
     border-radius: 4px 4px 0 0;
-    /* Reserve 2px top slot for accent — keeps height identical across states */
-    border-top:    2px solid transparent;
-    border-left:   1px solid transparent;
-    border-right:  1px solid transparent;
+    /* Faint tab border on inactive — accent slot reserved at top for consistency */
+    border-top:    2px solid rgba(255,255,255,0.09);
+    border-left:   1px solid rgba(255,255,255,0.06);
+    border-right:  1px solid rgba(255,255,255,0.06);
     border-bottom: none;
     cursor: grab;
     font-size: 11px;
