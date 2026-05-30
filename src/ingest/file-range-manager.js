@@ -38,7 +38,7 @@ export async function openFileRangeManager() {
     const html = await loadTemplate(TEMPLATES.FILE_RANGE_MANAGER);
     const tmp = document.createElement('div');
     tmp.innerHTML = html;
-    _panel = tmp.firstElementChild;
+    _panel = /** @type {HTMLElement} */ (tmp.firstElementChild);
     overlay.appendChild(_panel);
 
     const overlayRect = overlay.getBoundingClientRect();
@@ -83,7 +83,7 @@ function _render() {
         const isEmpty  = range.entryNums.length === 0;
         const sizeKb   = estimateRangeSizeKB(range.entryNums);
         const over     = sizeKb > FILE_SIZE_LIMIT_KB;
-        const pct      = Math.min(100, (sizeKb / FILE_SIZE_LIMIT_KB) * 100).toFixed(1);
+        const pct      = Math.min(100, (sizeKb / FILE_SIZE_LIMIT_KB) * 100);
         const isLast   = idx === ranges.length - 1;
         const overCls  = over ? ' se-frm-row--over' : '';
         const emptyCls = isEmpty ? ' se-frm-row--empty' : '';

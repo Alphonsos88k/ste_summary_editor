@@ -23,7 +23,7 @@ const PROMPTS_KEY = 'se-system-prompts-v1';
 /** Base URL for prompt text files. */
 const PROMPTS_BASE = `/scripts/extensions/third-party/${EXT_NAME}/configs/prompts`;
 
-/** @type {Array<{key: string, label: string, defaultText: string, warnJson: boolean}>} */
+/** @type {PromptEntry[]} */
 const _registry = [];
 
 /**
@@ -40,12 +40,14 @@ const _registry = [];
  */
 export function registerPrompt(key, label, defaultText, opts = {}) {
     if (_registry.some(r => r.key === key)) return;
-    _registry.push({ key, label, location: opts.location || '', defaultText, warnJson: !!opts.warnJson, passive: !!opts.passive });
+    /** @type {PromptEntry} */
+    const entry = { key, label, location: opts.location || '', defaultText, warnJson: !!opts.warnJson, passive: !!opts.passive };
+    _registry.push(entry);
 }
 
 /**
  * Return a snapshot of all registered prompts (used by the hub).
- * @returns {Array<{key: string, label: string, location: string, defaultText: string, warnJson: boolean}>}
+ * @returns {PromptEntry[]}
  */
 export function getRegisteredPrompts() {
     return [..._registry];

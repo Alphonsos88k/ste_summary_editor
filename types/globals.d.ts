@@ -47,6 +47,21 @@ interface SillyTavernContext {
      */
     generateQuietPrompt?(prompt: string): Promise<string | undefined>;
 
+    /** Current model / API identifier. */
+    mainApi?: string;
+
+    /** All ST characters. */
+    characters: Array<{ name: string; avatar: string; [key: string]: any }>;
+
+    /** All ST tags (used by the blacklist feature). */
+    tags?: Array<{ id: string; name: string; color?: string; color2?: string; [key: string]: any }>;
+
+    /** Extension-specific settings keyed by extension name. */
+    extensionSettings: Record<string, any>;
+
+    /** Persist settings to storage (debounced). */
+    saveSettingsDebounced?(): void;
+
     /** ST event system — used for listening to chat/character changes. */
     eventSource?: {
         on(event: string, callback: (...args: unknown[]) => void): void;
@@ -54,7 +69,8 @@ interface SillyTavernContext {
     };
     event_types?: Record<string, string>;
 
-    [key: string]: unknown;
+    /** Catch-all for other ST context properties not listed above. */
+    [key: string]: any;
 }
 
 // ─── jQuery ───────────────────────────────────────────────────────────────────
@@ -87,6 +103,125 @@ declare const mermaid: any;
 /** localForage — bundled in lib/localforage.min.js. */
 declare const localforage: any;
 
+// ─── Application data shapes ─────────────────────────────────────────────────
+//
+// These interfaces describe the plain objects this extension passes around.
+// Declaring them globally (not in a module) means any .js file can reference
+// them in JSDoc @type and @typedef tags without an import statement.
+
+/**
+ * A file record stored in state.files after ingestion.
+ * Valid files have mode/entryCount; invalid files have rejectReason.
+ */
+interface IngestedFile {
+    name:                     string;
+    entryCount:               number;
+    valid:                    boolean;
+    mode?:                    string;
+    problematic?:             boolean;
+    rejectReason?:            string;
+    isSupplementaryCandidate?: boolean;
+    isEmpty?:                 boolean;
+    rawContent?:              string;
+    /** Count of duplicate entry numbers encountered while parsing this file. */
+    duplicates?:              number;
+    source?:                  string;
+}
+
+/**
+ * A single Part-section object produced by `parsePartEntries` in ingestion.js.
+ * `unsplit` is true when a part was detected as needing manual split confirmation.
+ */
+interface ParsedPart {
+    partNum:    number;
+    title:      string;
+    paragraphs: string[];
+    unsplit?:   boolean;
+}
+
+/**
+ * Intermediate parse result produced during file ingestion, before the file
+ * object is built and pushed into state.files.
+ */
+interface ParsedFileResult {
+    name:                     string;
+    reason?:                  string;
+    rawContent?:              string;
+    count?:                   number;
+    mode?:                    string;
+    isSupplementaryCandidate?: boolean;
+    isEmpty?:                 boolean;
+    problematic?:             boolean;
+}
+
+/**
+ * A single conflict annotation stored in state.conflicts[entryNum][].
+ * Created by conflict-detection.js after parsing the LLM JSON response.
+ */
+interface ConflictResult {
+    text:       string;
+    reason?:    string;
+    severity:   string;
+    problems?:  string[];
+    criticism?: string[];
+    feedback?:  string[];
+    entry?:     number;
+}
+
+/**
+ * A supplementary (non-summary) file stored in state.supplementaryFiles.
+ * May be world notes, character notes, personality files, etc.
+ */
+interface SuppFile {
+    name:          string;
+    category:      string;
+    content:       string;
+    editedContent: string;
+    date?:         string;
+    time?:         string;
+    location?:     string;
+    notes?:        string;
+}
+
+/**
+ * A calendar month group built by _tlBuildDateGroups in arcs.js.
+ * Extra layout properties (rawX, side, stackH) are added by later passes.
+ */
+interface TlDateGroup {
+    monthKey:  string;
+    ts:        number;
+    entries:   any[];
+    label:     string;
+    side?:     'top' | 'bottom';
+    rawX?:     number;
+    stackH?:   number;
+}
+
+/**
+ * An act-keyed column of undated entries built by _tlBuildUndatedCols.
+ * Extra layout properties (centreX, stackH) are added by later passes.
+ */
+interface TlUndatedCol {
+    act:      any | null;
+    entries:  any[];
+    side:     'top';
+    centreX?: number;
+    stackH?:  number;
+}
+
+/**
+ * A registered system prompt entry stored in the _registry array
+ * inside system-prompts.js.
+ */
+interface PromptEntry {
+    key:         string;
+    label:       string;
+    location:    string;
+    defaultText: string;
+    warnJson:    boolean;
+    passive:     boolean;
+}
+
 // ─── Window augmentation ─────────────────────────────────────────────────────
 //
 // SillyTavern and CDN scripts attach objects directly to window at runtime.
@@ -97,6 +232,8 @@ interface Window {
     LiteGraph: any;
     /** Tailwind CSS Play CDN — injected via <script> in index.html / ST shell. */
     tailwind: any;
+    /** Mermaid.js diagram renderer — CDN-loaded lazily. */
+    mermaid: any;
     /** localForage — bundled in lib/. Accessed as window.localforage in some paths. */
     localforage: any;
 }
@@ -124,6 +261,8 @@ interface Event {
     deltaY:       number;
     /** WheelEvent — horizontal scroll delta. */
     deltaX:       number;
+    /** CustomEvent — arbitrary payload. */
+    detail:       any;
     /** PointerEvent — offset position within the target element. */
     offsetX:      number;
     offsetY:      number;
@@ -201,6 +340,7 @@ interface Element {
 
     // HTML element meta
     title:       string;
+    readOnly:    boolean;
     lang:        string;
 
     // Media / resource

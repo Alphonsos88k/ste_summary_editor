@@ -39,7 +39,7 @@ export const state = {
     /** @type {number[]} Missing entry numbers in the sequence */
     gaps: [],
 
-    /** @type {Array<{name: string, entryCount: number, valid: boolean}>} Ingested file info */
+    /** @type {IngestedFile[]} Ingested file info */
     files: [],
 
     /** @type {number} Auto-incrementing ID for the next act */
@@ -92,7 +92,7 @@ export const state = {
     /** @type {Set<number>} Currently selected (checked) entry numbers */
     selected: new Set(),
 
-    /** @type {Object<number, Array<{text: string, reason: string, severity: string}>>} Conflict data keyed by entry number */
+    /** @type {Object<number, ConflictResult[]>} Conflict data keyed by entry number */
     conflicts: {},
 
     /** @type {Object<number, number[]>} Causal links: effectNum → [causeNum, ...] */
@@ -144,7 +144,7 @@ export const state = {
     /**
      * Supplementary files — non-summary files assigned a display category.
      * Keyed by filename. Category determines where they appear in Review tab.
-     * @type {Map<string, {name: string, category: string, content: string, editedContent: string}>}
+     * @type {Map<string, SuppFile>}
      */
     supplementaryFiles: new Map(),
 

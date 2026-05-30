@@ -640,12 +640,10 @@ function processConflictResponse(results) {
     // but entries not in this batch keep their previous feedback.
     for (const item of results) {
         if (!item.entry) continue;
-        state.conflicts[item.entry] = [{
-            text: item.text || '',
-            criticism: item.criticism || [],
-            feedback: item.feedback || [],
-            severity: item.severity || 'warning',
-        }];
+        const rawItem = /** @type {ConflictResult} */ (item);
+        /** @type {ConflictResult} */
+        const result = { text: rawItem.text || '', criticism: rawItem.criticism || [], feedback: rawItem.feedback || [], severity: rawItem.severity || 'warning' };
+        state.conflicts[item.entry] = [result];
     }
 
     renderTable();

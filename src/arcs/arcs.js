@@ -615,7 +615,7 @@ function _tlBuildUndatedCols(all) {
         colMap.get(key).push(e);
     }
     return [...colMap.entries()]
-        .map(([key, entries]) => ({
+        .map(([key, entries]) => /** @type {TlUndatedCol} */ ({
             act:     key !== 'none' ? state.acts.get(key) ?? null : null,
             entries: entries.sort((a, b) => a.num - b.num),
             side:    'top',
@@ -640,12 +640,12 @@ function _tlBuildDateGroups(all) {
             return dc !== 0 ? dc : (a.time || '').localeCompare(b.time || '');
         });
         const rep = tlParseDate(entries[0].date);
-        return {
+        return /** @type {TlDateGroup} */ ({
             monthKey,
             ts:    rep ? rep.getTime() : 0,
             entries,
             label: rep ? rep.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : monthKey,
-        };
+        });
     }).sort((a, b) => a.ts - b.ts);
 }
 

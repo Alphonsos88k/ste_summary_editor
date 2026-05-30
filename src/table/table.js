@@ -43,7 +43,7 @@ let activeEditPopover = null;
 /** @type {number|null} Last checked entry number (for shift+click range). */
 let lastCheckedNum = null;
 
-/** @type {Set<string>} Act IDs that are collapsed in act-sorted view. */
+/** @type {Set<string|number>} Act IDs (number) or '__unassigned__' (string) that are collapsed. */
 const collapsedActs = new Set();
 
 /** @type {Function|null} Called with entry num when content cell is clicked. */
@@ -635,7 +635,7 @@ export function closeEditPopover() {
  * Apply conflict highlight spans to content text.
  *
  * @param {string} content - The original entry content.
- * @param {Array<{text: string, reason: string, severity: string}>} conflicts - Conflict items.
+ * @param {ConflictResult[]} conflicts - Conflict items.
  * @returns {string} HTML string with conflict spans.
  */
 export function applyConflictHighlights(content, conflicts) {
@@ -687,7 +687,7 @@ function buildGapRow(num) {
  * Build the feedback cell + row style for an entry.
  * @param {number} num - Entry number.
  * @param {boolean} hasFeedback - Whether this entry has conflict feedback.
- * @param {Array|undefined} conflicts - Conflict items for this entry.
+ * @param {ConflictResult[]|undefined} conflicts - Conflict items for this entry.
  * @returns {{ feedbackCell: string, rowStyle: string }}
  */
 function buildFeedbackCell(num, hasFeedback, conflicts) {
@@ -1173,7 +1173,7 @@ function bindEditableCells($body) {
         } else if (isTime) {
             bindTimePickerEvents(pop);
         } else {
-            const input = pop.querySelector('input, textarea');
+            const input = /** @type {HTMLInputElement} */ (pop.querySelector('input, textarea'));
             input.focus();
             if (input.select) input.select();
             attachAutocomplete(input, field, (val) => {

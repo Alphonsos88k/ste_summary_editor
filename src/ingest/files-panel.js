@@ -121,7 +121,8 @@ function _handleAssignChange(sel) {
 
     if (category && category !== 'none') {
         const rawContent = state.fileRawContent.get(filename) || '';
-        state.supplementaryFiles.set(filename, {
+        /** @type {SuppFile} */
+        const suppFile = {
             name:          filename,
             category,
             content:       rawContent,
@@ -130,7 +131,8 @@ function _handleAssignChange(sel) {
             time:          existing?.time     ?? '',
             location:      existing?.location ?? '',
             notes:         existing?.notes    ?? '',
-        });
+        };
+        state.supplementaryFiles.set(filename, suppFile);
     } else {
         state.supplementaryFiles.delete(filename);
     }
