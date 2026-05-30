@@ -206,7 +206,7 @@ function _renderFileList(chats) {
     listEl.querySelectorAll('[data-cfm-file]').forEach((el) => {
         el.addEventListener('click', () => {
             _selectedFileName = el.dataset.cfmFile;
-            _panel?.querySelector('#se-cfm-analyze-shortcut-btn')?.removeAttribute('disabled');
+            _updateTabLimitBtns();
             selectFile(el.dataset.cfmFile, _currentChar);
         });
         _attachMarquee(el);
@@ -483,6 +483,7 @@ function _renderTabBar() {
             (_tabs.length > 1 ? `<button class="se-cfm-an-inner-tab-close" data-close-tab="${tab.id}" title="Close">×</button>` : '');
         newBtn.before(item);
     }
+    _updateTabLimitBtns();
 }
 
 function _bindTabBarEvents() {
@@ -503,6 +504,27 @@ function _dedupeLabel(base, currentTabId) {
     let n = 2;
     while (others.has(`${base} - ${n}`)) n++;
     return `${base} - ${n}`;
+}
+
+const _CANVAS_RE = /^Canvas (\d+)$/;
+
+function _nextCanvasNum() {
+    const used = new Set(
+        _tabs.map(t => { const m = _CANVAS_RE.exec(t.label ?? ''); return m ? Number(m[1]) : null; })
+             .filter(n => n !== null)
+    );
+    let n = 1;
+    while (used.has(n)) n++;
+    return n;
+}
+
+const _TAB_LIMIT = 10;
+
+function _updateTabLimitBtns() {
+    const atLimit = _tabs.length >= _TAB_LIMIT;
+    _panel?.querySelector('#se-cfm-an-tab-new')?.toggleAttribute('disabled', atLimit);
+    const analyzeBtn = _panel?.querySelector('#se-cfm-analyze-shortcut-btn');
+    if (analyzeBtn) analyzeBtn.disabled = atLimit || !_selectedFileName;
 }
 
 function _registerBusyListener() {
@@ -541,12 +563,12 @@ async function _switchTab(id) {
 }
 
 async function _createTab(label) {
-    if (!_analyserReady) return;
+    if (!_analyserReady || _tabs.length >= _TAB_LIMIT) return;
     const current = _tabs.find(t => t.id === _activeTabId);
     if (current) current.graphData = getGraphState();
     destroyAnalyser();
     const id = _nextTabId++;
-    _tabs.push({ id, label: label ?? `Canvas ${id}`, graphData: null });
+    _tabs.push({ id, label: label ?? `Canvas ${_nextCanvasNum()}`, graphData: null });
     _activeTabId = id;
     _renderTabBar();
     await initAnalyser(_panel, _files, _currentChar);
@@ -577,6 +599,7 @@ async function _closeTab(id) {
 // ─── Open file in new Analyse tab ─────────────────────────────
 
 async function _openFileInAnalyseTab(fileName) {
+    if (_analyserReady && _tabs.length >= _TAB_LIMIT) return;
     const label = _fileTabLabel(fileName);
 
     // Activate the Analyse tab visually
