@@ -705,32 +705,33 @@
     gap: 4px;
     padding: 3px 10px;
     border-radius: 4px 4px 0 0;
-    /* Faint tab border on inactive — accent slot reserved at top for consistency */
-    border-top:    2px solid rgba(255,255,255,0.09);
+    /* Faint tab border on inactive — bottom slot reserved for active accent */
+    border-top:    1px solid rgba(255,255,255,0.09);
     border-left:   1px solid rgba(255,255,255,0.06);
     border-right:  1px solid rgba(255,255,255,0.06);
-    border-bottom: none;
+    border-bottom: 2px solid transparent;
     cursor: grab;
     font-size: 11px;
     color: #6a6a6a;
     background: transparent;
     max-width: 160px;
     flex-shrink: 0;
-    transition: background 0.12s, color 0.12s, border-top-color 0.12s;
+    transition: background 0.12s, color 0.12s, border-bottom-color 0.12s;
     user-select: none;
 }
 .se-cfm-an-inner-tab-item:active { cursor: grabbing; }
 .se-cfm-an-inner-tab-item:hover  { color: #999; background: rgba(255,255,255,0.03); }
-/* Active: green top accent + bg matches toolbar so tab visually connects to content */
+/* Active: green bottom accent + bg matches toolbar so tab visually connects to content */
 .se-cfm-an-inner-tab-item.active {
-    border-top-color:   #a6e22e;
-    border-left-color:  rgba(255,255,255,0.07);
-    border-right-color: rgba(255,255,255,0.07);
+    border-bottom-color: #a6e22e;
+    border-top-color:    rgba(255,255,255,0.12);
+    border-left-color:   rgba(255,255,255,0.10);
+    border-right-color:  rgba(255,255,255,0.10);
     background: #1e1e18;
     color: #e0e0d8;
 }
 .se-cfm-an-inner-tab-item.se-cfm-an-tab-busy        { background: rgba(253,151,31,0.12); }
-.se-cfm-an-inner-tab-item.active.se-cfm-an-tab-busy { background: rgba(253,151,31,0.20); border-top-color: #fd971f; }
+.se-cfm-an-inner-tab-item.active.se-cfm-an-tab-busy { background: rgba(253,151,31,0.20); border-bottom-color: #fd971f; }
 .se-cfm-an-inner-tab-item.se-cfm-an-tab-drag-before { border-left:  2px solid #a6e22e; }
 .se-cfm-an-inner-tab-item.se-cfm-an-tab-drag-after  { border-right: 2px solid #a6e22e; }
 
