@@ -1,0 +1,28 @@
+<div class="se-cfm-an-run-hdr">
+    <span>Entry #{{entryNum}} &mdash; Full View</span>
+    <button class="se-close-circle se-cfm-an-det-close">&times;</button>
+</div>
+<div class="se-cfm-an-det-body">
+    <div class="se-cfm-an-det-col">
+        <div class="se-cfm-an-det-entry-nav">
+            <select class="se-cfm-an-det-entry-sel" title="Browse all entries for reference">{{selOptions}}</select>
+            <button class="se-cfm-an-det-orig-tog" hidden title="Toggle between proposed and original ingested content">ORIG</button>
+        </div>
+        <div class="se-cfm-an-digest-lbl se-cfm-an-det-entry-lbl">Entry #{{entryNum}}</div>
+        <pre class="se-cfm-an-det-pre" id="se-cfm-an-det-pre-{{entryNum}}">{{originalContent}}</pre>
+    </div>
+    <div class="se-cfm-an-det-col">
+        <div class="se-cfm-an-digest-lbl">Analysis output</div>
+        <textarea class="se-cfm-an-det-ta" id="se-cfm-an-det-ta-{{entryNum}}" spellcheck="false">{{rawAnalysis}}</textarea>
+        <div class="se-cfm-an-digest-lbl" style="margin-top:8px;">Feedback</div>
+        <textarea class="se-cfm-an-det-fb" id="se-cfm-an-det-fb-{{entryNum}}"
+            placeholder="e.g. Entry #4 should swap with #7; align tone with #3&hellip;"
+            spellcheck="false">{{feedbackInit}}</textarea>
+        <div class="se-cfm-an-det-foot">
+            <span class="se-cfm-an-det-status" id="se-cfm-an-det-st-{{entryNum}}"></span>
+            <button class="se-cfm-an-rc-rerun se-cfm-an-det-rerun" data-det-num="{{entryNum}}">&#8634;&ensp;Re-run</button>
+            <button class="se-cfm-an-det-struct-apply" id="se-cfm-an-det-apply-{{entryNum}}" hidden>&#9889;&ensp;Apply</button>
+            <button class="se-cfm-an-digest-proceed-btn se-cfm-an-det-confirm" data-det-num="{{entryNum}}">&#10003;&ensp;Confirm</button>
+        </div>
+    </div>
+</div>

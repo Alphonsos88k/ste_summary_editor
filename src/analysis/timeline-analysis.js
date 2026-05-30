@@ -12,6 +12,7 @@
  */
 
 import { state, persistState } from '../core/state.js';
+import { logLLMCall } from '../core/llm-history.js';
 import { registerPrompt, getPrompt } from '../core/system-prompts.js';
 import { escHtml, spawnPanel } from '../core/utils.js';
 import { TEMPLATES } from '../core/constants.js';
@@ -163,6 +164,7 @@ async function _fetchAnalysisResults() {
     if (!resp.ok) throw new Error(`API ${resp.status}`);
     const data  = await resp.json();
     const raw   = (data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '').trim();
+    logLLMCall('Timeline Analysis', `${getPrompt(PROMPT_KEY)}\n\n${userMsg}`, raw);
     const match = raw.match(/\[[\s\S]*\]/);
     const parsed = match ? JSON.parse(match[0]) : [];
     return Array.isArray(parsed) ? parsed : [];

@@ -168,8 +168,11 @@ export const TEMPLATES = Object.freeze({
     GAP_ROW:                 'gap-row',
     ACT_ITEM:                'act-item',
     // chat-files/
-    CHAT_FILES_MANAGER:      'partials/chat-files/chat-files-manager',
-    CHAT_FILES_HELP:         'partials/chat-files/chat-files-help',
+    CHAT_FILES_MANAGER:        'partials/chat-files/chat-files-manager',
+    CHAT_FILES_HELP:           'partials/chat-files/chat-files-help',
+    ANALYSER_ENTRY_DETAIL:     'partials/chat-files/analyser-entry-detail',
+    ANALYSER_PROMPTS:          'partials/chat-files/analyser-prompts',
+    ANALYSER_RUN_ERROR:        'partials/chat-files/analyser-run-error',
     // dialogs/
     DIALOG_ALERT:            'partials/dialogs/dialog-alert',
     DIALOG_CONFLICT_RESULTS: 'partials/dialogs/dialog-conflict-results',
@@ -221,6 +224,7 @@ export const TEMPLATES = Object.freeze({
     TB_PILL:                 'partials/shared/tb-pill',
     TB_PANEL:                'partials/shared/tb-panel',
     UTILS_PANEL:             'partials/shared/utils-panel',
+    LLM_HISTORY_PANEL:       'partials/shared/llm-history-panel',
     KEYBOARD_SHORTCUTS_PANEL:'partials/shared/keyboard-shortcuts-panel',
     STORY_CONTEXT_PANEL:     'partials/shared/story-context-panel',
     BULK_FILL_PANEL:         'partials/shared/bulk-fill-panel',

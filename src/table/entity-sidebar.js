@@ -22,6 +22,7 @@
  */
 
 import { state, persistState } from '../core/state.js';
+import { logLLMCall } from '../core/llm-history.js';
 import { escHtml, escAttr, spawnPanel } from '../core/utils.js';
 import { registerPrompt, getPrompt } from '../core/system-prompts.js';
 
@@ -402,8 +403,10 @@ async function _callGenerateApi(entryTexts) {
         }),
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    return data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
+    const data   = await resp.json();
+    const result = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
+    logLLMCall('Story Index', `${sysPrompt}\n\n${entryTexts}`, result);
+    return result;
 }
 
 function _setStatus(statusEl, text, color) {

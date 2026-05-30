@@ -8,7 +8,8 @@
 import { state, persistState, snapshotState, restoreSnapshot } from '../core/state.js';
 import { escHtml } from '../core/utils.js';
 import { registerPrompt, getRegisteredPrompts, getPrompt, setPrompt } from '../core/system-prompts.js';
-import { loadTemplate } from '../core/template-loader.js';
+import { loadTemplate, fillTemplate } from '../core/template-loader.js';
+import { logLLMCall } from '../core/llm-history.js';
 import { TEMPLATES } from '../core/constants.js';
 import { shiftEntriesUp } from '../table/reorder.js';
 import { renderTable } from '../table/table.js';
@@ -728,7 +729,7 @@ async function _estimateChatTokens(fileName) {
 
 // ─── LLM helper ──────────────────────────────────────────────
 
-async function _callLLM(sysPrompt, userMsg) {
+async function _callLLM(sysPrompt, userMsg, feature = 'Chat Analysis') {
     const ctx = SillyTavern.getContext();
     const oai = ctx.chatCompletionSettings;
     const r   = await fetch('/api/backends/chat-completions/generate', {
@@ -747,9 +748,14 @@ async function _callLLM(sysPrompt, userMsg) {
             stream: false,
         }),
     });
-    if (!r.ok) throw new Error(`API ${r.status}`);
-    const d = await r.json();
-    return d?.choices?.[0]?.message?.content || d?.choices?.[0]?.text || '';
+    if (!r.ok) {
+        logLLMCall(feature, `${sysPrompt}\n\n${userMsg}`, null, 'error');
+        throw new Error(`API ${r.status}`);
+    }
+    const d    = await r.json();
+    const text = d?.choices?.[0]?.message?.content || d?.choices?.[0]?.text || '';
+    logLLMCall(feature, `${sysPrompt}\n\n${userMsg}`, text);
+    return text;
 }
 
 async function _callLLMWithRetry(sysPrompt, userMsg) {
@@ -795,7 +801,7 @@ async function _runAnalysis(fileNode, entryNodes) {
             .join('\n\n');
         if (!chatText) throw new Error('Chat file is empty or could not be read.');
 
-        const digestP1 = await _callLLM(getPrompt('chat-digest'), `Chat history:\n${chatText}`);
+        const digestP1 = await _callLLM(getPrompt('chat-digest'), `Chat history:\n${chatText}`, 'Chat Digest — Pass 1');
 
         // ── Stages 2 + 3: Unified pipeline dialog ─────────────────
         setLabel('✓ Pass 1');
@@ -813,7 +819,7 @@ async function _runAnalysis(fileNode, entryNodes) {
             if (!entry) { updateEntry(num, ''); continue; }
             setLabel(`Entry #${num} (${i + 1}/${entryNodes.length})…`, true);
             const userMsg = `Chat digest:\n${digest}\n\n---\nConnected entries:\n${_buildEntryContext(connectedNums)}\n\n---\nCurrent entry being analysed — Entry #${num}:\n${entry.content}`;
-            const raw     = await _callLLM(getPrompt('entry-analysis'), userMsg);
+            const raw     = await _callLLM(getPrompt('entry-analysis'), userMsg, `Entry Analysis #${num}`);
             updateEntry(num, raw);
         }
 
@@ -1457,7 +1463,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
             lock('Refining…');
             try {
                 const userMsg = `Current digest:\n${current}` + (feedback ? `\n\nUser feedback:\n${feedback}` : '');
-                const refined = await _callLLM(getPrompt('digest-refine'), userMsg);
+                const refined = await _callLLM(getPrompt('digest-refine'), userMsg, 'Digest Refinement');
                 if (refined) { ta.value = refined; if (fb) fb.value = ''; }
             } catch (err) {
                 if (status) status.textContent = ` — Error: ${err.message}`;
@@ -1584,14 +1590,14 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
 
 // ─── Entry detail pop-out ─────────────────────────────────────
 
-function _openEntryDetail(num, digest, connectedNums, resultsByNum, confirmedRewrites, parentDlg, applyCallback = null) {
+async function _openEntryDetail(num, digest, connectedNums, resultsByNum, confirmedRewrites, parentDlg, applyCallback = null) {
     const existId = `se-cfm-an-entry-det-${num}`;
     document.getElementById(existId)?.remove();
 
-    const entry          = state.entries?.get(num);
+    const entry           = state.entries?.get(num);
     const originalContent = String(entry?.content ?? '');
-    const raw            = resultsByNum[num] ?? '';
-    const fbInit         = parentDlg?.querySelector(`#se-cfm-an-rc-f-${num}`)?.value ?? '';
+    const raw             = resultsByNum[num] ?? '';
+    const fbInit          = parentDlg?.querySelector(`#se-cfm-an-rc-f-${num}`)?.value ?? '';
 
     // Only show entries linked to the connected chat file
     const allEntries = connectedNums
@@ -1606,32 +1612,13 @@ function _openEntryDetail(num, digest, connectedNums, resultsByNum, confirmedRew
     const det = document.createElement('div');
     det.id = existId;
     det.className = 'se-cfm-an-entry-det';
-    det.innerHTML =
-        `<div class="se-cfm-an-run-hdr">` +
-        `<span>Entry #${num} &mdash; Full View</span>` +
-        `<button class="se-close-circle se-cfm-an-det-close">&times;</button></div>` +
-        `<div class="se-cfm-an-det-body">` +
-        // ── Left col: entry browser + content ──
-        `<div class="se-cfm-an-det-col">` +
-        `<div class="se-cfm-an-det-entry-nav">` +
-        `<select class="se-cfm-an-det-entry-sel" title="Browse all entries for reference">${selOptions}</select>` +
-        `<button class="se-cfm-an-det-orig-tog" hidden title="Toggle between proposed and original ingested content">ORIG</button>` +
-        `</div>` +
-        `<div class="se-cfm-an-digest-lbl se-cfm-an-det-entry-lbl">Entry #${num}</div>` +
-        `<pre class="se-cfm-an-det-pre" id="se-cfm-an-det-pre-${num}">${escHtml(originalContent)}</pre>` +
-        `</div>` +
-        // ── Right col: analysis + feedback ──
-        `<div class="se-cfm-an-det-col">` +
-        `<div class="se-cfm-an-digest-lbl">Analysis output</div>` +
-        `<textarea class="se-cfm-an-det-ta" id="se-cfm-an-det-ta-${num}" spellcheck="false">${escHtml(raw)}</textarea>` +
-        `<div class="se-cfm-an-digest-lbl" style="margin-top:8px;">Feedback</div>` +
-        `<textarea class="se-cfm-an-det-fb" id="se-cfm-an-det-fb-${num}" placeholder="e.g. Entry #4 should swap with #7; align tone with #3…" spellcheck="false">${escHtml(fbInit)}</textarea>` +
-        `<div class="se-cfm-an-det-foot">` +
-        `<span class="se-cfm-an-det-status" id="se-cfm-an-det-st-${num}"></span>` +
-        `<button class="se-cfm-an-rc-rerun se-cfm-an-det-rerun" data-det-num="${num}">&#8634;&ensp;Re-run</button>` +
-        `<button class="se-cfm-an-det-struct-apply" id="se-cfm-an-det-apply-${num}" hidden>&#9889;&ensp;Apply</button>` +
-        `<button class="se-cfm-an-digest-proceed-btn se-cfm-an-det-confirm" data-det-num="${num}">&#10003;&ensp;Confirm</button>` +
-        `</div></div></div>`;
+    det.innerHTML = fillTemplate(await loadTemplate(TEMPLATES.ANALYSER_ENTRY_DETAIL), {
+        entryNum:        String(num),
+        selOptions,
+        originalContent: escHtml(originalContent),
+        rawAnalysis:     escHtml(raw),
+        feedbackInit:    escHtml(fbInit),
+    });
 
     document.body.appendChild(det);
     _centerDialog(det);
@@ -1796,16 +1783,12 @@ function _openEntryDetail(num, digest, connectedNums, resultsByNum, confirmedRew
     });
 }
 
-function _showRunError(msg) {
+async function _showRunError(msg) {
     document.getElementById('se-cfm-an-results-dlg')?.remove();
     const dlg = document.createElement('div');
     dlg.id = 'se-cfm-an-results-dlg';
     dlg.className = 'se-cfm-an-results-dlg';
-    dlg.innerHTML =
-        `<div class="se-cfm-an-run-hdr" style="background:#3a1018;">` +
-        `<span style="color:#f92672;">Analysis Error</span>` +
-        `<button class="se-close-circle se-cfm-an-results-close">&times;</button></div>` +
-        `<div style="padding:16px;color:#f8b0b0;font-size:12px;">${escHtml(msg)}</div>`;
+    dlg.innerHTML = fillTemplate(await loadTemplate(TEMPLATES.ANALYSER_RUN_ERROR), { message: escHtml(msg) });
     document.body.appendChild(dlg);
     _centerDialog(dlg);
     _makeDraggable(dlg, dlg.querySelector('.se-cfm-an-run-hdr'));
@@ -1839,29 +1822,24 @@ function _initTooltips(toolbar) {
     });
 }
 
-function _openAnalysePrompts() {
+async function _openAnalysePrompts() {
     const existing = document.getElementById('se-cfm-an-prompts-dlg');
     if (existing) { existing.remove(); return; }
 
     const prompts = getRegisteredPrompts().filter(p => p.location === 'Chat Files › Analyse tab');
     if (!prompts.length) return;
 
+    const promptItems = prompts.map(p =>
+        `<div class="se-cfm-an-pdlg-item">` +
+        `<label class="se-cfm-an-pdlg-label">${escHtml(p.label)}</label>` +
+        `<textarea class="se-cfm-an-pdlg-ta" data-pk="${escHtml(p.key)}" rows="5" spellcheck="false">${escHtml(getPrompt(p.key))}</textarea>` +
+        `</div>`
+    ).join('');
+
     const dlg = document.createElement('div');
     dlg.id = 'se-cfm-an-prompts-dlg';
     dlg.className = 'se-cfm-an-prompts-dlg';
-    dlg.innerHTML =
-        `<div class="se-cfm-an-pdlg-hdr">` +
-        `<span class="se-cfm-an-pdlg-title">Analyze Prompts</span>` +
-        `<button class="se-cfm-an-pdlg-close se-close-circle">&times;</button>` +
-        `</div>` +
-        `<div class="se-cfm-an-prompts-dlg-body">` +
-        prompts.map(p =>
-            `<div class="se-cfm-an-pdlg-item">` +
-            `<label class="se-cfm-an-pdlg-label">${escHtml(p.label)}</label>` +
-            `<textarea class="se-cfm-an-pdlg-ta" data-pk="${escHtml(p.key)}" rows="5" spellcheck="false">${escHtml(getPrompt(p.key))}</textarea>` +
-            `</div>`
-        ).join('') +
-        `</div>`;
+    dlg.innerHTML = fillTemplate(await loadTemplate(TEMPLATES.ANALYSER_PROMPTS), { promptItems });
 
     document.body.appendChild(dlg);
     _centerDialog(dlg);
