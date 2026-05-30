@@ -9,7 +9,7 @@ import { escHtml } from '../core/utils.js';
 import { loadTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
 import { bindEditorControls, selectFile, applyFileSearch, clearFileSearch, clearEditorSession } from './chat-files-editor.js';
-import { initAnalyser, destroyAnalyser, refreshEntries, refreshAnalyserCanvas } from './chat-files-analyser.js';
+import { initAnalyser, destroyAnalyser, refreshEntries, refreshAnalyserCanvas, getGraphState, setGraphState, addFileNode, onApiStateChange, setRunButtonBlocked } from './chat-files-analyser.js';
 
 let _panel = null;
 let _currentChar = null;
@@ -21,6 +21,18 @@ let _contentCache = {};   // fileName → messages[] (fetched on demand, lives f
 let _searchGen    = 0;    // incremented on each new search to cancel stale async runs
 let _searchTimer  = null;
 let _focusLockAbort = null;
+
+// ─── Analyse tab state ────────────────────────────────────────
+// Each tab stores its own serialized LiteGraph state (graphData).
+// Only one analyser instance is active at a time; switching tabs
+// saves the current graph, destroys, re-inits, and restores.
+
+/** @type {Array<{id:number, label:string, graphData:object|null}>} */
+let _tabs          = [];
+let _activeTabId   = null;
+let _nextTabId     = 1;
+let _busyTabId     = null;
+let _selectedFileName = null;
 
 // ─── Public API ──────────────────────────────────────────────
 
@@ -58,6 +70,11 @@ export function closeChatFilesManager() {
     _analyserReady = false;
     _contentCache  = {};
     _searchGen     = 0;
+    _tabs             = [];
+    _activeTabId      = null;
+    _nextTabId        = 1;
+    _busyTabId        = null;
+    _selectedFileName = null;
 }
 
 // ─── Search focus lock ────────────────────────────────────────
@@ -187,7 +204,11 @@ function _renderFileList(chats) {
     listEl.innerHTML = _files.map((chat) => _fileItemHtml(chat)).join('');
 
     listEl.querySelectorAll('[data-cfm-file]').forEach((el) => {
-        el.addEventListener('click', () => selectFile(el.dataset.cfmFile, _currentChar));
+        el.addEventListener('click', () => {
+            _selectedFileName = el.dataset.cfmFile;
+            _panel?.querySelector('#se-cfm-analyze-shortcut-btn')?.removeAttribute('disabled');
+            selectFile(el.dataset.cfmFile, _currentChar);
+        });
         _attachMarquee(el);
     });
 }
@@ -372,9 +393,14 @@ function _bindPanelEvents() {
         this.title = isFull ? 'Exit fullscreen' : 'Fullscreen';
     });
 
+    // "+ Analyze" shortcut — opens selected file in a new Analyse canvas tab
+    _panel.querySelector('#se-cfm-analyze-shortcut-btn')?.addEventListener('click', () => {
+        if (_selectedFileName) _openFileInAnalyseTab(_selectedFileName);
+    });
+
     // Tab switching — Files / Analyse
     _panel.querySelectorAll('.se-cfm-tab').forEach((tab) => {
-        tab.addEventListener('click', () => {
+        tab.addEventListener('click', async () => {
             const target = tab.dataset.tab;
             _panel.querySelectorAll('.se-cfm-tab').forEach((t) => t.classList.toggle('active', t === tab));
             _panel.querySelector('#se-cfm-tab-files').style.display = target === 'files' ? '' : 'none';
@@ -386,9 +412,182 @@ function _bindPanelEvents() {
                     refreshAnalyserCanvas();
                 } else {
                     _analyserReady = true;
-                    initAnalyser(_panel, _files, _currentChar);
+                    const saved    = _loadTabState();
+                    if (saved) {
+                        _tabs        = saved.tabs;
+                        _activeTabId = saved.activeTabId;
+                        _nextTabId   = saved.nextTabId;
+                    } else {
+                        _tabs        = [{ id: 1, label: 'Canvas 1', graphData: null }];
+                        _activeTabId = 1;
+                        _nextTabId   = 2;
+                    }
+                    _renderTabBar();
+                    _bindTabBarEvents();
+                    _registerBusyListener();
+                    await initAnalyser(_panel, _files, _currentChar);
+                    const active = _tabs.find(t => t.id === _activeTabId);
+                    if (active?.graphData) setGraphState(active.graphData);
                 }
             }
         });
     });
+}
+
+// ─── Inner analyse tab bar ────────────────────────────────────
+
+function _tabStateKey() {
+    return `se-analyser-tabs-${_currentChar?.name ?? '_unknown'}`;
+}
+
+function _saveTabState() {
+    try {
+        localStorage.setItem(_tabStateKey(), JSON.stringify({
+            tabs: _tabs,
+            activeTabId: _activeTabId,
+            nextTabId: _nextTabId,
+        }));
+    } catch { /* quota / private browsing */ }
+}
+
+function _loadTabState() {
+    try {
+        const raw = localStorage.getItem(_tabStateKey());
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!Array.isArray(data?.tabs) || !data.tabs.length) return null;
+        return data;
+    } catch { return null; }
+}
+
+function _fileTabLabel(fileName) {
+    const base = fileName.replace(/\.jsonl$/, '');
+    return base.length > 22 ? `${base.slice(0, 22)}…` : base;
+}
+
+function _renderTabBar() {
+    const bar = _panel?.querySelector('#se-cfm-an-inner-tab-bar');
+    if (!bar) return;
+    bar.querySelectorAll('.se-cfm-an-inner-tab-item').forEach(el => el.remove());
+    const newBtn = bar.querySelector('#se-cfm-an-tab-new');
+    for (const tab of _tabs) {
+        const item = document.createElement('div');
+        const classes = ['se-cfm-an-inner-tab-item'];
+        if (tab.id === _activeTabId) classes.push('active');
+        if (tab.id === _busyTabId)   classes.push('se-cfm-an-tab-busy');
+        item.className = classes.join(' ');
+        item.dataset.tabId = String(tab.id);
+        item.innerHTML =
+            `<span class="se-cfm-an-inner-tab-label" title="${escHtml(tab.label)}">${escHtml(tab.label)}</span>` +
+            (_tabs.length > 1 ? `<button class="se-cfm-an-inner-tab-close" data-close-tab="${tab.id}" title="Close">×</button>` : '');
+        newBtn.before(item);
+    }
+}
+
+function _bindTabBarEvents() {
+    const bar = _panel?.querySelector('#se-cfm-an-inner-tab-bar');
+    if (!bar) return;
+    bar.addEventListener('click', async e => {
+        const closeBtn = e.target.closest('[data-close-tab]');
+        if (closeBtn) { await _closeTab(Number(closeBtn.dataset.closeTab)); return; }
+        const item = e.target.closest('.se-cfm-an-inner-tab-item');
+        if (item) await _switchTab(Number(item.dataset.tabId));
+    });
+    bar.querySelector('#se-cfm-an-tab-new')?.addEventListener('click', () => _createTab());
+}
+
+function _registerBusyListener() {
+    onApiStateChange(busy => {
+        _busyTabId = busy ? _activeTabId : null;
+        _renderTabBar();
+        if (!busy && _busyTabId === null) setRunButtonBlocked(false);
+    });
+}
+
+async function _switchTab(id) {
+    if (id === _activeTabId || !_analyserReady) return;
+    const current = _tabs.find(t => t.id === _activeTabId);
+    if (current) current.graphData = getGraphState();
+    destroyAnalyser();
+    _activeTabId = id;
+    _renderTabBar();
+    const next = _tabs.find(t => t.id === id);
+    await initAnalyser(_panel, _files, _currentChar);
+    if (next?.graphData) setGraphState(next.graphData);
+    if (_busyTabId !== null && _busyTabId !== id) setRunButtonBlocked(true);
+    _saveTabState();
+}
+
+async function _createTab(label) {
+    if (!_analyserReady) return;
+    const current = _tabs.find(t => t.id === _activeTabId);
+    if (current) current.graphData = getGraphState();
+    destroyAnalyser();
+    const id = _nextTabId++;
+    _tabs.push({ id, label: label ?? `Canvas ${id}`, graphData: null });
+    _activeTabId = id;
+    _renderTabBar();
+    await initAnalyser(_panel, _files, _currentChar);
+    if (_busyTabId !== null) setRunButtonBlocked(true);
+    _saveTabState();
+}
+
+async function _closeTab(id) {
+    if (_tabs.length <= 1) return;
+    const idx = _tabs.findIndex(t => t.id === id);
+    if (idx < 0) return;
+    if (id === _busyTabId) _busyTabId = null;
+    _tabs.splice(idx, 1);
+    if (id === _activeTabId) {
+        const next = _tabs[Math.min(idx, _tabs.length - 1)];
+        destroyAnalyser();
+        _activeTabId = next.id;
+        _renderTabBar();
+        await initAnalyser(_panel, _files, _currentChar);
+        if (next.graphData) setGraphState(next.graphData);
+        if (_busyTabId !== null && _busyTabId !== next.id) setRunButtonBlocked(true);
+    } else {
+        _renderTabBar();
+    }
+    _saveTabState();
+}
+
+// ─── Open file in new Analyse tab ─────────────────────────────
+
+async function _openFileInAnalyseTab(fileName) {
+    const label = _fileTabLabel(fileName);
+
+    // Activate the Analyse tab visually
+    _panel.querySelectorAll('.se-cfm-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === 'analyse');
+    });
+    _panel.querySelector('#se-cfm-tab-files').style.display    = 'none';
+    _panel.querySelector('#se-cfm-tab-analyse').style.display  = '';
+
+    if (!_analyserReady) {
+        _analyserReady = true;
+        const saved = _loadTabState();
+        if (saved) {
+            _tabs        = saved.tabs;
+            _activeTabId = saved.activeTabId;
+            _nextTabId   = saved.nextTabId;
+        } else {
+            _tabs        = [{ id: 1, label, graphData: null }];
+            _activeTabId = 1;
+            _nextTabId   = 2;
+        }
+        _renderTabBar();
+        _bindTabBarEvents();
+        _registerBusyListener();
+        await initAnalyser(_panel, _files, _currentChar);
+        const active = _tabs.find(t => t.id === _activeTabId);
+        if (active?.graphData) setGraphState(active.graphData);
+        if (saved) { return; }
+        addFileNode(fileName);
+        _saveTabState();
+    } else {
+        await _createTab(label);
+        addFileNode(fileName);
+        _saveTabState();
+    }
 }
