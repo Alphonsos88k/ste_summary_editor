@@ -173,6 +173,9 @@ export const TEMPLATES = Object.freeze({
     ANALYSER_ENTRY_DETAIL:     'partials/chat-files/analyser-entry-detail',
     ANALYSER_PROMPTS:          'partials/chat-files/analyser-prompts',
     ANALYSER_RUN_ERROR:        'partials/chat-files/analyser-run-error',
+    ANALYSER_POP_PANEL:        'partials/chat-files/analyser-pop-panel',
+    ANALYSER_PIPELINE_SHELL:   'partials/chat-files/analyser-pipeline-shell',
+    ANALYSER_TOK_DROP:         'partials/chat-files/analyser-tok-drop',
     // dialogs/
     DIALOG_ALERT:            'partials/dialogs/dialog-alert',
     DIALOG_CONFLICT_RESULTS: 'partials/dialogs/dialog-conflict-results',
@@ -186,6 +189,7 @@ export const TEMPLATES = Object.freeze({
     FILES_ATTENTION_DIALOG:  'partials/dialogs/files-attention-dialog',
     SPLIT_DIALOG:            'partials/dialogs/split-dialog',
     FRM_SPLIT_FORM:          'partials/dialogs/frm-split-form',
+    FRM_NEW_FILE:            'partials/dialogs/frm-new-file',
     INGEST_SPLIT_PANEL:      'partials/dialogs/ingest-split-panel',
     INGEST_PREVIEW_PANEL:    'partials/dialogs/ingest-preview-panel',
     // editor/
@@ -203,6 +207,7 @@ export const TEMPLATES = Object.freeze({
     GAP_SUGGEST_PANEL:       'partials/analysis/gap-suggest-panel',
     GAPS_PANEL:              'partials/analysis/gaps-panel',
     // table/
+    ENTITY_SIDEBAR:          'partials/table/entity-sidebar',
     SEG_ITEM:                'partials/table/seg-item',
     CE_FEEDBACK_ITEM:        'partials/table/ce-feedback-item',
     ACD_ITEM:                'partials/table/acd-item',

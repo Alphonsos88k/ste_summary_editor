@@ -454,20 +454,20 @@ function _bindPopOutButtons() {
     });
 }
 
-function _popOut(type) {
+async function _popOut(type) {
     if (_popPanels[type]) return;
 
-    const title  = type === 'files' ? 'Chat Files' : 'Entries';
-    const listId = `se-cfm-an-pop-${type}`;
-    const pop    = document.createElement('div');
-    pop.className = 'se-cfm-an-pop-panel';
-    pop.innerHTML =
-        `<div class="se-cfm-an-pop-hdr" id="se-cfm-an-pop-hdr-${type}">` +
-        `<span>${escHtml(title)}</span>` +
-        `<button class="se-cfm-an-pop-close" title="Restore to panel">&#x00D7;</button></div>` +
-        `<div class="se-cfm-an-pop-body">` +
-        `<div class="se-cfm-an-${type === 'files' ? 'file' : 'entry'}-list" id="${listId}"></div>` +
-        `</div>`;
+    const title     = type === 'files' ? 'Chat Files' : 'Entries';
+    const listId    = `se-cfm-an-pop-${type}`;
+    const listClass = `se-cfm-an-${type === 'files' ? 'file' : 'entry'}-list`;
+    const pop       = document.createElement('div');
+    pop.className   = 'se-cfm-an-pop-panel';
+    pop.innerHTML   = fillTemplate(await loadTemplate(TEMPLATES.ANALYSER_POP_PANEL), {
+        title:     escHtml(title),
+        hdrId:     `se-cfm-an-pop-hdr-${type}`,
+        listClass,
+        listId,
+    });
 
     const sbRect = _panel?.querySelector('.se-cfm-an-sidebar')?.getBoundingClientRect();
     if (sbRect) {
@@ -638,31 +638,28 @@ function _updateTokBtn() {
     btn.classList.toggle('active', _runMaxTokens !== null);
 }
 
-function _toggleTokDrop() {
+async function _toggleTokDrop() {
     const existing = document.getElementById('se-cfm-an-tok-drop');
     if (existing) { existing.remove(); return; }
 
     const btn = _panel?.querySelector('#se-cfm-an-tok');
     if (!btn) return;
 
-    const ctx     = SillyTavern.getContext();
-    const def     = ctx.chatCompletionSettings?.openai_max_tokens ?? 2000;
-    const current = _runMaxTokens ?? def;
-
-    const drop = document.createElement('div');
-    drop.id        = 'se-cfm-an-tok-drop';
-    drop.className = 'se-cfm-an-tok-drop';
+    const ctx        = SillyTavern.getContext();
+    const def        = ctx.chatCompletionSettings?.openai_max_tokens ?? 2000;
+    const current    = _runMaxTokens ?? def;
     const defDisplay = def >= 1000 ? `${+(def / 1000).toFixed(1)}k` : String(def);
     const tokFooter  = _runMaxTokens !== null
         ? `<button class="se-cfm-an-tok-reset">&#x2715; Reset to ST default (${defDisplay})</button>`
         : `<div class="se-cfm-an-tok-hint">ST default: ${defDisplay}</div>`;
-    drop.innerHTML =
-        `<div class="se-cfm-an-tok-drop-lbl">Response token limit</div>` +
-        `<div class="se-cfm-an-tok-drop-row">` +
-        `<input class="se-cfm-an-tok-inp" type="number" min="256" max="32000" step="256" value="${current}">` +
-        `<button class="se-cfm-an-tok-set">Set</button>` +
-        `</div>` +
-        tokFooter;
+
+    const drop = document.createElement('div');
+    drop.id        = 'se-cfm-an-tok-drop';
+    drop.className = 'se-cfm-an-tok-drop';
+    drop.innerHTML = fillTemplate(await loadTemplate(TEMPLATES.ANALYSER_TOK_DROP), {
+        current:    String(current),
+        tokFooter,
+    });
 
     const rect     = btn.getBoundingClientRect();
     drop.style.top  = `${rect.bottom + 6}px`;
@@ -1053,7 +1050,7 @@ function _cardHtml(num, snippet) {
         `</div></div></div>`;
 }
 
-function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
+async function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
     document.getElementById('se-cfm-an-pipeline-dlg')?.remove();
 
     // Deferred resolver — avoids wrapping all logic inside Promise callback
@@ -1077,11 +1074,7 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
     const dlg = document.createElement('div');
     dlg.id        = 'se-cfm-an-pipeline-dlg';
     dlg.className = 'se-cfm-an-pipeline-dlg';
-    dlg.innerHTML =
-        `<div class="se-cfm-an-run-hdr" id="se-cfm-an-pl-hdr">` +
-        `<span id="se-cfm-an-pl-title">Pass 1 — Digest Review</span>` +
-        `<button class="se-close-circle se-cfm-an-pl-x">&times;</button></div>` +
-        `<div class="se-cfm-an-pl-body"></div>`;
+    dlg.innerHTML = await loadTemplate(TEMPLATES.ANALYSER_PIPELINE_SHELL);
 
     document.body.appendChild(dlg);
     _centerDialog(dlg);

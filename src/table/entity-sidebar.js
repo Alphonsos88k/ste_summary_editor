@@ -25,6 +25,8 @@ import { state, persistState } from '../core/state.js';
 import { logLLMCall } from '../core/llm-history.js';
 import { escHtml, escAttr, spawnPanel } from '../core/utils.js';
 import { registerPrompt, getPrompt } from '../core/system-prompts.js';
+import { loadTemplate } from '../core/template-loader.js';
+import { TEMPLATES } from '../core/constants.js';
 
 const PROMPT_KEY = 'entity-panel';
 registerPrompt(PROMPT_KEY, 'Story Index — Entity Generation', '', { warnJson: true, location: 'Utils › Story Index' });
@@ -87,14 +89,14 @@ export function closeEntitySidebar() {
 
 // ─── Private ─────────────────────────────────────────────────
 
-function _openPanel() {
+async function _openPanel() {
     const overlay = document.getElementById('se-modal-overlay');
     if (!overlay) return;
 
     _panel = document.createElement('div');
     _panel.id = 'se-entity-panel';
     _panel.className = 'se-entity-panel';
-    _panel.innerHTML = _buildShell();
+    _panel.innerHTML = await loadTemplate(TEMPLATES.ENTITY_SIDEBAR);
     overlay.appendChild(_panel);
 
     // Width depends on how many sections we have — start at 2-box width
@@ -108,22 +110,6 @@ function _openPanel() {
 function _closePanel() {
     _panel?.remove();
     _panel = null;
-}
-
-function _buildShell() {
-    return `
-        <div class="se-ep-header">
-            <span class="se-ep-title">&#128196; Story Index</span>
-            <button class="se-close-circle se-ep-close">&times;</button>
-        </div>
-        <div class="se-ep-toolbar">
-            <input type="text" class="se-ep-filter" id="se-ep-filter" placeholder="Filter across all sections…" />
-            <span class="se-btn-split-group">
-                <button class="se-btn se-btn-sm se-ep-gen-btn" id="se-ep-gen" title="Generate AI sections from selected (or all) entries">&#10024; Generate</button><button class="se-btn-split-cog" data-edit-prompt="entity-panel" title="Edit generation prompt">&#9881;</button>
-            </span>
-            <span class="se-ep-gen-status" id="se-ep-gen-status"></span>
-        </div>
-        <div class="se-ep-grid" id="se-ep-grid"></div>`;
 }
 
 function _bindEvents() {
