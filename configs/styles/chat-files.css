@@ -687,7 +687,7 @@
 /* ─── Inner Analyse tab bar ─────────────────────────────────── */
 .se-cfm-an-inner-tab-bar {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: 2px;
     padding: 0 6px;
     background: #1a1a15;
@@ -696,6 +696,8 @@
     min-height: 30px;
     overflow-x: auto;
     scrollbar-width: none;
+    /* allow active-tab bottom border to overlap the 1px separator below */
+    clip-path: inset(0 0 -2px 0);
 }
 .se-cfm-an-inner-tab-bar::-webkit-scrollbar { display: none; }
 
@@ -729,11 +731,51 @@
     border-right-color:  rgba(255,255,255,0.10);
     background: #1e1e18;
     color: #e0e0d8;
+    /* extend 1px below the tab bar's border-bottom to sit flush with toolbar top */
+    margin-bottom: -1px;
+    position: relative;
+    z-index: 1;
 }
 .se-cfm-an-inner-tab-item.se-cfm-an-tab-busy        { background: rgba(253,151,31,0.12); }
 .se-cfm-an-inner-tab-item.active.se-cfm-an-tab-busy { background: rgba(253,151,31,0.20); border-bottom-color: #fd971f; }
 .se-cfm-an-inner-tab-item.se-cfm-an-tab-drag-before { border-left:  2px solid #a6e22e; }
 .se-cfm-an-inner-tab-item.se-cfm-an-tab-drag-after  { border-right: 2px solid #a6e22e; }
+
+/* ─── Tab bar overflow scrollbar ───────────────────────────────── */
+.se-cfm-an-tab-sb {
+    height: 0;
+    overflow: hidden;
+    flex-shrink: 0;
+    padding: 0 6px;
+    background: #1a1a15;
+    transition: height 0.12s ease;
+    cursor: default;
+}
+.se-cfm-an-tab-sb.visible {
+    height: 8px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+.se-cfm-an-tab-sb-track {
+    height: 4px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 2px;
+    position: relative;
+    cursor: pointer;
+}
+.se-cfm-an-tab-sb-thumb {
+    position: absolute;
+    top: 0;
+    height: 4px;
+    min-width: 28px;
+    background: rgba(255,255,255,0.22);
+    border-radius: 2px;
+    cursor: grab;
+    transition: background 0.12s;
+    will-change: left, width;
+}
+.se-cfm-an-tab-sb-thumb:hover     { background: rgba(255,255,255,0.38); }
+.se-cfm-an-tab-sb-thumb.dragging  { cursor: grabbing; background: rgba(166,226,46,0.5); }
 
 .se-cfm-an-inner-tab-label {
     overflow: hidden;

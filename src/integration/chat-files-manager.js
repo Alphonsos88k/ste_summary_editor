@@ -9,7 +9,7 @@ import { escHtml } from '../core/utils.js';
 import { loadTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
 import { bindEditorControls, selectFile, applyFileSearch, clearFileSearch, clearEditorSession } from './chat-files-editor.js';
-import { initAnalyser, destroyAnalyser, refreshEntries, refreshAnalyserCanvas, getGraphState, setGraphState, addFileNode, onApiStateChange, onActiveFileChange, setRunButtonBlocked } from './chat-files-analyser.js';
+import { initAnalyser, destroyAnalyser, refreshEntries, refreshAnalyserCanvas, getGraphState, setGraphState, syncGraphActiveFile, addFileNode, onApiStateChange, onActiveFileChange, setRunButtonBlocked } from './chat-files-analyser.js';
 
 let _panel = null;
 let _currentChar = null;
@@ -32,7 +32,8 @@ let _tabs          = [];
 let _activeTabId   = null;
 let _nextTabId     = 1;
 let _busyTabId     = null;
-let _selectedFileName = null;
+let _selectedFileName  = null;
+let _updateTabScrollbar = null; // set once by _bindTabScrollbar
 
 // ─── Public API ──────────────────────────────────────────────
 
@@ -70,11 +71,12 @@ export function closeChatFilesManager() {
     _analyserReady = false;
     _contentCache  = {};
     _searchGen     = 0;
-    _tabs             = [];
-    _activeTabId      = null;
-    _nextTabId        = 1;
-    _busyTabId        = null;
-    _selectedFileName = null;
+    _tabs                = [];
+    _activeTabId         = null;
+    _nextTabId           = 1;
+    _busyTabId           = null;
+    _selectedFileName    = null;
+    _updateTabScrollbar  = null;
 }
 
 // ─── Search focus lock ────────────────────────────────────────
@@ -424,11 +426,13 @@ function _bindPanelEvents() {
                     }
                     _renderTabBar();
                     _bindTabBarEvents();
+                    _bindTabScrollbar();
                     _registerBusyListener();
                     _registerActiveFileListener();
                     await initAnalyser(_panel, _files, _currentChar);
                     const active = _tabs.find(t => t.id === _activeTabId);
                     if (active?.graphData) setGraphState(active.graphData);
+                    syncGraphActiveFile();
                 }
             }
         });
@@ -465,6 +469,7 @@ function _renderTabBar() {
         newBtn.before(item);
     }
     _updateTabLimitBtns();
+    _updateTabScrollbar?.();
 }
 
 function _bindTabBarEvents() {
@@ -552,6 +557,63 @@ function _bindTabBarEvents() {
     bar.addEventListener('dragend', () => { clearDrag(); dragId = null; dragRects = null; rafPending = false; });
 }
 
+function _bindTabScrollbar() {
+    const bar   = _panel?.querySelector('#se-cfm-an-inner-tab-bar');
+    const sb    = _panel?.querySelector('#se-cfm-an-tab-sb');
+    const track = _panel?.querySelector('#se-cfm-an-tab-sb-track');
+    const thumb = _panel?.querySelector('#se-cfm-an-tab-sb-thumb');
+    if (!bar || !sb || !track || !thumb) return;
+
+    _updateTabScrollbar = () => {
+        const overflow = bar.scrollWidth > bar.clientWidth + 1;
+        sb.classList.toggle('visible', overflow);
+        if (!overflow) return;
+        const ratio  = bar.clientWidth / bar.scrollWidth;
+        const thumbW = Math.max(28, Math.floor(track.clientWidth * ratio));
+        const maxSL  = bar.scrollWidth - bar.clientWidth;
+        const maxL   = track.clientWidth - thumbW;
+        thumb.style.width = `${thumbW}px`;
+        thumb.style.left  = `${maxSL > 0 ? (bar.scrollLeft / maxSL) * maxL : 0}px`;
+    };
+
+    bar.addEventListener('scroll', _updateTabScrollbar);
+    new ResizeObserver(_updateTabScrollbar).observe(bar);
+
+    // Drag thumb
+    let dragging = false, startX = 0, startSL = 0;
+    thumb.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        dragging = true;
+        startX   = e.clientX;
+        startSL  = bar.scrollLeft;
+        thumb.classList.add('dragging');
+        thumb.setPointerCapture(e.pointerId);
+    });
+    thumb.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        bar.scrollLeft = Math.max(0, startSL + (e.clientX - startX) * (bar.scrollWidth / bar.clientWidth));
+    });
+    const _stopDrag = () => { dragging = false; thumb.classList.remove('dragging'); };
+    thumb.addEventListener('pointerup',     _stopDrag);
+    thumb.addEventListener('pointercancel', _stopDrag);
+
+    // Click track to jump
+    track.addEventListener('click', e => {
+        if (e.target === thumb) return;
+        const rect = track.getBoundingClientRect();
+        bar.scrollLeft = ((e.clientX - rect.left) / rect.width) * (bar.scrollWidth - bar.clientWidth);
+    });
+
+    // Vertical wheel → horizontal scroll
+    bar.addEventListener('wheel', e => {
+        if (e.deltaY === 0) return;
+        e.preventDefault();
+        bar.scrollLeft += e.deltaY;
+    }, { passive: false });
+
+    _updateTabScrollbar();
+}
+
 function _dedupeLabel(base, currentTabId) {
     const others = new Set(_tabs.filter(t => t.id !== currentTabId).map(t => t.label));
     if (!others.has(base)) return base;
@@ -612,6 +674,7 @@ async function _switchTab(id) {
     const next = _tabs.find(t => t.id === id);
     await initAnalyser(_panel, _files, _currentChar);
     if (next?.graphData) setGraphState(next.graphData);
+    syncGraphActiveFile();
     if (_busyTabId !== null && _busyTabId !== id) setRunButtonBlocked(true);
     _saveTabState();
 }
@@ -643,6 +706,7 @@ async function _closeTab(id) {
         _renderTabBar();
         await initAnalyser(_panel, _files, _currentChar);
         if (next.graphData) setGraphState(next.graphData);
+        syncGraphActiveFile();
         if (_busyTabId !== null && _busyTabId !== next.id) setRunButtonBlocked(true);
     } else {
         _renderTabBar();
@@ -678,9 +742,11 @@ async function _openFileInAnalyseTab(fileName) {
         _renderTabBar();
         _bindTabBarEvents();
         _registerBusyListener();
+        _registerActiveFileListener();
         await initAnalyser(_panel, _files, _currentChar);
         const active = _tabs.find(t => t.id === _activeTabId);
         if (active?.graphData) setGraphState(active.graphData);
+        syncGraphActiveFile();
         if (saved) { return; }
         addFileNode(fileName);
         _saveTabState();
