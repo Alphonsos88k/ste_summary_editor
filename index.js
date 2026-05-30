@@ -72,6 +72,7 @@ import {
     registerPrompt, getPrompt, seedDefaultPrompts, loadPromptDefaults,
     openEditPromptPopup, openSystemPromptHub,
 } from './src/core/system-prompts.js';
+import { openLLMHistoryPanel, closeLLMHistoryPanel } from './src/core/llm-history.js';
 
 registerPrompt('gap-suggest', 'Gap Suggest');
 
@@ -476,6 +477,7 @@ function closeEditor() {
     closeContentEditor();
     closeBulkRefine();
     closeTimelineEditor();
+    closeLLMHistoryPanel();
     closeSplitDialog();
     closeFileRangeManager();
     persistState();
@@ -1000,6 +1002,9 @@ function bindReviewEvents() {
         });
         _utilsPanel.querySelector('#se-btn-gaps-panel')?.addEventListener('click', () => {
             _utilsPanel?.remove(); _utilsPanel = null; openGapsPanel();
+        });
+        _utilsPanel.querySelector('#se-btn-llm-history')?.addEventListener('click', () => {
+            _utilsPanel?.remove(); _utilsPanel = null; openLLMHistoryPanel();
         });
         updateGapsBadge(_utilsPanel);
     }

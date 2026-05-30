@@ -12,6 +12,7 @@
  */
 
 import { state, persistState } from '../core/state.js';
+import { logLLMCall } from '../core/llm-history.js';
 import { renderTable } from '../table/table.js';
 import { escHtml, spawnPanel } from '../core/utils.js';
 import { reCheckEntry } from '../conflict/conflict-detection.js';
@@ -251,8 +252,9 @@ async function doAskApi(pop, num) {
         });
 
         if (!resp.ok) throw new Error(`API ${resp.status} ${resp.statusText}`);
-        const data = await resp.json();
+        const data   = await resp.json();
         const result = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
+        logLLMCall('Content Editor', `${sysPrompt}\n\n${userMsg}`, result);
         if (result) {
             const ta = pop.querySelector('#se-ce-textarea');
             const original = ta.value;

@@ -17,6 +17,7 @@
  */
 
 import { state, persistState } from '../core/state.js';
+import { logLLMCall } from '../core/llm-history.js';
 import { renderTable } from '../table/table.js';
 import { escHtml, spawnPanel } from '../core/utils.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
@@ -195,6 +196,7 @@ async function _runSingle(num) {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data   = await resp.json();
         const result = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
+        logLLMCall(`Bulk Refine #${num}`, messages.map(m => m.content).join('\n\n'), result);
 
         if (!result || !_panel) {
             if (statusEl && _panel) { statusEl.textContent = 'No response'; statusEl.style.color = '#f92672'; }

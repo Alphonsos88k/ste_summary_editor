@@ -8,6 +8,7 @@
  */
 
 import { state, persistState } from '../core/state.js';
+import { logLLMCall } from '../core/llm-history.js';
 import { escHtml, spawnPanel } from '../core/utils.js';
 import { renderTable, renderStatsBar, getCheckedNums } from '../table/table.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
@@ -215,9 +216,11 @@ async function callConflictAPI(prompt, systemContext = '', includesEntry1 = fals
     }
 
     const data = await resp.json();
-    return data?.choices?.[0]?.message?.content
+    const raw  = data?.choices?.[0]?.message?.content
         || data?.choices?.[0]?.text
         || (typeof data === 'string' ? data : '');
+    logLLMCall('Conflict Check', `${sysPrompt}\n\n${prompt}`, raw);
+    return raw;
 }
 
 /**
@@ -806,8 +809,9 @@ async function generateStoryContext(entries) {
         });
 
         if (!resp.ok) return;
-        const data = await resp.json();
+        const data   = await resp.json();
         const result = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
+        logLLMCall('Story Context', getPrompt('story-context') + '\n\n' + prompt, result);
         if (result.trim()) {
             state.storyContext = result.trim();
             persistState();
@@ -852,8 +856,9 @@ async function generateConsistencyScore(entries) {
     });
 
     if (!resp.ok) throw new Error(`API ${resp.status} ${resp.statusText}`);
-    const data = await resp.json();
-    const raw = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
+    const data  = await resp.json();
+    const raw   = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
+    logLLMCall('Consistency Score', `${sysPrompt}\n\n${prompt}`, raw);
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('No JSON in response');
     const parsed = JSON.parse(match[0]);
