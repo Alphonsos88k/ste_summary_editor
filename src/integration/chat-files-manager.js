@@ -437,29 +437,9 @@ function _bindPanelEvents() {
 
 // ─── Inner analyse tab bar ────────────────────────────────────
 
-function _tabStateKey() {
-    return `se-analyser-tabs-${_currentChar?.name ?? '_unknown'}`;
-}
-
-function _saveTabState() {
-    try {
-        localStorage.setItem(_tabStateKey(), JSON.stringify({
-            tabs: _tabs,
-            activeTabId: _activeTabId,
-            nextTabId: _nextTabId,
-        }));
-    } catch { /* quota / private browsing */ }
-}
-
-function _loadTabState() {
-    try {
-        const raw = localStorage.getItem(_tabStateKey());
-        if (!raw) return null;
-        const data = JSON.parse(raw);
-        if (!Array.isArray(data?.tabs) || !data.tabs.length) return null;
-        return data;
-    } catch { return null; }
-}
+// UI state resets on refresh — no localStorage persistence for tabs or canvas.
+function _saveTabState() { /* intentional no-op */ }
+function _loadTabState()  { return null; }
 
 function _fileTabLabel(fileName) {
     const base = fileName.replace(/\.jsonl$/, '');
@@ -478,9 +458,10 @@ function _renderTabBar() {
         if (tab.id === _busyTabId)   classes.push('se-cfm-an-tab-busy');
         item.className = classes.join(' ');
         item.dataset.tabId = String(tab.id);
+        item.draggable = true;
         item.innerHTML =
             `<span class="se-cfm-an-inner-tab-label" title="${escHtml(tab.tooltip ?? tab.label)}">${escHtml(tab.label)}</span>` +
-            (_tabs.length > 1 ? `<button class="se-cfm-an-inner-tab-close" data-close-tab="${tab.id}" title="Close">×</button>` : '');
+            (_tabs.length > 1 ? `<button class="se-cfm-an-inner-tab-close" data-close-tab="${tab.id}" draggable="false" title="Close">×</button>` : '');
         newBtn.before(item);
     }
     _updateTabLimitBtns();
@@ -489,6 +470,7 @@ function _renderTabBar() {
 function _bindTabBarEvents() {
     const bar = _panel?.querySelector('#se-cfm-an-inner-tab-bar');
     if (!bar) return;
+
     bar.addEventListener('click', async e => {
         const closeBtn = e.target.closest('[data-close-tab]');
         if (closeBtn) { await _closeTab(Number(closeBtn.dataset.closeTab)); return; }
@@ -496,6 +478,55 @@ function _bindTabBarEvents() {
         if (item) await _switchTab(Number(item.dataset.tabId));
     });
     bar.querySelector('#se-cfm-an-tab-new')?.addEventListener('click', () => _createTab());
+
+    // ── Drag-to-reorder ──────────────────────────────────────────
+    let dragId = null;
+
+    const _clearDragClasses = () =>
+        bar.querySelectorAll('.se-cfm-an-tab-drag-before, .se-cfm-an-tab-drag-after')
+           .forEach(el => el.classList.remove('se-cfm-an-tab-drag-before', 'se-cfm-an-tab-drag-after'));
+
+    bar.addEventListener('dragstart', e => {
+        const item = e.target.closest('.se-cfm-an-inner-tab-item');
+        if (!item) return;
+        dragId = Number(item.dataset.tabId);
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    bar.addEventListener('dragover', e => {
+        e.preventDefault();
+        const item = e.target.closest('.se-cfm-an-inner-tab-item');
+        if (!item || Number(item.dataset.tabId) === dragId) return;
+        _clearDragClasses();
+        const rect = item.getBoundingClientRect();
+        item.classList.add(e.clientX < rect.left + rect.width / 2
+            ? 'se-cfm-an-tab-drag-before'
+            : 'se-cfm-an-tab-drag-after');
+    });
+
+    bar.addEventListener('dragleave', e => {
+        if (!bar.contains(e.relatedTarget)) _clearDragClasses();
+    });
+
+    bar.addEventListener('drop', e => {
+        e.preventDefault();
+        const item = e.target.closest('.se-cfm-an-inner-tab-item');
+        const dropId = item ? Number(item.dataset.tabId) : null;
+        _clearDragClasses();
+        if (dragId === null || dropId === null || dragId === dropId) { dragId = null; return; }
+        const fromIdx = _tabs.findIndex(t => t.id === dragId);
+        const toIdx   = _tabs.findIndex(t => t.id === dropId);
+        if (fromIdx < 0 || toIdx < 0) { dragId = null; return; }
+        const rect = item.getBoundingClientRect();
+        const insertBefore = e.clientX < rect.left + rect.width / 2;
+        const [moved] = _tabs.splice(fromIdx, 1);
+        const newToIdx = _tabs.findIndex(t => t.id === dropId);
+        _tabs.splice(insertBefore ? newToIdx : newToIdx + 1, 0, moved);
+        dragId = null;
+        _renderTabBar();
+    });
+
+    bar.addEventListener('dragend', () => { _clearDragClasses(); dragId = null; });
 }
 
 function _dedupeLabel(base, currentTabId) {
