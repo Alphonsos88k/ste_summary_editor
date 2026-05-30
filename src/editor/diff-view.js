@@ -85,7 +85,7 @@ function _bindEditable(el, onAccept, onCancel) {
  * @param {HTMLElement} anchor - Element to insert the diff view after
  * @param {string} original - Original text (may be empty for new entries)
  * @param {string} revised - AI-generated revised text
- * @param {{ onAccept: (text: string) => void, onCancel?: () => void, onUndo?: () => void, id?: string, readOnly?: boolean }} opts
+ * @param {{ onAccept?: (text: string) => void, onCancel?: () => void, onUndo?: () => void, id?: string, readOnly?: boolean }} opts
  * @returns {Promise<HTMLElement>} The created diff view element
  */
 export async function showDiffView(anchor, original, revised, { onAccept, onCancel, onUndo, id = 'se-diff-view', readOnly = false }) {

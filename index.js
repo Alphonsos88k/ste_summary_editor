@@ -74,7 +74,7 @@ import {
 } from './src/core/system-prompts.js';
 import { openLLMHistoryPanel, closeLLMHistoryPanel } from './src/core/llm-history.js';
 
-registerPrompt('gap-suggest', 'Gap Suggest');
+registerPrompt('gap-suggest', 'Gap Suggest', '');
 
 // Register analyser prompts eagerly so they appear in the Prompts Hub
 // regardless of whether the Analyse tab has been opened yet.
@@ -145,7 +145,7 @@ export function ensureMermaidLoaded() {
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
         script.onload = () => {
-            mermaid.initialize({
+            window.mermaid.initialize({
                 startOnLoad: false,
                 theme: 'dark',
                 themeVariables: {
@@ -1851,7 +1851,7 @@ function openFindReplace() {
 
     // Restore persisted threshold
     const savedThresh = parseFloat(localStorage.getItem('se-fr-threshold') || '0.4');
-    threshSlider.value = savedThresh;
+    threshSlider.value = String(savedThresh);
     threshValEl.textContent = savedThresh.toFixed(1);
 
     threshSlider.addEventListener('input', () => {
@@ -1997,7 +1997,7 @@ function openBulkFill() {
 
 /**
  * Update the gap count badge on the Gaps button inside any utils panel container.
- * @param {HTMLElement} [container] - If provided, only updates within that element.
+ * @param {Document|HTMLElement} [container] - If provided, only updates within that element.
  */
 function updateGapsBadge(container = document) {
     const badge = container.querySelector?.('#se-gaps-btn-badge') ?? document.getElementById('se-gaps-btn-badge');

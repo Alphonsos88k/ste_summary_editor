@@ -388,8 +388,9 @@ export async function copyToClipboard() {
         $('#se-copy-popover-body').text(preview);
         $popover.addClass('active');
 
-        clearTimeout(copyToClipboard._timer);
-        copyToClipboard._timer = setTimeout(() => $popover.removeClass('active'), 3000);
+        const _fn = /** @type {any} */ (copyToClipboard);
+        clearTimeout(_fn._timer);
+        _fn._timer = setTimeout(() => $popover.removeClass('active'), 3000);
     } catch (err) {
         console.warn('[Summary Editor] Clipboard copy failed:', err);
         await seAlert('Failed to copy to clipboard. Your browser may not support this feature.');
@@ -500,7 +501,7 @@ export async function downloadAsZip() {
  * @param {string} folderPath - Folder name/path to use inside the zip.
  * @param {string} fileName - The export filename (e.g. bulk_summary.txt).
  * @param {string} content - The export content string.
- * @param {string} format - The export format (txt/json/md/yaml).
+ * (format is derived from fileName extension — not a separate parameter)
  */
 async function downloadFolderZip(folderPath, fileName, content) {
     const folderName = folderPath.replaceAll('\\', '/');

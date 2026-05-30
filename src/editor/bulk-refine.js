@@ -203,7 +203,7 @@ async function _runSingle(num) {
             return;
         }
 
-        const anchor = _panel.querySelector(`#se-br-original-${num}`);
+        const anchor = /** @type {HTMLElement|null} */ (_panel.querySelector(`#se-br-original-${num}`));
         if (anchor) {
             showDiffView(anchor, entry.content, result.trim(), {
                 id: `se-br-diff-${num}`,

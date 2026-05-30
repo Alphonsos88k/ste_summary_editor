@@ -109,7 +109,7 @@ function flushCurrentPart(part, bodyLines, parts) {
  * body into paragraphs. Each paragraph becomes a numbered entry.
  *
  * @param {string} text - Raw file content to parse.
- * @returns {{ parts: Array<{partNum: number, title: string, paragraphs: string[]}>, hasUnsplitParts: boolean }}
+ * @returns {{ parts: ParsedPart[], hasUnsplitParts: boolean }}
  */
 export function parsePartEntries(text) {
     const lines = text.split(/\r?\n/);
@@ -317,9 +317,9 @@ const SUPPORTED_EXTENSIONS = new Set(['txt', 'json', 'yaml', 'yml']);
  *
  * @param {string} text - Raw file content.
  * @param {string} fileName - Source file name.
- * @param {Array} validFiles - Accumulator for successfully parsed files.
- * @param {Array<{name:string, reason:string}>} invalidFiles - Accumulator for rejected files with reasons.
- * @param {number[]} duplicates - Accumulator for duplicate entry numbers.
+ * @param {ParsedFileResult[]} validFiles   - Accumulator for successfully parsed files.
+ * @param {ParsedFileResult[]} invalidFiles - Accumulator for rejected files with reasons.
+ * @param {number[]} duplicates             - Accumulator for duplicate entry numbers.
  */
 function processFile(text, fileName, validFiles, invalidFiles, duplicates) {
     const ext = fileName.split('.').pop().toLowerCase();
@@ -394,22 +394,17 @@ function mergePartEntriesWithSplitCheck(parts, fileName, hasUnsplitParts, validF
 
 
 /**
- * Handle the file input change event.
- * Reads each selected file, dispatches to the appropriate parser based on
- * file extension, merges into global state, detects gaps, and re-renders.
- *
- * @param {Event} event - The file input `change` event.
+ * Auto-assign supplementary candidates loaded from a summary-like folder.
+ * @param {ParsedFileResult[]} invalidFiles - The rejected-file accumulators for this batch.
  */
 function _autoAssignSuppFromFolder(invalidFiles) {
     for (const inv of invalidFiles) {
         if (!inv.isSupplementaryCandidate || inv.isEmpty) continue;
         if (state.supplementaryFiles.has(inv.name)) continue;
         const raw = state.fileRawContent.get(inv.name) || '';
-        state.supplementaryFiles.set(inv.name, {
-            name: inv.name, category: 'summary-related',
-            content: raw, editedContent: raw,
-            date: '', time: '', location: '', notes: '',
-        });
+        /** @type {SuppFile} */
+        const suppFile = { name: inv.name, category: 'summary-related', content: raw, editedContent: raw, date: '', time: '', location: '', notes: '' };
+        state.supplementaryFiles.set(inv.name, suppFile);
     }
 }
 
@@ -457,11 +452,11 @@ export async function handleFileInput(event) {
     // Append new file statuses to existing list (preserve files from previous loads)
     state.files = [
         ...state.files,
-        ...validFiles.map(f => ({
+        ...validFiles.map(f => /** @type {IngestedFile} */ ({
             name: f.name, entryCount: f.count, valid: true,
             mode: f.mode, problematic: f.problematic || false,
         })),
-        ...invalidFiles.map(f => ({
+        ...invalidFiles.map(f => /** @type {IngestedFile} */ ({
             name: f.name, entryCount: 0, valid: false, problematic: false,
             rejectReason: f.reason,
             isSupplementaryCandidate: f.isSupplementaryCandidate || false,
@@ -595,7 +590,7 @@ function mergeNumberedEntries(parsed, fileName, duplicates) {
  * Merge Part-based entries into global state and auto-create acts.
  * Entry numbers start after the current highest entry number.
  *
- * @param {Array<{partNum: number, title: string, paragraphs: string[]}>} parts - Parsed parts.
+ * @param {ParsedPart[]} parts - Parsed parts.
  * @param {string} fileName - Source file name.
  * @returns {number} Total number of entries created.
  */
@@ -638,7 +633,7 @@ function mergePartEntries(parts, fileName) {
 /**
  * Build an array of user-facing warning messages from ingestion results.
  *
- * @param {string[]} invalidFiles - Filenames with no parseable content.
+ * @param {ParsedFileResult[]} invalidFiles - Files with no parseable content.
  * @param {number[]} duplicates - Entry numbers that appeared in multiple files.
  * @returns {string[]} Warning messages to display.
  */
