@@ -350,9 +350,13 @@ function _renderFileListInto(container) {
         const date     = _anRelDate(f.last_mes);
         const onCanvas = _activeFile === name;
         const tkCount  = onCanvas && _fileTokens[name];
-        const tkBadge  = tkCount
-            ? `<span class="se-cfm-an-tk-badge">${tkCount >= 1000 ? `~${(tkCount / 1000).toFixed(1)}k` : `~${tkCount}`} tk</span>`
-            : (onCanvas ? `<span class="se-cfm-an-tk-badge se-cfm-an-tk-spin"><span class="se-an-spin">&#x27F3;</span></span>` : '');
+        let tkBadge = '';
+        if (tkCount) {
+            const tkText = tkCount >= 1000 ? `~${(tkCount / 1000).toFixed(1)}k` : `~${tkCount}`;
+            tkBadge = `<span class="se-cfm-an-tk-badge">${tkText} tk</span>`;
+        } else if (onCanvas) {
+            tkBadge = `<span class="se-cfm-an-tk-badge se-cfm-an-tk-spin"><span class="se-an-spin">&#x27F3;</span></span>`;
+        }
         return `<div class="se-cfm-an-node-item">` +
             `<span class="se-cfm-an-node-date">${escHtml(date)}</span>` +
             `<span class="se-cfm-an-node-label" title="${escHtml(name)}">${escHtml(label)}</span>` +
@@ -604,15 +608,17 @@ function _toggleTokDrop() {
     const drop = document.createElement('div');
     drop.id        = 'se-cfm-an-tok-drop';
     drop.className = 'se-cfm-an-tok-drop';
+    const defDisplay = def >= 1000 ? `${+(def / 1000).toFixed(1)}k` : String(def);
+    const tokFooter  = _runMaxTokens !== null
+        ? `<button class="se-cfm-an-tok-reset">&#x2715; Reset to ST default (${defDisplay})</button>`
+        : `<div class="se-cfm-an-tok-hint">ST default: ${defDisplay}</div>`;
     drop.innerHTML =
         `<div class="se-cfm-an-tok-drop-lbl">Response token limit</div>` +
         `<div class="se-cfm-an-tok-drop-row">` +
         `<input class="se-cfm-an-tok-inp" type="number" min="256" max="32000" step="256" value="${current}">` +
         `<button class="se-cfm-an-tok-set">Set</button>` +
         `</div>` +
-        (_runMaxTokens !== null
-            ? `<button class="se-cfm-an-tok-reset">&#x2715; Reset to ST default (${def >= 1000 ? `${+(def / 1000).toFixed(1)}k` : def})</button>`
-            : `<div class="se-cfm-an-tok-hint">ST default: ${def >= 1000 ? `${+(def / 1000).toFixed(1)}k` : def}</div>`);
+        tokFooter;
 
     const rect     = btn.getBoundingClientRect();
     drop.style.top  = `${rect.bottom + 6}px`;
@@ -624,7 +630,7 @@ function _toggleTokDrop() {
     inp.select();
 
     const _apply = () => {
-        const v = parseInt(inp.value, 10);
+        const v = Number.parseInt(inp.value, 10);
         if (!isNaN(v) && v >= 256) {
             _runMaxTokens = v;
             drop.remove();
@@ -807,6 +813,20 @@ function _normaliseTarget(parsed) {
     return !isNaN(n) && raw !== null ? n : null;
 }
 
+function _actionIcon(action) {
+    if (action === 'SPLIT') return '✂';
+    if (action === 'MERGE') return '⧫';
+    if (action === 'MOVE')  return '→';
+    return '⇄';
+}
+
+function _actionDesc(n, p, target) {
+    if (p.action === 'SPLIT') return `Split #${n} into ${p.parts?.length ?? '?'} entries`;
+    if (p.action === 'MERGE') return `Merge #${n} + #${target ?? (n + 1)}`;
+    if (p.action === 'MOVE')  return `Move #${n} to after #${target ?? '?'}`;
+    return `Swap #${n} ↔ #${target}`;
+}
+
 function _makePlanNote(parsed, num) {
     if (!parsed) return '';
     const a = parsed.action;
@@ -866,28 +886,36 @@ function _stageSwap(numA, numB) {
     renderTable();
 }
 
+function _stageMoveForward(numFrom, numAfter, moving, proposed) {
+    for (let n = numFrom; n < numAfter; n++) {
+        const src = state.entries.get(n + 1);
+        if (src) { state.entries.set(n, { ...src, num: n }); state.modified.add(n); }
+    }
+    const landed = { ...moving, num: numAfter };
+    if (proposed) landed.content = proposed;
+    state.entries.set(numAfter, landed);
+    state.modified.add(numAfter);
+}
+
+function _stageMoveBackward(numFrom, numAfter, moving, proposed) {
+    for (let n = numFrom; n > numAfter + 1; n--) {
+        const src = state.entries.get(n - 1);
+        if (src) { state.entries.set(n, { ...src, num: n }); state.modified.add(n); }
+    }
+    const landed = { ...moving, num: numAfter + 1 };
+    if (proposed) landed.content = proposed;
+    state.entries.set(numAfter + 1, landed);
+    state.modified.add(numAfter + 1);
+}
+
 function _stageMove(numFrom, numAfter, proposed = null) {
     if (!state.entries.has(numFrom)) throw new Error(`Entry #${numFrom} not found`);
     if (numFrom === numAfter || numFrom === numAfter + 1) return;
     const moving = { ...state.entries.get(numFrom) };
     if (numFrom < numAfter) {
-        for (let n = numFrom; n < numAfter; n++) {
-            const src = state.entries.get(n + 1);
-            if (src) { state.entries.set(n, { ...src, num: n }); state.modified.add(n); }
-        }
-        const landed = { ...moving, num: numAfter };
-        if (proposed) landed.content = proposed;
-        state.entries.set(numAfter, landed);
-        state.modified.add(numAfter);
+        _stageMoveForward(numFrom, numAfter, moving, proposed);
     } else {
-        for (let n = numFrom; n > numAfter + 1; n--) {
-            const src = state.entries.get(n - 1);
-            if (src) { state.entries.set(n, { ...src, num: n }); state.modified.add(n); }
-        }
-        const landed = { ...moving, num: numAfter + 1 };
-        if (proposed) landed.content = proposed;
-        state.entries.set(numAfter + 1, landed);
-        state.modified.add(numAfter + 1);
+        _stageMoveBackward(numFrom, numAfter, moving, proposed);
     }
     detectGaps();
     renderTable();
@@ -1041,15 +1069,9 @@ function _showPipelineDialog(fileName, digestP1, entryNodes, setLabel) {
         if (!list) return;
 
         list.innerHTML = actionItems.map(({ num: n, parsed: p }) => {
-            const icon   = p.action === 'SPLIT' ? '✂' : p.action === 'MERGE' ? '⧫' : p.action === 'MOVE' ? '→' : '⇄';
+            const icon   = _actionIcon(p.action);
             const target = _normaliseTarget(p);
-            const desc   = p.action === 'SPLIT'
-                ? `Split #${n} into ${p.parts?.length ?? '?'} entries`
-                : p.action === 'MERGE'
-                ? `Merge #${n} + #${target ?? (n + 1)}`
-                : p.action === 'MOVE'
-                ? `Move #${n} to after #${target ?? '?'}`
-                : `Swap #${n} ↔ #${target}`;
+            const desc   = _actionDesc(n, p, target);
             return `<li class="se-cfm-an-action-item">` +
                 `<span class="se-cfm-an-action-icon">${icon}</span>` +
                 `<span class="se-cfm-an-action-lbl">${escHtml(desc)}</span>` +

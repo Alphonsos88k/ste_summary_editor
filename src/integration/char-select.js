@@ -91,7 +91,7 @@ function _handleChange(e) {
     document.dispatchEvent(new CustomEvent('se:character-changed', { detail: state.associatedCharacter }));
 }
 
-function _updateStrip(sel) {
+function _updateStrip(_sel) {
     const strip   = document.getElementById('se-char-select-strip');
     const portrait = document.getElementById('se-char-portrait');
     if (!strip) return;

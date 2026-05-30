@@ -149,29 +149,32 @@ async function _runAll(nums) {
     if (runBtn && _panel) runBtn.disabled = false;
 }
 
-async function _runSingle(num) {
-    const entry    = state.entries.get(num);
-    if (!entry) return;
-
-    const statusEl = _panel?.querySelector(`#se-br-status-${num}`);
-    if (statusEl) { statusEl.textContent = 'Thinking…'; statusEl.style.color = '#fd971f'; }
-
+function _buildRefineMessages(entry, num, sysPrompt) {
     const conflicts = (state.conflicts[num] || []).filter(c => c.severity !== 'ok');
     const feedbackLines = conflicts.flatMap(c => [
         ...(c.criticism || []).map(t => `• ${t}`),
         ...(c.feedback  || []).map(t => `→ ${t}`),
     ]);
-
-    let userMsg = '';
-    if (feedbackLines.length > 0) {
-        userMsg += `Conflict feedback for this entry:\n${feedbackLines.join('\n')}\n\n`;
-    }
+    let userMsg = feedbackLines.length > 0
+        ? `Conflict feedback for this entry:\n${feedbackLines.join('\n')}\n\n`
+        : '';
     userMsg += `Entry #${num} (rewrite this):\n${entry.content}`;
+    return [
+        { role: 'system', content: sysPrompt },
+        { role: 'user',   content: userMsg   },
+    ];
+}
+
+async function _runSingle(num) {
+    const entry = state.entries.get(num);
+    if (!entry) return;
+
+    const statusEl = _panel?.querySelector(`#se-br-status-${num}`);
+    if (statusEl) { statusEl.textContent = 'Thinking…'; statusEl.style.color = '#fd971f'; }
 
     const base      = getPrompt(PROMPT_KEY);
-    const sysPrompt = state.storyContext
-        ? `${base}\n\n---\nStory context:\n${state.storyContext}`
-        : base;
+    const sysPrompt = state.storyContext ? `${base}\n\n---\nStory context:\n${state.storyContext}` : base;
+    const messages  = _buildRefineMessages(entry, num, sysPrompt);
 
     try {
         const ctx  = SillyTavern.getContext();
@@ -182,10 +185,7 @@ async function _runSingle(num) {
                 type: 'quiet',
                 chat_completion_source: ctx.chatCompletionSettings.chat_completion_source,
                 model: ctx.getChatCompletionModel(),
-                messages: [
-                    { role: 'system', content: sysPrompt },
-                    { role: 'user',   content: userMsg   },
-                ],
+                messages,
                 max_tokens:  ctx.chatCompletionSettings.openai_max_tokens || 800,
                 temperature: 0.5,
                 stream:      false,
@@ -196,28 +196,29 @@ async function _runSingle(num) {
         const data   = await resp.json();
         const result = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
 
-        if (result && _panel) {
-            const anchor = _panel.querySelector(`#se-br-original-${num}`);
-            if (anchor) {
-                showDiffView(anchor, entry.content, result.trim(), {
-                    id: `se-br-diff-${num}`,
-                    onAccept: (newText) => {
-                        state.prevContent[num] = entry.content;
-                        entry.content = newText.trim();
-                        state.modified.add(num);
-                        persistState();
-                        renderTable();
-                        if (statusEl) { statusEl.textContent = 'Saved ✓'; statusEl.style.color = '#a6e22e'; }
-                    },
-                    onCancel: () => {
-                        if (statusEl) { statusEl.textContent = 'Discarded'; statusEl.style.color = '#75715e'; }
-                    },
-                });
-            }
-            if (statusEl) { statusEl.textContent = 'Ready ✓'; statusEl.style.color = '#a6e22e'; }
-        } else if (_panel) {
-            if (statusEl) { statusEl.textContent = 'No response'; statusEl.style.color = '#f92672'; }
+        if (!result || !_panel) {
+            if (statusEl && _panel) { statusEl.textContent = 'No response'; statusEl.style.color = '#f92672'; }
+            return;
         }
+
+        const anchor = _panel.querySelector(`#se-br-original-${num}`);
+        if (anchor) {
+            showDiffView(anchor, entry.content, result.trim(), {
+                id: `se-br-diff-${num}`,
+                onAccept: (newText) => {
+                    state.prevContent[num] = entry.content;
+                    entry.content = newText.trim();
+                    state.modified.add(num);
+                    persistState();
+                    renderTable();
+                    if (statusEl) { statusEl.textContent = 'Saved ✓'; statusEl.style.color = '#a6e22e'; }
+                },
+                onCancel: () => {
+                    if (statusEl) { statusEl.textContent = 'Discarded'; statusEl.style.color = '#75715e'; }
+                },
+            });
+        }
+        if (statusEl) { statusEl.textContent = 'Ready ✓'; statusEl.style.color = '#a6e22e'; }
     } catch (err) {
         console.error('[SE] Bulk refine error:', err);
         if (statusEl && _panel) { statusEl.textContent = 'Error'; statusEl.style.color = '#f92672'; }

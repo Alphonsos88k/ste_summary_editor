@@ -339,9 +339,8 @@ export function showFeedbackDetail(entryNum) {
     if (!feedbackItems || feedbackItems.length === 0) return;
 
     const entry = state.entries.get(entryNum);
-    const contentPreview = entry
-        ? (entry.content.length > 300 ? entry.content.slice(0, 300) + '...' : entry.content)
-        : '';
+    const raw = entry?.content ?? '';
+    const contentPreview = raw.length > 300 ? raw.slice(0, 300) + '...' : raw;
 
     // Find worst severity for the header
     const headerSev = getWorstSeverity(feedbackItems);
@@ -478,11 +477,13 @@ async function showConflictResultsDialog(logEntry) {
             </table>
         </div>`;
 
+        const prevDis = page > 1 ? '' : 'disabled';
+        const nextDis = page < totalPages ? '' : 'disabled';
         const paginatorHtml = totalPages > 1
             ? `<div class="se-cr-paginator">
-                <button class="se-btn se-btn-sm" id="se-cr-prev" ${page > 1 ? '' : 'disabled'}>&laquo; Prev</button>
+                <button class="se-btn se-btn-sm" id="se-cr-prev" ${prevDis}>&laquo; Prev</button>
                 <span class="se-cr-page-info">Page ${page} / ${totalPages}</span>
-                <button class="se-btn se-btn-sm" id="se-cr-next" ${page < totalPages ? '' : 'disabled'}>Next &raquo;</button>
+                <button class="se-btn se-btn-sm" id="se-cr-next" ${nextDis}>Next &raquo;</button>
             </div>`
             : '';
 

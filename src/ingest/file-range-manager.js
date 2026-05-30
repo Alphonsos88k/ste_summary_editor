@@ -370,50 +370,50 @@ function _showInlineNewFileForm({ overflow = [], label = '' } = {}) {
 
 async function _autoBalance() {
     if (!state.fileRanges.size) return;
-
-    // Phase 0: detect orphan entries (in state.entries but not in any range)
-    const orphans = _findOrphanEntries();
-    if (orphans.length > 0) {
-        const entryList = orphans.slice(0, 20).map(n => `#${n}`).join(', ') +
-            (orphans.length > 20 ? ` … (+${orphans.length - 20} more)` : '');
-        // Re-use _showInlineNewFileForm to let user name a file for them
-        const tbody = _panel.querySelector('#se-frm-rows');
-        // Add a placeholder row so user sees the context
-        const infoRow = document.createElement('tr');
-        infoRow.className = 'se-frm-new-form';
-        infoRow.innerHTML = `<td colspan="5" class="se-frm-split-td" style="color:#fd971f;font-size:0.82em;padding:6px 10px;">
-            Unassigned entries found: ${escHtml(entryList)}. Name a file to collect them, or Cancel to skip.
-        </td>`;
-        tbody.appendChild(infoRow);
-        await new Promise(r => setTimeout(r, 0)); // let DOM update
-
-        const newKey = await _showInlineNewFileForm({ overflow: orphans, label: 'orphans' });
-        infoRow.remove();
-        if (!newKey) {
-            // User skipped — continue without orphans
-        }
-        _sortRanges();
-        persistState();
-        _render();
-    }
-
-    // Phase 1: Even distribution by count
+    await _balancePhase0Orphans();
     const allNums = [...state.fileRanges.values()].flatMap(r => r.entryNums).sort((a, b) => a - b);
     if (allNums.length === 0) return;
+    _balancePhase1EvenDist(allNums);
+    _balancePhase2SizeShift();
+    await _balancePhase3Split();
+    _sortRanges();
+    persistState();
+    _render();
+}
 
+async function _balancePhase0Orphans() {
+    const orphans = _findOrphanEntries();
+    if (orphans.length === 0) return;
+    const suffix   = orphans.length > 20 ? ` … (+${orphans.length - 20} more)` : '';
+    const entryList = orphans.slice(0, 20).map(n => `#${n}`).join(', ') + suffix;
+    const tbody  = _panel.querySelector('#se-frm-rows');
+    const infoRow = document.createElement('tr');
+    infoRow.className = 'se-frm-new-form';
+    infoRow.innerHTML = `<td colspan="5" class="se-frm-split-td" style="color:#fd971f;font-size:0.82em;padding:6px 10px;">
+        Unassigned entries found: ${escHtml(entryList)}. Name a file to collect them, or Cancel to skip.
+    </td>`;
+    tbody.appendChild(infoRow);
+    await new Promise(r => setTimeout(r, 0));
+    await _showInlineNewFileForm({ overflow: orphans, label: 'orphans' });
+    infoRow.remove();
+    _sortRanges();
+    persistState();
+    _render();
+}
+
+function _balancePhase1EvenDist(allNums) {
     const rangeKeys = [...state.fileRanges.keys()];
-    const n = rangeKeys.length;
+    const n     = rangeKeys.length;
     const chunk = Math.ceil(allNums.length / n);
     for (let i = 0; i < n; i++) {
         state.fileRanges.get(rangeKeys[i]).entryNums = allNums.slice(i * chunk, (i + 1) * chunk);
     }
     _render();
+}
 
-    // Phase 2: Size-based shifting — move overflow from over-limit files to the smallest
-    // available file that comes AFTER the source file in part order
+function _balancePhase2SizeShift() {
     let changed = true;
-    // Only shift to the immediately next file — preserves cross-file entry order
-    let guard = 0;
+    let guard   = 0;
     while (changed && guard++ < 200) {
         changed = false;
         const keys = [...state.fileRanges.keys()];
@@ -421,7 +421,6 @@ async function _autoBalance() {
             const src  = state.fileRanges.get(keys[i]);
             const dest = state.fileRanges.get(keys[i + 1]);
             if (estimateRangeSizeKB(src.entryNums) <= FILE_SIZE_LIMIT_KB) continue;
-
             const sorted = [...src.entryNums].sort((a, b) => a - b);
             while (estimateRangeSizeKB(src.entryNums) > FILE_SIZE_LIMIT_KB) {
                 const last = sorted[sorted.length - 1];
@@ -434,41 +433,28 @@ async function _autoBalance() {
         }
     }
     _render();
+}
 
-    // Phase 3: Any file still over limit gets split — user names the new overflow file
+async function _balancePhase3Split() {
     const overKeys = [...state.fileRanges.keys()].filter(
         k => estimateRangeSizeKB(state.fileRanges.get(k).entryNums) > FILE_SIZE_LIMIT_KB
     );
-
     for (const key of overKeys) {
         const range = state.fileRanges.get(key);
         if (!range) continue;
-
         const sorted = [...range.entryNums].sort((a, b) => a - b);
-        // Find max entries that fit within the size limit
         let splitAt = 0;
         while (splitAt < sorted.length - 1 &&
                estimateRangeSizeKB(sorted.slice(0, splitAt + 1)) <= FILE_SIZE_LIMIT_KB) {
             splitAt++;
         }
-        // Ensure at least one entry stays in the source
         if (splitAt === 0) splitAt = 1;
         const overflow = sorted.slice(splitAt);
         if (overflow.length === 0) continue;
-
         range.entryNums = sorted.slice(0, splitAt);
-
         const newKey = await _showInlineNewFileForm({ overflow, label: `overflow from ${key}` });
-        if (!newKey) {
-            // User cancelled — put entries back
-            range.entryNums = sorted;
-            break;
-        }
+        if (!newKey) { range.entryNums = sorted; break; }
         _sortRanges();
         _render();
     }
-
-    _sortRanges();
-    persistState();
-    _render();
 }

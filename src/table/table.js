@@ -81,62 +81,54 @@ export async function initTable() {
 export function getFilteredEntries() {
     const allNums = new Set([...state.entries.keys(), ...state.gaps]);
     let entries = [...allNums].sort((a, b) => a - b).map(num => {
-        if (state.entries.has(num)) {
-            return { ...state.entries.get(num), isGap: false };
-        }
+        if (state.entries.has(num)) return { ...state.entries.get(num), isGap: false };
         return { num, content: '', isGap: true };
     });
 
-    // Apply search filter across all columns
-    if (state.searchQuery) {
-        const q = state.searchQuery;
-        if (q === 'checked') {
-            entries = entries.filter(e => e.isGap || state.selected.has(e.num));
-        } else if (q === 'unchecked') {
-            entries = entries.filter(e => e.isGap || !state.selected.has(e.num));
-        } else {
-            entries = entries.filter(e => {
-                if (e.isGap) return false;
-                // Match against num, content, act name, date, time, location
-                if (String(e.num).includes(q)) return true;
-                if (e.content.toLowerCase().includes(q)) return true;
-                if (e.date?.toLowerCase().includes(q)) return true;
-                if (e.time?.toLowerCase().includes(q)) return true;
-                if (e.location?.toLowerCase().includes(q)) return true;
-                if (e.actId) {
-                    const actName = state.acts.get(e.actId)?.name || '';
-                    if (actName.toLowerCase().includes(q)) return true;
-                }
-                return false;
-            });
+    if (state.searchQuery) entries = _applySearchFilter(entries, state.searchQuery);
+    entries = _applyActFilter(entries, state.filterAct);
+    _applySortOrder(entries, state.sortBy, state.sortDir);
+    entries.sort((a, b) => (a.problematic ? 1 : 0) - (b.problematic ? 1 : 0));
+    return entries;
+}
+
+function _applySearchFilter(entries, q) {
+    if (q === 'checked')   return entries.filter(e => e.isGap || state.selected.has(e.num));
+    if (q === 'unchecked') return entries.filter(e => e.isGap || !state.selected.has(e.num));
+    return entries.filter(e => {
+        if (e.isGap) return false;
+        if (String(e.num).includes(q)) return true;
+        if (e.content.toLowerCase().includes(q)) return true;
+        if (e.date?.toLowerCase().includes(q)) return true;
+        if (e.time?.toLowerCase().includes(q)) return true;
+        if (e.location?.toLowerCase().includes(q)) return true;
+        if (e.actId) {
+            const actName = state.acts.get(e.actId)?.name || '';
+            if (actName.toLowerCase().includes(q)) return true;
         }
+        return false;
+    });
+}
+
+function _applyActFilter(entries, filterAct) {
+    if (filterAct === 'unassigned')  return entries.filter(e => e.isGap || !e.actId);
+    if (filterAct === 'gaps')        return entries.filter(e => e.isGap);
+    if (filterAct === 'checked')     return entries.filter(e => !e.isGap && state.selected.has(e.num));
+    if (filterAct === 'unchecked')   return entries.filter(e => !e.isGap && !state.selected.has(e.num));
+    if (filterAct === 'summary:all') return entries;
+    if (typeof filterAct === 'string' && filterAct.startsWith('supp:')) return [];
+    if (filterAct !== 'all') {
+        const actId = Number.parseInt(filterAct, 10);
+        return entries.filter(e => e.isGap || e.actId === actId);
     }
+    return entries;
+}
 
-    // Apply filter dropdown
-    if (state.filterAct === 'unassigned') {
-        entries = entries.filter(e => e.isGap || !e.actId);
-    } else if (state.filterAct === 'gaps') {
-        entries = entries.filter(e => e.isGap);
-    } else if (state.filterAct === 'checked') {
-        entries = entries.filter(e => !e.isGap && state.selected.has(e.num));
-    } else if (state.filterAct === 'unchecked') {
-        entries = entries.filter(e => !e.isGap && !state.selected.has(e.num));
-    } else if (typeof state.filterAct === 'string' && state.filterAct.startsWith('supp:')) {
-        // Supplementary filter: hide all main entries — supp rows render separately below
-        entries = [];
-    } else if (state.filterAct === 'summary:all') {
-        // Summary-only filter: show all regular entries, hide supp rows (no-op here — supp skipped below)
-    } else if (state.filterAct !== 'all') {
-        const actId = Number.parseInt(state.filterAct, 10);
-        entries = entries.filter(e => e.isGap || e.actId === actId);
-    }
-
-    // Apply sort with direction
-    const dir = state.sortDir === 'desc' ? -1 : 1;
-
-    if (state.sortBy === 'num') {
+function _applySortOrder(entries, sortBy, sortDir) {
+    const dir = sortDir === 'desc' ? -1 : 1;
+    if (sortBy === 'num') {
         entries.sort((a, b) => (a.num - b.num) * dir);
-    } else if (state.sortBy === 'act') {
+    } else if (sortBy === 'act') {
         entries.sort((a, b) => {
             const aAct = a.actId ? (state.acts.get(a.actId)?.name || '') : '';
             const bAct = b.actId ? (state.acts.get(b.actId)?.name || '') : '';
@@ -145,22 +137,16 @@ export function getFilteredEntries() {
             if (!bAct) return -1;
             return aAct.localeCompare(bAct) * dir;
         });
-    } else if (['content', 'date', 'time', 'location', 'notes'].includes(state.sortBy)) {
-        const field = state.sortBy;
+    } else if (['content', 'date', 'time', 'location', 'notes'].includes(sortBy)) {
         entries.sort((a, b) => {
-            const aVal = (a[field] || '').toLowerCase();
-            const bVal = (b[field] || '').toLowerCase();
+            const aVal = (a[sortBy] || '').toLowerCase();
+            const bVal = (b[sortBy] || '').toLowerCase();
             if (aVal === bVal) return (a.num - b.num) * dir;
             if (!aVal) return 1;
             if (!bVal) return -1;
             return aVal.localeCompare(bVal) * dir;
         });
     }
-
-    // Push problematic entries to the bottom (after all normal + gap rows)
-    entries.sort((a, b) => (a.problematic ? 1 : 0) - (b.problematic ? 1 : 0));
-
-    return entries;
 }
 
 /**
@@ -177,83 +163,32 @@ export function getTotalPages() {
  * Rebuilds the entire table body — called after any state change.
  */
 export function renderTable() {
-    const entries = getFilteredEntries();
+    const entries    = getFilteredEntries();
     const totalPages = Math.max(1, Math.ceil(entries.length / ROWS_PER_PAGE));
-
     if (state.currentPage > totalPages) state.currentPage = totalPages;
 
-    const start = (state.currentPage - 1) * ROWS_PER_PAGE;
+    const start      = (state.currentPage - 1) * ROWS_PER_PAGE;
     const pageEntries = entries.slice(start, start + ROWS_PER_PAGE);
 
     const $wrap = $('#se-table-wrap');
     const scrollTop = $wrap.scrollTop();
-
     const $body = $('#se-table-body');
     $body.empty();
 
-    // Toggle feedback column header
     const hasFeedback = Object.keys(state.conflicts).length > 0;
     $('#se-th-feedback').toggle(hasFeedback);
     const colSpan = hasFeedback ? 9 : 8;
 
-    // Show empty state or table — keep table visible if supplementary files are assigned
     const hasSupp = [...state.supplementaryFiles.values()].some(f => !!f.category);
-    if (entries.length === 0 && state.entries.size === 0 && !hasSupp) {
-        $('#se-empty-state').show();
-        $('#se-table').hide();
-        $('#se-pagination').hide();
-    } else {
-        $('#se-empty-state').hide();
-        $('#se-table').show();
-        $('#se-pagination').show();
-
-        if (entries.length === 0) {
-            $body.append(
-                `<tr><td colspan="${colSpan}" style="text-align:center;color:#75715e;padding:30px;">` +
-                'No entries match the current filter.</td></tr>'
-            );
-        }
-    }
-
-    let lastActId = null;
-    for (const entry of pageEntries) {
-        // Insert act group header when sorted by act
-        if (state.sortBy === 'act' && !entry.isGap) {
-            const actId = entry.actId || '__unassigned__';
-            if (actId !== lastActId) {
-                lastActId = actId;
-                const act = actId === '__unassigned__' ? null : state.acts.get(actId);
-                const name = act ? escHtml(act.name) : 'Unassigned';
-                const bg = act ? act.color.bg : '#555';
-                const fg = act ? act.color.fg : '#ccc';
-                const isCollapsed = collapsedActs.has(actId);
-                const chevron = isCollapsed ? '&#9654;' : '&#9660;';
-                $body.append(
-                    `<tr class="se-act-group-header" data-act-group="${escAttr(actId)}">` +
-                    `<td colspan="${colSpan}" style="cursor:pointer;">` +
-                    `<span class="se-act-group-chevron">${chevron}</span>` +
-                    `<span class="se-act-badge" style="background:${bg};color:${fg};font-size:0.82em;">${name}</span>` +
-                    '</td></tr>',
-                );
-            }
-            if (collapsedActs.has(entry.actId || '__unassigned__')) continue;
-        }
-
-        if (entry.isGap) {
-            $body.append(buildGapRow(entry.num));
-        } else {
-            $body.append(buildEntryRow(entry));
-        }
-    }
+    _updateTableVisibility(entries, $body, colSpan, hasSupp);
+    _renderTableBody(pageEntries, $body, colSpan);
 
     applyRangeBorderClasses($body[0]);
-
     bindCheckboxEvents($body);
     bindRowClickEvents($body);
     bindEditableCells($body);
     bindDragReorder($body);
 
-    // Supplementary rows on last page only; Summary Files subheader on first page only
     const isLastPage  = state.currentPage >= totalPages;
     const isFirstPage = state.currentPage <= 1;
     _renderSupplementaryRows($body, colSpan, isLastPage, isFirstPage && hasSupp && entries.length > 0);
@@ -263,8 +198,53 @@ export function renderTable() {
     syncSelectAllCheckbox($body);
     updateUndoButton();
     _updateCollapseAllBtn();
-
     $wrap.scrollTop(scrollTop);
+}
+
+function _updateTableVisibility(entries, $body, colSpan, hasSupp) {
+    if (entries.length === 0 && state.entries.size === 0 && !hasSupp) {
+        $('#se-empty-state').show();
+        $('#se-table').hide();
+        $('#se-pagination').hide();
+    } else {
+        $('#se-empty-state').hide();
+        $('#se-table').show();
+        $('#se-pagination').show();
+        if (entries.length === 0) {
+            $body.append(
+                `<tr><td colspan="${colSpan}" style="text-align:center;color:#75715e;padding:30px;">` +
+                'No entries match the current filter.</td></tr>'
+            );
+        }
+    }
+}
+
+function _renderTableBody(pageEntries, $body, colSpan) {
+    let lastActId = null;
+    for (const entry of pageEntries) {
+        if (state.sortBy === 'act' && !entry.isGap) {
+            const actId = entry.actId || '__unassigned__';
+            if (actId !== lastActId) {
+                lastActId = actId;
+                $body.append(_buildActGroupHeader(actId, colSpan));
+            }
+            if (collapsedActs.has(entry.actId || '__unassigned__')) continue;
+        }
+        $body.append(entry.isGap ? buildGapRow(entry.num) : buildEntryRow(entry));
+    }
+}
+
+function _buildActGroupHeader(actId, colSpan) {
+    const act     = actId === '__unassigned__' ? null : state.acts.get(actId);
+    const name    = act ? escHtml(act.name) : 'Unassigned';
+    const bg      = act ? act.color.bg : '#555';
+    const fg      = act ? act.color.fg : '#ccc';
+    const chevron = collapsedActs.has(actId) ? '&#9654;' : '&#9660;';
+    return `<tr class="se-act-group-header" data-act-group="${escAttr(actId)}">` +
+        `<td colspan="${colSpan}" style="cursor:pointer;">` +
+        `<span class="se-act-group-chevron">${chevron}</span>` +
+        `<span class="se-act-badge" style="background:${bg};color:${fg};font-size:0.82em;">${name}</span>` +
+        '</td></tr>';
 }
 
 function _updateCollapseAllBtn() {
@@ -421,34 +401,10 @@ function _bindSuppEditableCells($body) {
         const label  = field.charAt(0).toUpperCase() + field.slice(1);
         const isDate = field === 'date';
         const isTime = field === 'time';
-        const isNotes = field === 'notes';
-
-        let fieldInput;
-        if (isDate)       fieldInput = buildDatePickerHtml(currentValue);
-        else if (isTime)  fieldInput = buildTimePickerHtml(currentValue);
-        else if (isNotes) fieldInput = `<textarea placeholder="${label}" rows="4">${escHtml(currentValue)}</textarea>`;
-        else              fieldInput = `<input type="text" value="${escAttr(currentValue)}" placeholder="${label}" />`;
-
-        const showOk = !isDate;
-        const pop = document.createElement('div');
-        pop.className = 'se-edit-popover' + (isDate ? ' se-edit-popover-wide' : '') + (isNotes ? ' se-edit-popover-notes' : '');
-        pop.innerHTML =
-            `<div class="se-edit-popover-label">${label} <span style="color:#75715e;font-size:0.85em;">(no export effect)</span></div>` +
-            fieldInput +
-            '<div class="se-edit-popover-actions">' +
-            (isDate ? '<button class="se-btn se-btn-sm se-ep-clear">Clear</button><span style="flex:1;"></span>' : '') +
-            '<button class="se-btn se-btn-sm se-ep-cancel">Cancel</button>' +
-            (showOk ? '<button class="se-btn se-btn-primary se-btn-sm se-ep-ok">OK</button>' : '') +
-            '</div>';
 
         const rect = $td[0].getBoundingClientRect();
-        const popWidth = isDate ? 260 : 240;
-        let left = rect.left;
-        const top = rect.bottom + 6;
-        if (left + popWidth > window.innerWidth) left = window.innerWidth - popWidth - 10;
-        if (left < 4) left = 4;
-        pop.style.left = left + 'px';
-        pop.style.top  = top + 'px';
+        const pop  = _spawnEditPopover(field, `${label} <span style="color:#75715e;font-size:0.85em;">(no export effect)</span>`, '', rect, currentValue);
+
         document.body.appendChild(pop);
         activeEditPopover = pop;
 
@@ -759,44 +715,32 @@ function buildFeedbackCell(num, hasFeedback, conflicts) {
     return { feedbackCell: '', rowStyle: '' };
 }
 
+function _buildHealthBadge(entry, hasFeedback, conflicts) {
+    const hasContent      = !!entry.content.trim();
+    const hasAllMeta      = !!(entry.date && entry.time && entry.location);
+    const hasHardConflict = hasFeedback && conflicts.some(c => c.severity === 'error' || c.severity === 'warning');
+    let healthColor, healthTitle;
+    if (!hasContent)       { healthColor = '#f92672'; healthTitle = 'No content'; }
+    else if (hasHardConflict) { healthColor = '#f92672'; healthTitle = 'Has conflicts'; }
+    else if (hasAllMeta)   { healthColor = '#a6e22e'; healthTitle = 'Valid'; }
+    else                   { healthColor = '#e9c46a'; healthTitle = 'Missing metadata'; }
+    const textColor = healthColor === '#a6e22e' ? '#1a1b12' : '#f8f8f2';
+    return `<span class="se-health-badge" data-tooltip="${healthTitle}" style="background:${healthColor};color:${textColor};">${entry.num}</span>`;
+}
+
 function buildEntryRow(entry) {
     const act = entry.actId ? state.acts.get(entry.actId) : null;
     const actBadge = act
         ? `<span class="se-act-badge" style="background:${act.color.bg};color:${act.color.fg};">${escHtml(act.name)}</span>`
         : '<span class="se-act-unassigned">Unassigned</span>';
 
-    const isSelected = state.selected.has(entry.num);
-    const conflicts = state.conflicts[entry.num];
+    const isSelected  = state.selected.has(entry.num);
+    const conflicts   = state.conflicts[entry.num];
     const hasFeedback = conflicts && conflicts.length > 0;
-    let contentHtml;
-    if (hasFeedback) {
-        contentHtml = applyConflictHighlights(entry.content, conflicts);
-    } else {
-        contentHtml = escHtml(entry.content);
-    }
+    const contentHtml = hasFeedback ? applyConflictHighlights(entry.content, conflicts) : escHtml(entry.content);
 
-    // Build feedback cell — severity chip, clickable
     const { feedbackCell, rowStyle } = buildFeedbackCell(entry.num, hasFeedback, conflicts);
-
-    // Health dot
-    // Red:    no content, OR has error/warning conflicts
-    // Yellow: has content + no hard conflicts, but missing any of date/time/location
-    // Green:  has content + all metadata filled + no error/warning conflicts
-    const hasContent     = !!entry.content.trim();
-    const hasAllMeta     = !!(entry.date && entry.time && entry.location);
-    const hasHardConflict = hasFeedback && conflicts.some(c => c.severity === 'error' || c.severity === 'warning');
-    let healthColor, healthTitle;
-    if (!hasContent) {
-        healthColor = '#f92672'; healthTitle = 'No content';
-    } else if (hasHardConflict) {
-        healthColor = '#f92672'; healthTitle = 'Has conflicts';
-    } else if (hasAllMeta) {
-        healthColor = '#a6e22e'; healthTitle = 'Valid';
-    } else {
-        healthColor = '#e9c46a'; healthTitle = 'Missing metadata';
-    }
-    const textColor = healthColor === '#a6e22e' ? '#1a1b12' : '#f8f8f2';
-    const healthBadge = `<span class="se-health-badge" data-tooltip="${healthTitle}" style="background:${healthColor};color:${textColor};">${entry.num}</span>`;
+    const healthBadge = _buildHealthBadge(entry, hasFeedback, conflicts);
 
     const rowClasses = [];
     if (isSelected) rowClasses.push('se-selected');
@@ -1129,63 +1073,65 @@ function readTimePicker(pop) {
 
 // ─── Editable Cells ──────────────────────────────────────────
 
+function _buildFieldInput(field, currentValue, label) {
+    if (field === 'date')  return buildDatePickerHtml(currentValue);
+    if (field === 'time')  return buildTimePickerHtml(currentValue);
+    if (field === 'notes') return `<textarea placeholder="${label}" rows="4">${escHtml(currentValue)}</textarea>`;
+    return `<input type="text" value="${escAttr(currentValue)}" placeholder="${label}" />`;
+}
+
+function _spawnEditPopover(field, label, notExported, rect, currentValue = '') {
+    const isDate  = field === 'date';
+    const isNotes = field === 'notes';
+    const showOk  = !isDate;
+    const fieldInput = _buildFieldInput(field, currentValue, label);
+
+    const pop = document.createElement('div');
+    pop.className = 'se-edit-popover' + (isDate ? ' se-edit-popover-wide' : '') + (isNotes ? ' se-edit-popover-notes' : '');
+    pop.innerHTML =
+        `<div class="se-edit-popover-label">${label}${notExported}</div>` +
+        fieldInput +
+        '<div class="se-edit-popover-actions">' +
+        (isDate ? '<button class="se-btn se-btn-sm se-ep-clear">Clear</button><span style="flex:1;"></span>' : '') +
+        '<button class="se-btn se-btn-sm se-ep-cancel">Cancel</button>' +
+        (showOk ? '<button class="se-btn se-btn-primary se-btn-sm se-ep-ok">OK</button>' : '') +
+        '</div>';
+
+    const popWidth = isDate ? 260 : 240;
+    const timeOrDefault = field === 'time' ? 100 : 120;
+    const popHeight = isDate ? 310 : timeOrDefault;
+    let left = rect.left;
+    let top  = rect.bottom + 6;
+    if (left + popWidth > window.innerWidth) left = window.innerWidth - popWidth - 10;
+    if (left < 4) left = 4;
+    if (top + popHeight > window.innerHeight) {
+        top = rect.top - popHeight;
+        pop.classList.add('se-edit-popover-above');
+    }
+    pop.style.left = left + 'px';
+    pop.style.top  = top + 'px';
+    return pop;
+}
+
 function bindEditableCells($body) {
     $body.find('.se-editable-cell .se-cell-display').on('click', function (e) {
         e.stopPropagation();
         closeEditPopover();
 
-        const $td = $(this).closest('.se-editable-cell');
-        const num = Number.parseInt($td.data('num'), 10);
+        const $td  = $(this).closest('.se-editable-cell');
+        const num  = Number.parseInt($td.data('num'), 10);
         const field = $td.data('field');
         const entry = state.entries.get(num);
         if (!entry) return;
 
         const currentValue = entry[field] || '';
-        const label = field.charAt(0).toUpperCase() + field.slice(1);
+        const label      = field.charAt(0).toUpperCase() + field.slice(1);
         const notExported = field === 'notes' ? ' (not exported)' : '';
         const isDate = field === 'date';
         const isTime = field === 'time';
 
-        let fieldInput;
-        if (isDate) {
-            fieldInput = buildDatePickerHtml(currentValue);
-        } else if (isTime) {
-            fieldInput = buildTimePickerHtml(currentValue);
-        } else if (field === 'notes') {
-            fieldInput = `<textarea placeholder="${label}" rows="4">${escHtml(currentValue)}</textarea>`;
-        } else {
-            fieldInput = `<input type="text" value="${escAttr(currentValue)}" placeholder="${label}" />`;
-        }
-
-        const showOk = !isDate; // date auto-saves on day click
-        const pop = document.createElement('div');
-        pop.className = 'se-edit-popover' + (isDate ? ' se-edit-popover-wide' : '') + (field === 'notes' ? ' se-edit-popover-notes' : '');
-        pop.innerHTML =
-            `<div class="se-edit-popover-label">${label}${notExported}</div>` +
-            fieldInput +
-            '<div class="se-edit-popover-actions">' +
-            (isDate ? '<button class="se-btn se-btn-sm se-ep-clear">Clear</button><span style="flex:1;"></span>' : '') +
-            '<button class="se-btn se-btn-sm se-ep-cancel">Cancel</button>' +
-            (showOk ? '<button class="se-btn se-btn-primary se-btn-sm se-ep-ok">OK</button>' : '') +
-            '</div>';
-
-        // Position below the cell, clamped to viewport
         const rect = $td[0].getBoundingClientRect();
-        const popWidth = isDate ? 260 : 240;
-        let popHeight = 120;
-        if (isDate) popHeight = 310;
-        else if (isTime) popHeight = 100;
-        let left = rect.left;
-        let top = rect.bottom + 6;
-        if (left + popWidth > window.innerWidth) left = window.innerWidth - popWidth - 10;
-        if (left < 4) left = 4;
-        if (top + popHeight > window.innerHeight) {
-            top = rect.top - popHeight;
-            pop.classList.add('se-edit-popover-above');
-        }
-
-        pop.style.left = left + 'px';
-        pop.style.top = top + 'px';
+        const pop  = _spawnEditPopover(field, label, notExported, rect, currentValue);
 
         document.body.appendChild(pop);
         activeEditPopover = pop;

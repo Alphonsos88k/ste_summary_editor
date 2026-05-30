@@ -461,9 +461,10 @@ export async function downloadBySource() {
     let delay = 0;
     for (const [fileName, entries] of grouped) {
         const content = buildContentForEntries(entries, format);
-        const ext = format === 'json' ? '.json' : format === 'md' ? '.md' : '.txt';
+        const ext = _formatExt(format);
         const name = fileName.replace(/\.[^.]+$/, '') + ext;
-        setTimeout(() => downloadFile(name, content, format === 'json' ? 'application/json' : 'text/plain'), delay);
+        const mime = format === 'json' ? 'application/json' : 'text/plain';
+        setTimeout(() => downloadFile(name, content, mime), delay);
         delay += 300;
     }
 }
@@ -483,7 +484,7 @@ export async function downloadAsZip() {
     const files = [];
     for (const [fileName, entries] of grouped) {
         const content = buildContentForEntries(entries, format);
-        const ext = format === 'json' ? '.json' : format === 'md' ? '.md' : '.txt';
+        const ext = _formatExt(format);
         const name = fileName.replace(/\.[^.]+$/, '') + ext;
         files.push({ name, content });
     }
@@ -524,6 +525,12 @@ function groupEntriesBySource() {
         entries.sort((a, b) => a.num - b.num);
     }
     return grouped;
+}
+
+function _formatExt(format) {
+    if (format === 'json') return '.json';
+    if (format === 'md')   return '.md';
+    return '.txt';
 }
 
 /**
