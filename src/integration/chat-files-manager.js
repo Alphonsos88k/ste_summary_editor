@@ -27,7 +27,7 @@ let _focusLockAbort = null;
 // Only one analyser instance is active at a time; switching tabs
 // saves the current graph, destroys, re-inits, and restores.
 
-/** @type {Array<{id:number, label:string, graphData:object|null}>} */
+/** @type {Array<{id:number, label:string, tooltip?:string, graphData:object|null}>} */
 let _tabs          = [];
 let _activeTabId   = null;
 let _nextTabId     = 1;
@@ -479,7 +479,7 @@ function _renderTabBar() {
         item.className = classes.join(' ');
         item.dataset.tabId = String(tab.id);
         item.innerHTML =
-            `<span class="se-cfm-an-inner-tab-label" title="${escHtml(tab.label)}">${escHtml(tab.label)}</span>` +
+            `<span class="se-cfm-an-inner-tab-label" title="${escHtml(tab.tooltip ?? tab.label)}">${escHtml(tab.label)}</span>` +
             (_tabs.length > 1 ? `<button class="se-cfm-an-inner-tab-close" data-close-tab="${tab.id}" title="Close">×</button>` : '');
         newBtn.before(item);
     }
@@ -518,7 +518,8 @@ function _registerActiveFileListener() {
         const tab = _tabs.find(t => t.id === _activeTabId);
         if (!tab) return;
         if (fileName) {
-            tab.label = _dedupeLabel(_fileTabLabel(fileName), _activeTabId);
+            tab.tooltip = fileName.replace(/\.jsonl$/, '');
+            tab.label   = _dedupeLabel(_fileTabLabel(fileName), _activeTabId);
         }
         _renderTabBar();
         _saveTabState();
