@@ -1,3 +1,27 @@
+# [1.22.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.21.0...v1.22.0) (2026-05-30)
+
+
+### Bug Fixes
+
+* canvas starts empty on reload; draggable tabs; cross-hatch at tab cap; clear-all resets panel ([129a6fe](https://github.com/Alphonsos88k/ste_summary_editor/commit/129a6fe4c49cc38a0cc0bc2267bbedce1943f28c))
+* faint border on inactive tabs so they read as tabs ([f32fe44](https://github.com/Alphonsos88k/ste_summary_editor/commit/f32fe44fd525a3608c4c96b147903ed47542a4db))
+* modern tab styling — green top accent on active, contrast-safe inactive text ([9a7db09](https://github.com/Alphonsos88k/ste_summary_editor/commit/9a7db0981d5672aaad3444076f26b6376c37ddb1)), closes [#a6e22e](https://github.com/Alphonsos88k/ste_summary_editor/issues/a6e22e) [#1e1e18](https://github.com/Alphonsos88k/ste_summary_editor/issues/1e1e18) [#6a6a6a](https://github.com/Alphonsos88k/ste_summary_editor/issues/6a6a6a) [#999](https://github.com/Alphonsos88k/ste_summary_editor/issues/999) [#e0e0d8](https://github.com/Alphonsos88k/ste_summary_editor/issues/e0e0d8) [#fd971f](https://github.com/Alphonsos88k/ste_summary_editor/issues/fd971f)
+* move active tab accent to bottom border (green underline) ([e5ea0e7](https://github.com/Alphonsos88k/ste_summary_editor/commit/e5ea0e7cea794276ce26419c2e23ec6afac005d3))
+* remove folder path copy button from chat files toolbar ([225c814](https://github.com/Alphonsos88k/ste_summary_editor/commit/225c81404828a1c84d63e2d1a9c2ba8433389215))
+* tab names auto-update to chat file name; dedup with ' - N' convention ([4638a9e](https://github.com/Alphonsos88k/ste_summary_editor/commit/4638a9e0fff24d8d4bcc0cbc7e04e0eadf9c4c87))
+* tab tooltip shows full untruncated file name on hover ([2668d5b](https://github.com/Alphonsos88k/ste_summary_editor/commit/2668d5b4ea09c7cc6fb32bb61967d600b5455cc2))
+
+
+### Features
+
+* multiple closeable Analyze tabs with file shortcut and API busy indicator ([6aed042](https://github.com/Alphonsos88k/ste_summary_editor/commit/6aed0427cab060fc005a3a0b4a0ab28622508a21))
+* recycle Canvas numbers, dedup suffixes smallest-first; 10-tab hard cap ([1ebbf5b](https://github.com/Alphonsos88k/ste_summary_editor/commit/1ebbf5be950cd54fbbbad2b073af305d8eb88ef1))
+
+
+### Performance Improvements
+
+* batch dot-grid into single canvas path; rAF-throttle tab drag; defer canvas init ([0b810e5](https://github.com/Alphonsos88k/ste_summary_editor/commit/0b810e576b237a855f879a4933cb23f812099b21))
+
 # [1.21.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.20.0...v1.21.0) (2026-05-27)
 
 
