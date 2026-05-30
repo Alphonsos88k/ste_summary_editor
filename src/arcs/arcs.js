@@ -147,7 +147,7 @@ function suggestNextActName() {
     for (const name of names) {
         const m = name.match(/^(.*?)(\d+)\s*$/);
         if (m) {
-            const n = parseInt(m[2], 10);
+            const n = Number.parseInt(m[2], 10);
             if (n > bestNum) { bestNum = n; bestPrefix = m[1]; }
         }
     }
@@ -408,6 +408,30 @@ export function renderActPanel() {
     renderActDetail(state.selectedActId);
 }
 
+function _buildActDetailEntriesHtml(nums) {
+    let html = '';
+    for (const num of nums) {
+        const entry = state.entries.get(num);
+        if (!entry) continue;
+        const preview = entry.content.length > 80 ? entry.content.slice(0, 80) + '...' : entry.content;
+        html += `<div><span style="color:#75715e;">#${num}</span> &mdash; ${escHtml(preview)}</div>`;
+    }
+    return html;
+}
+
+function _bindActDetailNotes($detail, act, actId) {
+    $detail.find('.se-act-notes-input').on('change', function () {
+        const oldNotes = act.notes;
+        act.notes = $(this).val();
+        state.lastAction = {
+            description: `Edit notes for act "${act.name}"`,
+            undo: () => { act.notes = oldNotes; renderActDetail(actId); persistState(); updateUndoButton(); },
+        };
+        updateUndoButton();
+        persistState();
+    });
+}
+
 /**
  * Render the act detail panel (right side).
  *
@@ -428,14 +452,6 @@ function renderActDetail(actId) {
         return sum + (e ? Math.ceil(e.content.length / 4) : 0);
     }, 0);
 
-    let entriesHtml = '';
-    for (const num of nums) {
-        const entry = state.entries.get(num);
-        if (!entry) continue;
-        const preview = entry.content.length > 80 ? entry.content.slice(0, 80) + '...' : entry.content;
-        entriesHtml += `<div><span style="color:#75715e;">#${num}</span> &mdash; ${escHtml(preview)}</div>`;
-    }
-
     $detail.html(
         `<div class="se-act-detail-title">&#9632; ${escHtml(act.name)}</div>` +
         `<div class="se-act-entries-mini">` +
@@ -444,22 +460,11 @@ function renderActDetail(actId) {
         `<textarea class="se-act-notes-input" data-act-notes="${actId}" placeholder="Notes about this act (UI only, not exported)...">${escHtml(act.notes)}</textarea>` +
         `<div style="margin-top:20px;">` +
         `<div class="se-act-notes-label">Entries in this Act</div>` +
-        `<div style="font-size:0.82em;color:#ccc;line-height:1.8;max-height:200px;overflow-y:auto;">${entriesHtml}</div>` +
+        `<div style="font-size:0.82em;color:#ccc;line-height:1.8;max-height:200px;overflow-y:auto;">${_buildActDetailEntriesHtml(nums)}</div>` +
         `</div>`
     );
 
-    // Bind notes change
-    $detail.find('.se-act-notes-input').on('change', function () {
-        const oldNotes = act.notes;
-        const newNotes = $(this).val();
-        act.notes = newNotes;
-        state.lastAction = {
-            description: `Edit notes for act "${act.name}"`,
-            undo: () => { act.notes = oldNotes; renderActDetail(actId); persistState(); updateUndoButton(); },
-        };
-        updateUndoButton();
-        persistState();
-    });
+    _bindActDetailNotes($detail, act, actId);
 }
 
 /**
@@ -591,6 +596,169 @@ export function setTimelineRenderer(fn) {
     _timelineRenderer = fn;
 }
 
+// ─── Timeline layout helpers ──────────────────────────────────────────────────
+
+const _TL_MS_DAY    = 86400000;
+const _TL_MAX_DAYS  = 365 * 15;
+const _TL_MAX_EXTENT = 1800;
+
+function _tlBuildUndatedCols(all) {
+    const undated = all.filter(e => !e.date);
+    const colMap  = new Map();
+    for (const e of undated) {
+        const key = e.actId ?? 'none';
+        if (!colMap.has(key)) colMap.set(key, []);
+        colMap.get(key).push(e);
+    }
+    return [...colMap.entries()]
+        .map(([key, entries]) => ({
+            act:     key !== 'none' ? state.acts.get(key) ?? null : null,
+            entries: entries.sort((a, b) => a.num - b.num),
+            side:    'top',
+        }))
+        .sort((a, b) => a.entries[0].num - b.entries[0].num);
+}
+
+function _tlBuildDateGroups(all) {
+    const dated    = all.filter(e => e.date);
+    const monthMap = new Map();
+    for (const e of dated) {
+        const d   = tlParseDate(e.date);
+        const key = d
+            ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            : e.date.slice(0, 7);
+        if (!monthMap.has(key)) monthMap.set(key, []);
+        monthMap.get(key).push(e);
+    }
+    return [...monthMap.entries()].map(([monthKey, entries]) => {
+        entries.sort((a, b) => {
+            const dc = a.date.localeCompare(b.date);
+            return dc !== 0 ? dc : (a.time || '').localeCompare(b.time || '');
+        });
+        const rep = tlParseDate(entries[0].date);
+        return {
+            monthKey,
+            ts:    rep ? rep.getTime() : 0,
+            entries,
+            label: rep ? rep.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : monthKey,
+        };
+    }).sort((a, b) => a.ts - b.ts);
+}
+
+function _tlAssignPositions(dateGroups, CARD_W, COL_GAP) {
+    for (let i = 0; i < dateGroups.length; i++) {
+        dateGroups[i].side = i % 2 === 0 ? 'bottom' : 'top';
+    }
+    const baseline = dateGroups.length > 0
+        ? dateGroups[Math.floor(dateGroups.length / 2)].ts
+        : 0;
+    let maxDiff = 1;
+    for (const g of dateGroups) {
+        const d = Math.abs(g.ts - baseline) / _TL_MS_DAY;
+        if (d > maxDiff) maxDiff = d;
+    }
+    for (const g of dateGroups) {
+        const days = (g.ts - baseline) / _TL_MS_DAY;
+        const sign = days >= 0 ? 1 : -1;
+        const t    = Math.min(Math.sqrt(Math.abs(days) / Math.max(maxDiff, _TL_MAX_DAYS / 4)), 1);
+        g.rawX     = sign * t * _TL_MAX_EXTENT / 2;
+    }
+    const minSpacing = CARD_W + COL_GAP;
+    const left  = dateGroups.filter(g => g.rawX < 0).sort((a, b) => b.rawX - a.rawX);
+    const right = dateGroups.filter(g => g.rawX >= 0).sort((a, b) => a.rawX - b.rawX);
+    for (let i = 1; i < right.length; i++) {
+        if (right[i].rawX - right[i - 1].rawX < minSpacing)
+            right[i].rawX = right[i - 1].rawX + minSpacing;
+    }
+    for (let i = 1; i < left.length; i++) {
+        if (left[i - 1].rawX - left[i].rawX < minSpacing)
+            left[i].rawX = left[i - 1].rawX - minSpacing;
+    }
+}
+
+function _tlDrawAxisSvg(svgParts, canvasW, AXIS_Y, originX, dateGroups, undatedCols) {
+    svgParts.push(
+        `<line x1="0" y1="${AXIS_Y}" x2="${canvasW}" y2="${AXIS_Y}" stroke="#3e3d32" stroke-width="1.5" opacity="0.9"/>`
+    );
+    if (dateGroups.length > 0) {
+        svgParts.push(`<text x="8" y="${AXIS_Y - 8}" fill="#555" font-size="10" font-family="monospace">← Past</text>`);
+        svgParts.push(`<text x="${canvasW - 8}" y="${AXIS_Y - 8}" fill="#555" font-size="10" font-family="monospace" text-anchor="end">Future →</text>`);
+    }
+    if (undatedCols.length > 0) {
+        svgParts.push(
+            `<text x="${originX}" y="${AXIS_Y - 8}" fill="#75715e" font-size="10" font-family="monospace" text-anchor="middle">Undated</text>`
+        );
+    }
+}
+
+function _tlDrawCausalityArrows(svgParts, cardCenters) {
+    for (const [effectStr, causes] of Object.entries(state.causality)) {
+        const eTo = cardCenters[Number(effectStr)];
+        if (!eTo) continue;
+        for (const causeNum of causes) {
+            const eFrom = cardCenters[causeNum];
+            if (!eFrom) continue;
+            const cpX = (eFrom.cx + eTo.cx) / 2;
+            const cpY = Math.min(eFrom.cy, eTo.cy) - 28;
+            svgParts.push(
+                `<path d="M${eFrom.cx},${eFrom.cy} Q${cpX},${cpY} ${eTo.cx},${eTo.cy}" ` +
+                `stroke="#ae81ff" stroke-width="1.5" fill="none" stroke-dasharray="5,3" opacity="0.7" marker-end="url(#causal-arrow)"/>`
+            );
+        }
+    }
+}
+
+function _tlDrawCol(lo, svgParts, htmlParts, cardCenters, centreX, entries, color, labelText, isDate, side) {
+    const { AXIS_Y, TICK, LABEL_GAP, CARD_H, CARD_GAP, CARD_W, originX } = lo;
+    const cx    = centreX + originX;
+    const isTop = side === 'top';
+
+    svgParts.push(
+        `<line x1="${cx}" y1="${AXIS_Y}" x2="${cx}" y2="${isTop ? AXIS_Y - TICK : AXIS_Y + TICK}" stroke="${color}" stroke-width="2" opacity="0.7"/>`
+    );
+    svgParts.push(
+        `<text x="${cx}" y="${isTop ? AXIS_Y + 17 : AXIS_Y - 20}" fill="${color}" font-size="10" font-weight="700" ` +
+        `font-family="monospace" text-anchor="middle" dominant-baseline="auto">${escHtml(labelText)}</text>`
+    );
+
+    entries.forEach((entry, i) => {
+        const top = isTop
+            ? AXIS_Y - TICK - (i + 1) * CARD_H - i * CARD_GAP
+            : AXIS_Y + TICK + LABEL_GAP + i * (CARD_H + CARD_GAP);
+        const cy       = top + CARD_H / 2;
+        const cardLeft = cx - CARD_W / 2;
+        const spokeFrom = isTop ? AXIS_Y - TICK : AXIS_Y + TICK;
+        const spokeTo   = isTop ? top + CARD_H  : top;
+        svgParts.push(
+            `<line x1="${cx}" y1="${spokeFrom}" x2="${cx}" y2="${spokeTo}" stroke="${color}" stroke-width="1" opacity="0.15"/>`
+        );
+
+        let content;
+        if (entry.content) {
+            const ellipsis = entry.content.length > 68 ? '…' : '';
+            content = escHtml(entry.content.slice(0, 68)) + ellipsis;
+        } else {
+            content = '<span style="color:#555;">empty</span>';
+        }
+
+        const pills = [];
+        if (isDate && entry.time)   pills.push(`<span class="se-mm-pill">${escHtml(entry.time)}</span>`);
+        if (entry.location)         pills.push(`<span class="se-mm-pill">${escHtml(entry.location)}</span>`);
+        if (isDate && entry.actId) {
+            const a = state.acts.get(entry.actId);
+            if (a) pills.push(`<span class="se-mm-pill" style="background:${a.color.bg};color:${a.color.fg};">${escHtml(a.name)}</span>`);
+        }
+        htmlParts.push(
+            `<div class="se-mm-card" style="top:${top}px;left:${cardLeft}px;width:${CARD_W}px;--mm-c:${color};" data-num="${entry.num}">` +
+            `<div class="se-mm-card-head"><span class="se-mm-card-num" style="color:${color};">#${entry.num}</span>` +
+            `<span class="se-mm-card-text">${content}</span></div>` +
+            (pills.length ? `<div class="se-mm-card-tags">${pills.join('')}</div>` : '') +
+            `</div>`
+        );
+        cardCenters[entry.num] = { cx, cy };
+    });
+}
+
 /**
  * Build a horizontal timeline diagram from entries.
  *
@@ -614,104 +782,16 @@ export async function buildTimelineDiagram() {
         return;
     }
 
-    const CARD_W    = 200;
-    const CARD_H    = 54;
-    const CARD_GAP  = 5;
-    const COL_GAP   = 28;    // gap between adjacent column centres
-    const TICK      = 14;    // tick length on each side of axis
-    const LABEL_GAP = 28;    // extra space between axis and the start of bottom cards
-                              // (leaves room for top-column date labels below the axis)
-    const MARGIN    = 52;
-    const ABOVE_PAD = 24;    // padding above the topmost top-stack card
-    const MS_DAY    = 86400000;
-    const MAX_DAYS  = 365 * 15;
-    const MAX_EXTENT = 1800;
+    const CARD_W = 200, CARD_H = 54, CARD_GAP = 5;
+    const COL_GAP = 28, TICK = 14, LABEL_GAP = 28;
+    const MARGIN = 52, ABOVE_PAD = 24;
 
-    const all     = [...state.entries.values()].sort((a, b) => a.num - b.num);
-    const dated   = all.filter(e => e.date);
-    const undated = all.filter(e => !e.date);
+    const all = [...state.entries.values()].sort((a, b) => a.num - b.num);
+    const undatedCols = _tlBuildUndatedCols(all);
+    const dateGroups  = _tlBuildDateGroups(all);
+    _tlAssignPositions(dateGroups, CARD_W, COL_GAP);
 
-    // ── Undated: group by act (always rendered top / above axis) ──
-    const undatedColMap = new Map();
-    for (const e of undated) {
-        const key = e.actId ?? 'none';
-        if (!undatedColMap.has(key)) undatedColMap.set(key, []);
-        undatedColMap.get(key).push(e);
-    }
-    const undatedCols = [...undatedColMap.entries()]
-        .map(([key, entries]) => ({
-            act:     key !== 'none' ? state.acts.get(key) ?? null : null,
-            entries: entries.sort((a, b) => a.num - b.num),
-            side:    'top',
-        }))
-        .sort((a, b) => a.entries[0].num - b.entries[0].num);
-
-    // ── Dated: group by YYYY-MM (month) ───────────────────────
-    const monthMap = new Map();
-    for (const e of dated) {
-        const d   = tlParseDate(e.date);
-        const key = d
-            ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-            : e.date.slice(0, 7);
-        if (!monthMap.has(key)) monthMap.set(key, []);
-        monthMap.get(key).push(e);
-    }
-    const dateGroups = [...monthMap.entries()].map(([monthKey, entries]) => {
-        // Sort by date then time within the month
-        entries.sort((a, b) => {
-            const dc = a.date.localeCompare(b.date);
-            return dc !== 0 ? dc : (a.time || '').localeCompare(b.time || '');
-        });
-        const rep = tlParseDate(entries[0].date);
-        return {
-            monthKey,
-            ts:    rep ? rep.getTime() : 0,
-            entries,
-            label: rep
-                ? rep.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-                : monthKey,
-        };
-    }).sort((a, b) => a.ts - b.ts);
-
-    // ── Alternate dated groups top / bottom ────────────────────
-    // First group → bottom, second → top, third → bottom, …
-    // This prevents adjacent month stacks clipping each other.
-    for (let i = 0; i < dateGroups.length; i++) {
-        dateGroups[i].side = i % 2 === 0 ? 'bottom' : 'top';
-    }
-
-    // ── Baseline = median timestamp ────────────────────────────
-    const baseline = dateGroups.length > 0
-        ? dateGroups[Math.floor(dateGroups.length / 2)].ts
-        : 0;
-
-    // ── Assign raw X offsets (origin = undated-cluster centre) ──
-    let maxDiff = 1;
-    for (const g of dateGroups) {
-        const d = Math.abs(g.ts - baseline) / MS_DAY;
-        if (d > maxDiff) maxDiff = d;
-    }
-    for (const g of dateGroups) {
-        const days = (g.ts - baseline) / MS_DAY;
-        const sign = days >= 0 ? 1 : -1;
-        const t    = Math.min(Math.sqrt(Math.abs(days) / Math.max(maxDiff, MAX_DAYS / 4)), 1);
-        g.rawX     = sign * t * MAX_EXTENT / 2;
-    }
-
-    // Enforce minimum column spacing on each side
-    const left  = dateGroups.filter(g => g.rawX < 0).sort((a, b) => b.rawX - a.rawX);
-    const right = dateGroups.filter(g => g.rawX >= 0).sort((a, b) => a.rawX - b.rawX);
-    const minSpacing = CARD_W + COL_GAP;
-    for (let i = 1; i < right.length; i++) {
-        if (right[i].rawX - right[i-1].rawX < minSpacing)
-            right[i].rawX = right[i-1].rawX + minSpacing;
-    }
-    for (let i = 1; i < left.length; i++) {
-        if (left[i-1].rawX - left[i].rawX < minSpacing)
-            left[i].rawX = left[i-1].rawX - minSpacing;
-    }
-
-    // ── Undated cluster centre X (origin = 0) ─────────────────
+    // Undated cluster centre X
     const clusterW = undatedCols.length > 0
         ? undatedCols.length * (CARD_W + COL_GAP) - COL_GAP
         : 0;
@@ -721,27 +801,23 @@ export async function buildTimelineDiagram() {
         colX += CARD_W + COL_GAP;
     }
 
-    // ── Stack heights ──────────────────────────────────────────
+    // Stack heights
     const colHeight = col => Math.max(0, col.entries.length * (CARD_H + CARD_GAP) - CARD_GAP);
     for (const col of undatedCols) col.stackH = colHeight(col);
     for (const g   of dateGroups)  g.stackH   = colHeight(g);
 
-    // ── Max top / bottom stack heights ─────────────────────────
-    let maxTopH    = 0;
-    let maxBottomH = 0;
+    // Max top / bottom stack heights
+    let maxTopH = 0, maxBottomH = 0;
     for (const col of undatedCols) maxTopH = Math.max(maxTopH, col.stackH);
     for (const g of dateGroups) {
         if (g.side === 'top') maxTopH    = Math.max(maxTopH, g.stackH);
         else                  maxBottomH = Math.max(maxBottomH, g.stackH);
     }
 
-    // ── Axis Y is placed to leave room for everything above ────
-    // ABOVE_PAD + maxTopH + TICK = space needed above axis
-    // An extra 24px provides room for the "Undated / Past / Future" labels
     const AXIS_Y  = MARGIN + ABOVE_PAD + maxTopH + TICK + 24;
     const canvasH = AXIS_Y + TICK + LABEL_GAP + maxBottomH + MARGIN;
 
-    // ── Bounding box X ─────────────────────────────────────────
+    // Bounding box X
     let minX = -clusterW / 2 - MARGIN;
     let maxX =  clusterW / 2 + MARGIN;
     for (const g of dateGroups) {
@@ -751,130 +827,29 @@ export async function buildTimelineDiagram() {
     const originX = -minX + MARGIN;
     const canvasW = maxX - minX + MARGIN;
 
-    // ── Draw ──────────────────────────────────────────────────
-    const svgParts  = [];
-    const htmlParts = [];
+    const svgParts    = [];
+    const htmlParts   = [];
     const cardCenters = {};
+    const lo = { AXIS_Y, TICK, LABEL_GAP, CARD_H, CARD_GAP, CARD_W, originX };
 
-    // Axis line
-    svgParts.push(
-        `<line x1="0" y1="${AXIS_Y}" x2="${canvasW}" y2="${AXIS_Y}" stroke="#3e3d32" stroke-width="1.5" opacity="0.9"/>`
-    );
-    if (dateGroups.length > 0) {
-        svgParts.push(`<text x="8" y="${AXIS_Y - 8}" fill="#555" font-size="10" font-family="monospace">← Past</text>`);
-        svgParts.push(`<text x="${canvasW - 8}" y="${AXIS_Y - 8}" fill="#555" font-size="10" font-family="monospace" text-anchor="end">Future →</text>`);
-    }
-    if (undatedCols.length > 0) {
-        svgParts.push(
-            `<text x="${originX}" y="${AXIS_Y - 8}" fill="#75715e" font-size="10" font-family="monospace" text-anchor="middle">Undated</text>`
-        );
-    }
+    _tlDrawAxisSvg(svgParts, canvasW, AXIS_Y, originX, dateGroups, undatedCols);
 
-    /**
-     * Draw one column (undated or month-group) on either side of the axis.
-     * @param {number}  centreX    - raw X offset from origin (before adding originX)
-     * @param {Array}   entries    - entry objects, sorted for this column
-     * @param {string}  color      - hex colour for tick, label, and card accent
-     * @param {string}  labelText  - column header text (act name or "Mar 2013")
-     * @param {boolean} isDate     - true for dated columns (show time/act pills)
-     * @param {'top'|'bottom'} side - which side of the axis to draw on
-     */
-    function drawCol(centreX, entries, color, labelText, isDate, side) {
-        const cx    = centreX + originX;
-        const isTop = side === 'top';
-
-        // Tick — goes upward for top, downward for bottom
-        const tickY2 = isTop ? AXIS_Y - TICK : AXIS_Y + TICK;
-        svgParts.push(
-            `<line x1="${cx}" y1="${AXIS_Y}" x2="${cx}" y2="${tickY2}" stroke="${color}" stroke-width="2" opacity="0.7"/>`
-        );
-
-        // Label:
-        //   bottom columns → label sits just above the axis (between axis and empty space above)
-        //   top    columns → label sits just below the axis (in the LABEL_GAP space before bottom cards)
-        const labelY = isTop
-            ? AXIS_Y + 17           // below axis, inside the LABEL_GAP buffer
-            : AXIS_Y - 20;          // above axis
-        svgParts.push(
-            `<text x="${cx}" y="${labelY}" fill="${color}" font-size="10" font-weight="700" ` +
-            `font-family="monospace" text-anchor="middle" dominant-baseline="auto">${escHtml(labelText)}</text>`
-        );
-
-        // Cards — stacked in the correct direction
-        entries.forEach((entry, i) => {
-            let top;
-            if (isTop) {
-                // Stack grows upward: card 0 is closest to axis
-                top = AXIS_Y - TICK - (i + 1) * CARD_H - i * CARD_GAP;
-            } else {
-                // Stack grows downward: card 0 is closest to axis
-                top = AXIS_Y + TICK + LABEL_GAP + i * (CARD_H + CARD_GAP);
-            }
-            const cy       = top + CARD_H / 2;
-            const cardLeft = cx - CARD_W / 2;
-
-            // Spoke from tick end to the near edge of the nearest card
-            const spokeFrom = isTop ? AXIS_Y - TICK : AXIS_Y + TICK;
-            const spokeTo   = isTop ? top + CARD_H  : top;
-            svgParts.push(
-                `<line x1="${cx}" y1="${spokeFrom}" x2="${cx}" y2="${spokeTo}" stroke="${color}" stroke-width="1" opacity="0.15"/>`
-            );
-
-            const content = entry.content
-                ? escHtml(entry.content.slice(0, 68)) + (entry.content.length > 68 ? '…' : '')
-                : '<span style="color:#555;">empty</span>';
-            const pills = [];
-            if (isDate && entry.time) pills.push(`<span class="se-mm-pill">${escHtml(entry.time)}</span>`);
-            if (entry.location)       pills.push(`<span class="se-mm-pill">${escHtml(entry.location)}</span>`);
-            if (isDate && entry.actId) {
-                const a = state.acts.get(entry.actId);
-                if (a) pills.push(`<span class="se-mm-pill" style="background:${a.color.bg};color:${a.color.fg};">${escHtml(a.name)}</span>`);
-            }
-            htmlParts.push(
-                `<div class="se-mm-card" style="top:${top}px;left:${cardLeft}px;width:${CARD_W}px;--mm-c:${color};" data-num="${entry.num}">` +
-                `<div class="se-mm-card-head"><span class="se-mm-card-num" style="color:${color};">#${entry.num}</span>` +
-                `<span class="se-mm-card-text">${content}</span></div>` +
-                (pills.length ? `<div class="se-mm-card-tags">${pills.join('')}</div>` : '') +
-                `</div>`
-            );
-            cardCenters[entry.num] = { cx, cy };
-        });
-    }
-
-    // Draw undated columns (always top)
     for (const col of undatedCols) {
         const color = col.act ? col.act.color.bg : '#666';
         const label = col.act ? col.act.name : 'Unassigned';
-        drawCol(col.centreX, col.entries, color, label, false, 'top');
+        _tlDrawCol(lo, svgParts, htmlParts, cardCenters, col.centreX, col.entries, color, label, false, 'top');
     }
-
-    // Draw dated month groups (alternating top/bottom)
     for (const g of dateGroups) {
-        drawCol(g.rawX, g.entries, '#a6e22e', g.label, true, g.side);
+        _tlDrawCol(lo, svgParts, htmlParts, cardCenters, g.rawX, g.entries, '#a6e22e', g.label, true, g.side);
     }
 
-    // Causality arrows
     const arrowMarker = `<defs><marker id="causal-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ae81ff" opacity="0.8"/></marker></defs>`;
-    for (const [effectStr, causes] of Object.entries(state.causality)) {
-        const eTo = cardCenters[Number(effectStr)];
-        if (!eTo) continue;
-        for (const causeNum of causes) {
-            const eFrom = cardCenters[causeNum];
-            if (!eFrom) continue;
-            const cpX = (eFrom.cx + eTo.cx) / 2;
-            const cpY = Math.min(eFrom.cy, eTo.cy) - 28;
-            svgParts.push(
-                `<path d="M${eFrom.cx},${eFrom.cy} Q${cpX},${cpY} ${eTo.cx},${eTo.cy}" ` +
-                `stroke="#ae81ff" stroke-width="1.5" fill="none" stroke-dasharray="5,3" opacity="0.7" marker-end="url(#causal-arrow)"/>`
-            );
-        }
-    }
+    _tlDrawCausalityArrows(svgParts, cardCenters);
 
     const svgEl = `<svg class="se-mm-svg" xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" style="position:absolute;top:0;left:0;pointer-events:none;">${arrowMarker}${svgParts.join('')}</svg>`;
     $canvas.html(svgEl + htmlParts.join(''));
     $canvas.css({ width: canvasW + 'px', height: canvasH + 'px' });
 
-    // Scroll to centre the undated cluster
     requestAnimationFrame(() => {
         const $vp = $('#se-timeline-viewport');
         $vp[0].scrollLeft = originX - $vp.width() / 2;
@@ -987,13 +962,14 @@ export function updateBulkActSwatch() {
  * Update tab badges with current counts.
  */
 export function updateTabBadges() {
-    const fileCount = state.files.length;
+    const fileCount  = state.files.length;
     const entryCount = state.entries.size;
-    const actCount = state.acts.size;
-
-    $('#se-tab-badge-ingest').text(fileCount > 0 ? `${fileCount} file${fileCount !== 1 ? 's' : ''}` : '');
+    const actCount   = state.acts.size;
+    const filePlural = fileCount !== 1 ? 's' : '';
+    const actPlural  = actCount  !== 1 ? 's' : '';
+    $('#se-tab-badge-ingest').text(fileCount  > 0 ? `${fileCount} file${filePlural}` : '');
     $('#se-tab-badge-review').text(entryCount > 0 ? `${entryCount} entries` : '');
-    $('#se-tab-badge-acts').text(actCount > 0 ? `${actCount} group${actCount !== 1 ? 's' : ''}` : '');
+    $('#se-tab-badge-acts').text(actCount   > 0 ? `${actCount} group${actPlural}` : '');
 }
 
 // ─── Internal Helpers ────────────────────────
@@ -1449,6 +1425,44 @@ function bindMinimapEvents($grid) {
     });
 }
 
+function _conflictMarkClass(severity) {
+    if (severity === 'error')   return 'se-conflict-mark';
+    if (severity === 'warning') return 'se-conflict-mark-warn';
+    return 'se-conflict-mark-info';
+}
+
+function _applyConflictHighlights(contentHtml, conflicts) {
+    if (!conflicts || conflicts.length === 0) return contentHtml;
+    const sorted = [...conflicts].sort((a, b) => b.text.length - a.text.length);
+    for (const c of sorted) {
+        const cls     = _conflictMarkClass(c.severity);
+        const escaped = escHtml(c.text);
+        const idx     = contentHtml.indexOf(escaped);
+        if (idx >= 0) {
+            contentHtml = contentHtml.slice(0, idx) +
+                `<span class="${cls}" title="${escAttr(c.reason)}">${escaped}</span>` +
+                contentHtml.slice(idx + escaped.length);
+        }
+    }
+    return contentHtml;
+}
+
+function _buildActAssignHtml(entry, num) {
+    const act = entry.actId ? state.acts.get(entry.actId) : null;
+    if (act) {
+        return `<span class="se-act-badge se-cell-popover-act" style="background:${act.color.bg};color:${act.color.fg};">${escHtml(act.name)}</span>`;
+    }
+    if (state.acts.size === 0) {
+        return `<button class="se-btn se-btn-sm se-pop-new-act-btn" data-num="${num}">+ New Act</button>`;
+    }
+    const opts = [...state.acts.values()]
+        .map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`)
+        .join('');
+    return `<select class="se-pop-act-select" data-num="${num}">` +
+        `<option value="">Assign…</option>${opts}` +
+        `<option value="new">+ New Act</option></select>`;
+}
+
 /**
  * Show the cell content popover on a minimap cell click.
  */
@@ -1456,53 +1470,21 @@ function showCellPopover(e, num) {
     const entry = state.entries.get(num);
     if (!entry) return;
 
-    const act = entry.actId ? state.acts.get(entry.actId) : null;
     const chips = ['date', 'time', 'location'].map(field => {
-        const val = entry[field];
+        const val    = entry[field];
         const filled = val && val.trim() !== '';
-        const cls = filled ? 'se-meta-chip filled' : 'se-meta-chip missing';
-        const icon = filled ? '&#10003;' : '&#10007;';
-        const label = field.charAt(0).toUpperCase() + field.slice(1);
-        const text = filled ? (label + ': ' + escHtml(val)) : ('Needs ' + label);
+        const cls    = filled ? 'se-meta-chip filled' : 'se-meta-chip missing';
+        const icon   = filled ? '&#10003;' : '&#10007;';
+        const label  = field.charAt(0).toUpperCase() + field.slice(1);
+        const text   = filled ? (label + ': ' + escHtml(val)) : ('Needs ' + label);
         return `<span class="${cls}">${icon} ${text}</span>`;
     }).join('');
 
-    let actHtml;
-    if (act) {
-        actHtml = `<span class="se-act-badge se-cell-popover-act" style="background:${act.color.bg};color:${act.color.fg};">${escHtml(act.name)}</span>`;
-    } else if (state.acts.size === 0) {
-        actHtml = `<button class="se-btn se-btn-sm se-pop-new-act-btn" data-num="${num}">+ New Act</button>`;
-    } else {
-        const opts = [...state.acts.values()]
-            .map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`)
-            .join('');
-        actHtml = `<select class="se-pop-act-select" data-num="${num}">` +
-            `<option value="">Assign…</option>${opts}` +
-            `<option value="new">+ New Act</option></select>`;
-    }
+    const actHtml = _buildActAssignHtml(entry, num);
 
     let content = entry.content;
     if (content.length > 500) content = content.slice(0, 500) + '...';
-
-    // Check for conflict highlights
-    const conflicts = state.conflicts[num];
-    let contentHtml = escHtml(content);
-    if (conflicts && conflicts.length > 0) {
-        // Apply inline conflict marks
-        const sorted = [...conflicts].sort((a, b) => b.text.length - a.text.length);
-        for (const c of sorted) {
-            const cls = c.severity === 'error' ? 'se-conflict-mark'
-                : c.severity === 'warning' ? 'se-conflict-mark-warn'
-                    : 'se-conflict-mark-info';
-            const escaped = escHtml(c.text);
-            const idx = contentHtml.indexOf(escaped);
-            if (idx >= 0) {
-                contentHtml = contentHtml.slice(0, idx) +
-                    `<span class="${cls}" title="${escAttr(c.reason)}">${escaped}</span>` +
-                    contentHtml.slice(idx + escaped.length);
-            }
-        }
-    }
+    const contentHtml = _applyConflictHighlights(escHtml(content), state.conflicts[num]);
 
     const $pop = $('#se-cell-popover');
     $pop.html(
@@ -1533,7 +1515,7 @@ function showCellPopover(e, num) {
 
     $pop.find('.se-pop-act-select').on('change', function () {
         const val = $(this).val();
-        const n = Number.parseInt($(this).data('num'), 10);
+        const n   = Number.parseInt($(this).data('num'), 10);
         if (!val) return;
         if (val === 'new') {
             createActForNums([n]);

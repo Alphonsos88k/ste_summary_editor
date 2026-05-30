@@ -120,53 +120,58 @@ export async function runTimelineAnalysis(_fromPanel = false) {
     if (runBtn)   runBtn.disabled = true;
 
     try {
-        const timelineContent = _buildTimelineContent();
-        const entryLines = _buildEntryLines();
-        const levelHint  = LEVEL_HINTS[_currentLevel] || LEVEL_HINTS.medium;
-
-        const userMsg =
-            `Judgment level: ${_currentLevel.toUpperCase()}\n${levelHint}\n\n` +
-            `Timeline reference:\n${timelineContent}\n\n` +
-            `Story entries to check:\n${entryLines}`;
-
-        const ctx = SillyTavern.getContext();
-        const resp = await fetch('/api/backends/chat-completions/generate', {
-            method: 'POST',
-            headers: ctx.getRequestHeaders(),
-            body: JSON.stringify({
-                type: 'quiet',
-                chat_completion_source: ctx.chatCompletionSettings.chat_completion_source,
-                model: ctx.getChatCompletionModel(),
-                messages: [
-                    { role: 'system', content: getPrompt(PROMPT_KEY) },
-                    { role: 'user',   content: userMsg },
-                ],
-                max_tokens: ctx.chatCompletionSettings.openai_max_tokens || 1200,
-                temperature: 0.2,
-                stream: false,
-            }),
-        });
-
-        if (!resp.ok) throw new Error(`API ${resp.status}`);
-        const data   = await resp.json();
-        const raw    = (data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '').trim();
-        const match  = raw.match(/\[[\s\S]*\]/);
-        const parsed = match ? JSON.parse(match[0]) : [];
-
-        state.timelineAnalysisResults = Array.isArray(parsed) ? parsed : [];
-        _renderResults(state.timelineAnalysisResults);
-
-        if (statusEl) {
-            const n = state.timelineAnalysisResults.length;
-            statusEl.textContent = n === 0 ? 'No issues found ✓' : `${n} issue${n > 1 ? 's' : ''} found`;
-            statusEl.style.color = n === 0 ? '#a6e22e' : '#f92672';
-        }
+        const results = await _fetchAnalysisResults();
+        state.timelineAnalysisResults = results;
+        _renderResults(results);
+        if (statusEl) _setAnalysisStatus(statusEl, results.length);
     } catch (err) {
         console.error('[SE] Timeline analysis error:', err);
         if (statusEl) { statusEl.textContent = 'Error — check console'; statusEl.style.color = '#f92672'; }
     }
 
     if (runBtn) runBtn.disabled = false;
+}
+
+async function _fetchAnalysisResults() {
+    const timelineContent = _buildTimelineContent();
+    const entryLines = _buildEntryLines();
+    const levelHint  = LEVEL_HINTS[_currentLevel] || LEVEL_HINTS.medium;
+
+    const userMsg =
+        `Judgment level: ${_currentLevel.toUpperCase()}\n${levelHint}\n\n` +
+        `Timeline reference:\n${timelineContent}\n\n` +
+        `Story entries to check:\n${entryLines}`;
+
+    const ctx = SillyTavern.getContext();
+    const resp = await fetch('/api/backends/chat-completions/generate', {
+        method: 'POST',
+        headers: ctx.getRequestHeaders(),
+        body: JSON.stringify({
+            type: 'quiet',
+            chat_completion_source: ctx.chatCompletionSettings.chat_completion_source,
+            model: ctx.getChatCompletionModel(),
+            messages: [
+                { role: 'system', content: getPrompt(PROMPT_KEY) },
+                { role: 'user',   content: userMsg },
+            ],
+            max_tokens: ctx.chatCompletionSettings.openai_max_tokens || 1200,
+            temperature: 0.2,
+            stream: false,
+        }),
+    });
+
+    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    const data  = await resp.json();
+    const raw   = (data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '').trim();
+    const match = raw.match(/\[[\s\S]*\]/);
+    const parsed = match ? JSON.parse(match[0]) : [];
+    return Array.isArray(parsed) ? parsed : [];
+}
+
+function _setAnalysisStatus(statusEl, n) {
+    const plural = n === 1 ? '' : 's';
+    statusEl.textContent = n === 0 ? 'No issues found ✓' : `${n} issue${plural} found`;
+    statusEl.style.color = n === 0 ? '#a6e22e' : '#f92672';
 }
 
 // ─── Private helpers ─────────────────────────────────────────
@@ -216,6 +221,7 @@ function _buildEntryLines() {
         const e = state.entries.get(n);
         if (!e) return null;
         const meta = [e.date, e.time, e.location].filter(Boolean).join(', ');
-        return `#${n}${meta ? ` (${meta})` : ''}: ${e.content}`;
+        const metaPart = meta ? ` (${meta})` : '';
+        return `#${n}${metaPart}: ${e.content}`;
     }).filter(Boolean).join('\n');
 }

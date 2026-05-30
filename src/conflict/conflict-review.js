@@ -38,9 +38,10 @@ export function setConflictReviewEditorCallback(fn) {
  */
 function buildRow(num, item) {
     const entry = state.entries.get(num);
-    const excerpt = entry
-        ? escHtml((entry.content || '').slice(0, 120).trim()) + (entry.content?.length > 120 ? '&hellip;' : '')
-        : '<em>Entry not found</em>';
+    const rawContent = entry?.content || '';
+    const truncated  = rawContent.slice(0, 120).trim();
+    const ellipsis   = rawContent.length > 120 ? '&hellip;' : '';
+    const excerpt    = entry ? escHtml(truncated) + ellipsis : '<em>Entry not found</em>';
 
     const sev = item.severity || 'warning';
     const sevLabel = sev.charAt(0).toUpperCase() + sev.slice(1);

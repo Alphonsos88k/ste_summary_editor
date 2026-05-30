@@ -400,6 +400,19 @@ function mergePartEntriesWithSplitCheck(parts, fileName, hasUnsplitParts, validF
  *
  * @param {Event} event - The file input `change` event.
  */
+function _autoAssignSuppFromFolder(invalidFiles) {
+    for (const inv of invalidFiles) {
+        if (!inv.isSupplementaryCandidate || inv.isEmpty) continue;
+        if (state.supplementaryFiles.has(inv.name)) continue;
+        const raw = state.fileRawContent.get(inv.name) || '';
+        state.supplementaryFiles.set(inv.name, {
+            name: inv.name, category: 'summary-related',
+            content: raw, editedContent: raw,
+            date: '', time: '', location: '', notes: '',
+        });
+    }
+}
+
 export async function handleFileInput(event) {
     const files = Array.from(event.target.files);
     if (!files.length) return;
@@ -456,19 +469,7 @@ export async function handleFileInput(event) {
         })),
     ];
 
-    // Auto-assign supplementary candidates from summary-named folders
-    if (fromSummaryFolder) {
-        for (const inv of invalidFiles) {
-            if (!inv.isSupplementaryCandidate || inv.isEmpty) continue;
-            if (state.supplementaryFiles.has(inv.name)) continue;
-            const raw = state.fileRawContent.get(inv.name) || '';
-            state.supplementaryFiles.set(inv.name, {
-                name: inv.name, category: 'summary-related',
-                content: raw, editedContent: raw,
-                date: '', time: '', location: '', notes: '',
-            });
-        }
-    }
+    if (fromSummaryFolder) _autoAssignSuppFromFolder(invalidFiles);
 
     detectGaps();
 
