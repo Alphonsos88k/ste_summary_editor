@@ -498,6 +498,34 @@ export function renderActMinimap() {
 }
 
 /**
+ * Create and return a single minimap grid cell element for entry number `i`.
+ * Returns null for numbers that are neither a known entry nor a gap (skip them).
+ */
+function _buildMinimapCellEl(i, entry, isGap) {
+    if (!isGap && !entry) return null;
+
+    const cell = document.createElement('div');
+    cell.className   = 'se-minimap-cell';
+    cell.textContent = i;
+    cell.dataset.num = i;
+
+    if (isGap) {
+        cell.className  += ' se-gap-cell';
+        cell.textContent = '?';
+    } else if (entry.actId) {
+        const act = state.acts.get(entry.actId);
+        if (act) {
+            cell.style.background = act.color.bg;
+            cell.style.color      = act.color.fg;
+        }
+    } else {
+        cell.className += ' se-unassigned';
+    }
+
+    return cell;
+}
+
+/**
  * Build and render the full minimap overlay grid.
  */
 export function buildMinimapOverlay() {
@@ -512,32 +540,8 @@ export function buildMinimapOverlay() {
     const maxNum = Math.max(...allNums, ...state.gaps);
 
     for (let i = 1; i <= maxNum; i++) {
-        const entry = state.entries.get(i);
-        const isGap = state.gaps.includes(i);
-
-        const cell = document.createElement('div');
-        cell.className = 'se-minimap-cell';
-        cell.textContent = i;
-        cell.dataset.num = i;
-
-        if (isGap) {
-            cell.className += ' se-gap-cell';
-            cell.textContent = '?';
-        } else if (entry) {
-            if (entry.actId) {
-                const act = state.acts.get(entry.actId);
-                if (act) {
-                    cell.style.background = act.color.bg;
-                    cell.style.color = act.color.fg;
-                }
-            } else {
-                cell.className += ' se-unassigned';
-            }
-        } else {
-            continue; // Skip numbers that are neither entries nor gaps
-        }
-
-        $grid.append(cell);
+        const cell = _buildMinimapCellEl(i, state.entries.get(i), state.gaps.includes(i));
+        if (cell) $grid.append(cell);
     }
 
     // Build legend
@@ -666,13 +670,23 @@ function _tlAssignPositions(dateGroups, CARD_W, COL_GAP) {
     const minSpacing = CARD_W + COL_GAP;
     const left  = dateGroups.filter(g => g.rawX < 0).sort((a, b) => b.rawX - a.rawX);
     const right = dateGroups.filter(g => g.rawX >= 0).sort((a, b) => a.rawX - b.rawX);
-    for (let i = 1; i < right.length; i++) {
-        if (right[i].rawX - right[i - 1].rawX < minSpacing)
-            right[i].rawX = right[i - 1].rawX + minSpacing;
-    }
-    for (let i = 1; i < left.length; i++) {
-        if (left[i - 1].rawX - left[i].rawX < minSpacing)
-            left[i].rawX = left[i - 1].rawX - minSpacing;
+    _applyMinSpacing(right, minSpacing, /* movingRight */ true);
+    _applyMinSpacing(left,  minSpacing, /* movingRight */ false);
+}
+
+/**
+ * Walk through a sorted list of date groups and push any group that is too
+ * close to its neighbour outward until every gap is at least `minSpacing`.
+ * `movingRight = true` pushes groups rightward (positive X); false pushes left.
+ */
+function _applyMinSpacing(groups, minSpacing, movingRight) {
+    for (let i = 1; i < groups.length; i++) {
+        const prev = groups[i - 1].rawX;
+        const curr = groups[i].rawX;
+        const tooClose = movingRight ? curr - prev < minSpacing : prev - curr < minSpacing;
+        if (tooClose) {
+            groups[i].rawX = movingRight ? prev + minSpacing : prev - minSpacing;
+        }
     }
 }
 
@@ -760,6 +774,30 @@ function _tlDrawCol(lo, svgParts, htmlParts, cardCenters, centreX, entries, colo
 }
 
 /**
+ * Write a `stackH` pixel-height onto each column/group so later layout steps
+ * can read it without repeating the formula.
+ */
+function _assignStackHeights(undatedCols, dateGroups, CARD_H, CARD_GAP) {
+    const colHeight = col => Math.max(0, col.entries.length * (CARD_H + CARD_GAP) - CARD_GAP);
+    for (const col of undatedCols) col.stackH = colHeight(col);
+    for (const g   of dateGroups)  g.stackH   = colHeight(g);
+}
+
+/**
+ * Return the tallest top-side stack height and the tallest bottom-side stack
+ * height across all undated columns (always top) and dated groups (top or bottom).
+ */
+function _computeMaxStackHeights(undatedCols, dateGroups) {
+    let maxTopH = 0, maxBottomH = 0;
+    for (const col of undatedCols) maxTopH = Math.max(maxTopH, col.stackH);
+    for (const g of dateGroups) {
+        if (g.side === 'top') maxTopH    = Math.max(maxTopH,    g.stackH);
+        else                  maxBottomH = Math.max(maxBottomH, g.stackH);
+    }
+    return { maxTopH, maxBottomH };
+}
+
+/**
  * Build a horizontal timeline diagram from entries.
  *
  * Layout rules:
@@ -801,18 +839,9 @@ export async function buildTimelineDiagram() {
         colX += CARD_W + COL_GAP;
     }
 
-    // Stack heights
-    const colHeight = col => Math.max(0, col.entries.length * (CARD_H + CARD_GAP) - CARD_GAP);
-    for (const col of undatedCols) col.stackH = colHeight(col);
-    for (const g   of dateGroups)  g.stackH   = colHeight(g);
-
-    // Max top / bottom stack heights
-    let maxTopH = 0, maxBottomH = 0;
-    for (const col of undatedCols) maxTopH = Math.max(maxTopH, col.stackH);
-    for (const g of dateGroups) {
-        if (g.side === 'top') maxTopH    = Math.max(maxTopH, g.stackH);
-        else                  maxBottomH = Math.max(maxBottomH, g.stackH);
-    }
+    // Compute per-column pixel heights and find the tallest top/bottom stacks
+    _assignStackHeights(undatedCols, dateGroups, CARD_H, CARD_GAP);
+    const { maxTopH, maxBottomH } = _computeMaxStackHeights(undatedCols, dateGroups);
 
     const AXIS_Y  = MARGIN + ABOVE_PAD + maxTopH + TICK + 24;
     const canvasH = AXIS_Y + TICK + LABEL_GAP + maxBottomH + MARGIN;
