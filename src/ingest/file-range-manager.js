@@ -22,6 +22,9 @@ let _panel = null;
 /** @type {string|null} */
 let _splitFormTmpl = null;
 
+/** @type {string|null} */
+let _newFileTmpl = null;
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -311,27 +314,18 @@ function _findOrphanEntries() {
  * @param {string}  [opts.label]     - Optional label hint shown in the form.
  * @returns {Promise<string|null>}
  */
-function _showInlineNewFileForm({ overflow = [], label = '' } = {}) {
+async function _showInlineNewFileForm({ overflow = [], label = '' } = {}) {
     _panel.querySelectorAll('.se-frm-new-form').forEach(el => el.remove());
     _panel.querySelectorAll('.se-frm-split-form').forEach(el => el.remove());
+
+    if (!_newFileTmpl) _newFileTmpl = await loadTemplate(TEMPLATES.FRM_NEW_FILE);
 
     const suggested = suggestNextFilename([...state.fileRanges.keys()]);
     const hint = label ? ` <span style="color:#75715e;font-size:0.8em;">(${escHtml(label)})</span>` : '';
 
     const formRow = document.createElement('tr');
     formRow.className = 'se-frm-new-form';
-    formRow.innerHTML = `
-        <td colspan="5" class="se-frm-split-td">
-            <div class="se-frm-split-inner">
-                <label class="se-frm-split-lbl">New file name:${hint}</label>
-                <input class="se-frm-new-name-input" value="${escHtml(suggested)}" spellcheck="false" />
-                <span class="se-frm-new-err" style="display:none;"></span>
-                <div class="se-frm-split-actions">
-                    <button class="se-btn se-btn-xs se-frm-new-confirm">Add</button>
-                    <button class="se-btn se-btn-xs se-frm-new-cancel">Cancel</button>
-                </div>
-            </div>
-        </td>`;
+    formRow.innerHTML = fillTemplate(_newFileTmpl, { suggested: escHtml(suggested), hint });
 
     const tbody = _panel.querySelector('#se-frm-rows');
     tbody.appendChild(formRow);
