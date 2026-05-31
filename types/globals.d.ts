@@ -302,7 +302,7 @@ interface Element {
     placeholder: string;
     spellcheck:  boolean;
     rows:        number;
-    hidden:      boolean;
+    hidden:      boolean | string;
     href:        string;
     type:        string;
     min:         string;
@@ -328,6 +328,14 @@ interface Element {
     releasePointerCapture(pointerId: number): void;
     hasPointerCapture(pointerId: number): boolean;
 
+    // Layout size (read-only)
+    offsetWidth:  number;
+    offsetHeight: number;
+    offsetTop:    number;
+    offsetLeft:   number;
+    clientWidth:  number;
+    clientHeight: number;
+
     // Scroll
     scrollTop:   number;
     scrollLeft:  number;
@@ -337,6 +345,10 @@ interface Element {
 
     // Drag-and-drop attribute
     draggable:   boolean;
+
+    // DOM traversal — override to drop the | null since our code never null-checks
+    querySelector(selector: string): Element;
+    querySelectorAll(selector: string): NodeListOf<Element>;
 
     // HTML element meta
     title:       string;
