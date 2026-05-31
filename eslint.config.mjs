@@ -35,9 +35,11 @@ export default [
       'sonarjs/pseudo-random': 'off',   // Math.random() used for color generation only
       'sonarjs/slow-regex':    'off',   // regexes are not user-facing attack surfaces
       // Downgrade to warnings so CI doesn't fail while we work through them
-      'sonarjs/cognitive-complexity':    'warn',
-      'sonarjs/no-nested-conditional':   'warn',
+      'sonarjs/cognitive-complexity':        'warn',
+      'sonarjs/no-nested-conditional':       'warn',
       'sonarjs/no-nested-template-literals': 'warn',
+      'sonarjs/no-inverted-boolean-check':   'warn',  // S7735 — negated ternaries
+      'max-params':                          ['warn', 7],  // S107  — too many parameters
     },
   },
 ];

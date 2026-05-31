@@ -455,7 +455,7 @@ function renderActDetail(actId) {
     $detail.html(
         `<div class="se-act-detail-title">&#9632; ${escHtml(act.name)}</div>` +
         `<div class="se-act-entries-mini">` +
-        `Range: #${nums[0] || '?'}\u2013#${nums.at(-1) || '?'} (${nums.length} entr${nums.length !== 1 ? 'ies' : 'y'}) &nbsp;|&nbsp; ${segments} segment${segments !== 1 ? 's' : ''} &nbsp;|&nbsp; ~${actTokens.toLocaleString()} tok</div>` +
+        `Range: #${nums[0] || '?'}\u2013#${nums.at(-1) || '?'} (${nums.length} entr${nums.length === 1 ? 'y' : 'ies'}) &nbsp;|&nbsp; ${segments} segment${segments === 1 ? '' : 's'} &nbsp;|&nbsp; ~${actTokens.toLocaleString()} tok</div>` +
         `<div class="se-act-notes-label">Act Notes</div>` +
         `<textarea class="se-act-notes-input" data-act-notes="${actId}" placeholder="Notes about this act (UI only, not exported)...">${escHtml(act.notes)}</textarea>` +
         `<div style="margin-top:20px;">` +
@@ -616,7 +616,7 @@ function _tlBuildUndatedCols(all) {
     }
     return [...colMap.entries()]
         .map(([key, entries]) => /** @type {TlUndatedCol} */ ({
-            act:     key !== 'none' ? state.acts.get(key) ?? null : null,
+            act:     key === 'none' ? null : state.acts.get(key) ?? null,
             entries: entries.sort((a, b) => a.num - b.num),
             side:    'top',
         }))
@@ -637,7 +637,7 @@ function _tlBuildDateGroups(all) {
     return [...monthMap.entries()].map(([monthKey, entries]) => {
         entries.sort((a, b) => {
             const dc = a.date.localeCompare(b.date);
-            return dc !== 0 ? dc : (a.time || '').localeCompare(b.time || '');
+            return dc === 0 ? (a.time || '').localeCompare(b.time || '') : dc;
         });
         const rep = tlParseDate(entries[0].date);
         return /** @type {TlDateGroup} */ ({
@@ -695,8 +695,10 @@ function _tlDrawAxisSvg(svgParts, canvasW, AXIS_Y, originX, dateGroups, undatedC
         `<line x1="0" y1="${AXIS_Y}" x2="${canvasW}" y2="${AXIS_Y}" stroke="#3e3d32" stroke-width="1.5" opacity="0.9"/>`
     );
     if (dateGroups.length > 0) {
-        svgParts.push(`<text x="8" y="${AXIS_Y - 8}" fill="#555" font-size="10" font-family="monospace">← Past</text>`);
-        svgParts.push(`<text x="${canvasW - 8}" y="${AXIS_Y - 8}" fill="#555" font-size="10" font-family="monospace" text-anchor="end">Future →</text>`);
+        svgParts.push(
+            `<text x="8" y="${AXIS_Y - 8}" fill="#555" font-size="10" font-family="monospace">← Past</text>`,
+            `<text x="${canvasW - 8}" y="${AXIS_Y - 8}" fill="#555" font-size="10" font-family="monospace" text-anchor="end">Future →</text>`
+        );
     }
     if (undatedCols.length > 0) {
         svgParts.push(
@@ -722,15 +724,22 @@ function _tlDrawCausalityArrows(svgParts, cardCenters) {
     }
 }
 
-function _tlDrawCol(lo, svgParts, htmlParts, cardCenters, centreX, entries, color, labelText, isDate, side) {
+/**
+ * @param {{AXIS_Y:number,TICK:number,LABEL_GAP:number,CARD_H:number,CARD_GAP:number,CARD_W:number,originX:number}} lo
+ * @param {{svgParts:string[],htmlParts:string[],cardCenters:object}} out
+ * @param {number} centreX
+ * @param {{color:string,labelText:string,isDate:boolean,entries:any[]}} colData
+ * @param {'top'|'bottom'} side
+ */
+function _tlDrawCol(lo, out, centreX, colData, side) {
     const { AXIS_Y, TICK, LABEL_GAP, CARD_H, CARD_GAP, CARD_W, originX } = lo;
+    const { svgParts, htmlParts, cardCenters } = out;
+    const { color, labelText, isDate, entries } = colData;
     const cx    = centreX + originX;
     const isTop = side === 'top';
 
     svgParts.push(
-        `<line x1="${cx}" y1="${AXIS_Y}" x2="${cx}" y2="${isTop ? AXIS_Y - TICK : AXIS_Y + TICK}" stroke="${color}" stroke-width="2" opacity="0.7"/>`
-    );
-    svgParts.push(
+        `<line x1="${cx}" y1="${AXIS_Y}" x2="${cx}" y2="${isTop ? AXIS_Y - TICK : AXIS_Y + TICK}" stroke="${color}" stroke-width="2" opacity="0.7"/>`,
         `<text x="${cx}" y="${isTop ? AXIS_Y + 17 : AXIS_Y - 20}" fill="${color}" font-size="10" font-weight="700" ` +
         `font-family="monospace" text-anchor="middle" dominant-baseline="auto">${escHtml(labelText)}</text>`
     );
@@ -859,17 +868,18 @@ export async function buildTimelineDiagram() {
     const svgParts    = [];
     const htmlParts   = [];
     const cardCenters = {};
-    const lo = { AXIS_Y, TICK, LABEL_GAP, CARD_H, CARD_GAP, CARD_W, originX };
+    const lo  = { AXIS_Y, TICK, LABEL_GAP, CARD_H, CARD_GAP, CARD_W, originX };
+    const out = { svgParts, htmlParts, cardCenters };
 
     _tlDrawAxisSvg(svgParts, canvasW, AXIS_Y, originX, dateGroups, undatedCols);
 
     for (const col of undatedCols) {
         const color = col.act ? col.act.color.bg : '#666';
         const label = col.act ? col.act.name : 'Unassigned';
-        _tlDrawCol(lo, svgParts, htmlParts, cardCenters, col.centreX, col.entries, color, label, false, 'top');
+        _tlDrawCol(lo, out, col.centreX, { color, labelText: label, isDate: false, entries: col.entries }, 'top');
     }
     for (const g of dateGroups) {
-        _tlDrawCol(lo, svgParts, htmlParts, cardCenters, g.rawX, g.entries, '#a6e22e', g.label, true, g.side);
+        _tlDrawCol(lo, out, g.rawX, { color: '#a6e22e', labelText: g.label, isDate: true, entries: g.entries }, g.side);
     }
 
     const arrowMarker = `<defs><marker id="causal-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ae81ff" opacity="0.8"/></marker></defs>`;
@@ -994,8 +1004,8 @@ export function updateTabBadges() {
     const fileCount  = state.files.length;
     const entryCount = state.entries.size;
     const actCount   = state.acts.size;
-    const filePlural = fileCount !== 1 ? 's' : '';
-    const actPlural  = actCount  !== 1 ? 's' : '';
+    const filePlural = fileCount === 1 ? '' : 's';
+    const actPlural  = actCount  === 1 ? '' : 's';
     $('#se-tab-badge-ingest').text(fileCount  > 0 ? `${fileCount} file${filePlural}` : '');
     $('#se-tab-badge-review').text(entryCount > 0 ? `${entryCount} entries` : '');
     $('#se-tab-badge-acts').text(actCount   > 0 ? `${actCount} group${actPlural}` : '');
