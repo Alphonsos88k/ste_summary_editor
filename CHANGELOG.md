@@ -1,3 +1,10 @@
+## [1.22.2](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.22.1...v1.22.2) (2026-05-31)
+
+
+### Bug Fixes
+
+* resolve TS2345 errors — Element/HTMLElement type mismatches ([09d6be9](https://github.com/Alphonsos88k/ste_summary_editor/commit/09d6be9e800e29f4c03414205e919d5330135867))
+
 ## [1.22.1](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.22.0...v1.22.1) (2026-05-31)
 
 
