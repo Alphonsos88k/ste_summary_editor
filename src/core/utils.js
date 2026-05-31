@@ -61,8 +61,8 @@ export function debounce(fn, ms) {
  * Make a floating element draggable by holding its handle.
  * Uses pointer capture for reliable drag across the document.
  *
- * @param {HTMLElement} el - The element to move (must be position:fixed or absolute).
- * @param {HTMLElement} handle - The area the user grabs to drag.
+ * @param {Element} el - The element to move (must be position:fixed or absolute).
+ * @param {Element} handle - The area the user grabs to drag.
  */
 export function makeDraggable(el, handle) {
     let startX, startY, startLeft, startTop;
