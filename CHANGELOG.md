@@ -1,3 +1,10 @@
+## [1.22.1](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.22.0...v1.22.1) (2026-05-31)
+
+
+### Bug Fixes
+
+* resolve SonarQube warnings in arcs.js; add S7735+S107 ESLint rules ([e80e3cd](https://github.com/Alphonsos88k/ste_summary_editor/commit/e80e3cd6d0e1d11c9a679f282dfbc9ce0cb8d41e))
+
 # [1.22.0](https://github.com/Alphonsos88k/ste_summary_editor/compare/v1.21.0...v1.22.0) (2026-05-30)
 
 
