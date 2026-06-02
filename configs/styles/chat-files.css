@@ -269,7 +269,6 @@
     cursor: pointer;
     border-bottom: 1px solid rgba(58,58,48,0.5);
     border-left: 3px solid var(--se-cfm-bc, transparent);
-    background-color: var(--se-cfm-bg, transparent);
     gap: 0;
     transition: background 0.1s;
     overflow: hidden;
@@ -677,7 +676,6 @@
     color: #ccc;
     border-bottom: 1px solid rgba(58,58,48,0.4);
     border-left: 3px solid var(--se-cfm-bc, transparent);
-    background-color: var(--se-cfm-bg, transparent);
     transition: background 0.1s;
 }
 .se-cfm-an-node-item:hover { background: #2a2a20; }
