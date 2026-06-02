@@ -22,6 +22,25 @@ let _searchGen    = 0;    // incremented on each new search to cancel stale asyn
 let _searchTimer  = null;
 let _focusLockAbort = null;
 
+// ─── Branch family state ─────────────────────────────────────
+// null = not yet fetched; populated by _fetchBranchData() on load.
+// _branchMap: parentFileName → Set<branchFileName>
+// _parentMap: branchFileName → parentFileName
+// _familyColors: parentFileName → hex color
+// _sortMode: 'date' | 'branch'
+
+let _branchMap    = null;
+let _parentMap    = null;
+let _familyColors = null;
+let _sortMode     = 'date';
+
+// 12 visually distinct colors that don't clash with Monokai accent palette
+const _FAMILY_COLORS = [
+    '#e06c75', '#61afef', '#98c379', '#c678dd',
+    '#e5c07b', '#56b6c2', '#be5046', '#528bff',
+    '#d19a66', '#ff79c6', '#4dc9b2', '#9b59b6',
+];
+
 // ─── Analyse tab state ────────────────────────────────────────
 // Each tab stores its own serialized LiteGraph state (graphData).
 // Only one analyser instance is active at a time; switching tabs
@@ -77,6 +96,10 @@ export function closeChatFilesManager() {
     _busyTabId           = null;
     _selectedFileName    = null;
     _updateTabScrollbar  = null;
+    _branchMap    = null;
+    _parentMap    = null;
+    _familyColors = null;
+    _sortMode     = 'date';
 }
 
 // ─── Search focus lock ────────────────────────────────────────
@@ -202,9 +225,12 @@ function _renderFileList(chats) {
         listEl.innerHTML = '<div class="se-cfm-hint">No chats found</div>';
         return;
     }
+    _applyFileItems(listEl, _files);
+    _fetchBranchData();
+}
 
-    listEl.innerHTML = _files.map((chat) => _fileItemHtml(chat)).join('');
-
+function _applyFileItems(listEl, files) {
+    listEl.innerHTML = files.map((chat) => _fileItemHtml(chat)).join('');
     listEl.querySelectorAll('[data-cfm-file]').forEach((el) => {
         el.addEventListener('click', () => {
             _selectedFileName = el.dataset.cfmFile;
@@ -215,15 +241,128 @@ function _renderFileList(chats) {
     });
 }
 
+// ─── Branch family helpers ────────────────────────────────────
+
+async function _fetchBranchData() {
+    if (_branchMap !== null) return;
+    _branchMap = {};
+    _parentMap = {};
+    const BATCH = 5;
+    for (let i = 0; i < _files.length; i += BATCH) {
+        await Promise.all(_files.slice(i, i + BATCH).map(_fetchOneHeader));
+    }
+    _assignFamilyColors();
+    _rerenderWithBranches();
+}
+
+async function _fetchOneHeader(file) {
+    try {
+        const ctx  = SillyTavern.getContext();
+        const resp = await fetch('/getchat', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', ...ctx.getRequestHeaders() },
+            body:    JSON.stringify({
+                ch_name:    _currentChar?.name   ?? '',
+                file_name:  (file.file_name ?? '').replace(/\.jsonl$/, ''),
+                avatar_url: _currentChar?.avatar ?? '',
+            }),
+        });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const header = Array.isArray(data) ? data[0] : null;
+        const parentRaw = header?.chat_metadata?.main_chat ?? null;
+        if (!parentRaw) return;
+        const childName  = file.file_name ?? '';
+        const parentName = parentRaw.endsWith('.jsonl') ? parentRaw : `${parentRaw}.jsonl`;
+        _parentMap[childName] = parentName;
+        if (!_branchMap[parentName]) _branchMap[parentName] = new Set();
+        _branchMap[parentName].add(childName);
+    } catch { /* single-file failures are non-fatal */ }
+}
+
+function _assignFamilyColors() {
+    _familyColors = {};
+    let idx = 0;
+    for (const parentName of Object.keys(_branchMap)) {
+        if (_branchMap[parentName].size > 0) {
+            _familyColors[parentName] = _FAMILY_COLORS[idx % _FAMILY_COLORS.length];
+            idx++;
+        }
+    }
+    for (const file of _files) {
+        const name       = file.file_name ?? '';
+        const parentName = _parentMap[name];
+        if (parentName && _familyColors[parentName]) {
+            file._branchColor = _familyColors[parentName];
+            file._isBranch    = true;
+        } else if (_familyColors[name]) {
+            file._branchColor = _familyColors[name];
+            file._isBranch    = false;
+        } else {
+            file._branchColor = null;
+            file._isBranch    = false;
+        }
+    }
+}
+
+function _getFileColor(file) {
+    const color = file._branchColor ?? null;
+    if (!color) return null;
+    return file._isBranch ? `${color}55` : color;
+}
+
+function _sortFilesByBranch(files) {
+    const visited = new Set();
+    const groups  = [];
+    for (const file of files) {
+        const name = file.file_name ?? '';
+        if (visited.has(name)) continue;
+        visited.add(name);
+        if (_branchMap?.[name]?.size > 0) {
+            const children = files
+                .filter(f => _branchMap[name].has(f.file_name ?? ''))
+                .toSorted((a, b) => _toMs(b.last_mes) - _toMs(a.last_mes));
+            children.forEach(c => visited.add(c.file_name ?? ''));
+            const groupMs = Math.max(_toMs(file.last_mes), ...children.map(c => _toMs(c.last_mes)));
+            groups.push({ files: [file, ...children], groupMs });
+        } else if (!_parentMap?.[name]) {
+            groups.push({ files: [file], groupMs: _toMs(file.last_mes) });
+        }
+    }
+    // orphaned branches whose parent isn't in the list
+    for (const file of files) {
+        if (!visited.has(file.file_name ?? '')) {
+            groups.push({ files: [file], groupMs: _toMs(file.last_mes) });
+            visited.add(file.file_name ?? '');
+        }
+    }
+    groups.sort((a, b) => b.groupMs - a.groupMs);
+    return groups.flatMap(g => g.files);
+}
+
+function _rerenderWithBranches() {
+    const listEl = _panel?.querySelector('#se-cfm-file-list');
+    if (!listEl) return;
+    const sorted = _sortMode === 'branch' ? _sortFilesByBranch(_files) : _files;
+    _applyFileItems(listEl, sorted);
+    if (_analyserReady) {
+        const anList = _panel?.querySelector('#se-cfm-an-file-list');
+        if (anList) refreshEntries();
+    }
+}
+
 const _LABEL_MAX = 52;
 
 function _fileItemHtml(chat) {
-    const name = chat.file_name ?? '';
-    const base = name.replace(/\.jsonl$/, '');
+    const name  = chat.file_name ?? '';
+    const base  = name.replace(/\.jsonl$/, '');
     const label = base.length > _LABEL_MAX ? `${base.slice(0, _LABEL_MAX)}…` : base;
-    const date = _relDate(chat.last_mes);
+    const date  = _relDate(chat.last_mes);
+    const color = _getFileColor(chat);
+    const style = color ? ` style="--se-cfm-bc:${color}"` : '';
+    const cls   = chat._isBranch ? ' se-cfm-branch-item' : '';
     return (
-        `<div class="se-cfm-file-item" data-cfm-file="${escHtml(name)}" title="${escHtml(name)}">` +
+        `<div class="se-cfm-file-item${cls}" data-cfm-file="${escHtml(name)}" title="${escHtml(name)}"${style}>` +
         `<span class="se-cfm-fname"><span class="se-cfm-fname-text">${escHtml(label)}</span></span>` +
         `<span class="se-cfm-fdate">${date}</span>` +
         '</div>'
@@ -330,6 +469,14 @@ async function _fetchChatContent(fileName) {
 
 function _bindPanelEvents() {
     _panel.querySelector('.se-cfm-close')?.addEventListener('click', closeChatFilesManager);
+
+    _panel.querySelectorAll('.se-cfm-sort-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            _sortMode = btn.dataset.sort ?? 'date';
+            _panel.querySelectorAll('.se-cfm-sort-btn').forEach((b) => b.classList.toggle('active', b === btn));
+            _rerenderWithBranches();
+        });
+    });
 
     const searchInp  = _panel.querySelector('#se-cfm-search');
     const searchClear = _panel.querySelector('#se-cfm-search-clear');

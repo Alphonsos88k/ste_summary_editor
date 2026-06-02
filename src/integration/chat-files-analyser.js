@@ -401,7 +401,12 @@ function _renderFileListInto(container) {
         } else if (onCanvas) {
             tkBadge = `<span class="se-cfm-an-tk-badge se-cfm-an-tk-spin"><span class="se-an-spin">&#x27F3;</span></span>`;
         }
-        return `<div class="se-cfm-an-node-item">` +
+        const rawColor = f._branchColor ?? null;
+        let itemColor = null;
+        if (rawColor) itemColor = f._isBranch ? `${rawColor}55` : rawColor;
+        const itemStyle = itemColor ? ` style="--se-cfm-bc:${itemColor}"` : '';
+        const itemCls   = f._isBranch ? ' se-cfm-branch-item' : '';
+        return `<div class="se-cfm-an-node-item${itemCls}"${itemStyle}>` +
             `<span class="se-cfm-an-node-date">${escHtml(date)}</span>` +
             `<span class="se-cfm-an-node-label" title="${escHtml(name)}">${escHtml(label)}</span>` +
             tkBadge +
