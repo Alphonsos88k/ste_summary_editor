@@ -9,7 +9,7 @@ import { escHtml } from '../core/utils.js';
 import { loadTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
 import { bindEditorControls, selectFile, applyFileSearch, clearFileSearch, clearEditorSession } from './chat-files-editor.js';
-import { initAnalyser, destroyAnalyser, refreshEntries, refreshAnalyserCanvas, getGraphState, setGraphState, syncGraphActiveFile, addFileNode, onApiStateChange, onActiveFileChange, setRunButtonBlocked } from './chat-files-analyser.js';
+import { initAnalyser, destroyAnalyser, refreshEntries, refreshAnalyserCanvas, refreshAnalyserFileList, getGraphState, setGraphState, syncGraphActiveFile, addFileNode, onApiStateChange, onActiveFileChange, setRunButtonBlocked } from './chat-files-analyser.js';
 
 let _panel = null;
 let _currentChar = null;
@@ -289,26 +289,33 @@ function _assignFamilyColors() {
             idx++;
         }
     }
+    const fileNames = new Set(_files.map(f => f.file_name ?? ''));
     for (const file of _files) {
         const name       = file.file_name ?? '';
         const parentName = _parentMap[name];
-        if (parentName && _familyColors[parentName]) {
-            file._branchColor = _familyColors[parentName];
-            file._isBranch    = true;
+        if (parentName && _familyColors[parentName] && fileNames.has(parentName)) {
+            file._branchColor  = _familyColors[parentName];
+            file._isBranch     = true;
+            file._isOrphaned   = false;
+            file._isStandalone = false;
+        } else if (parentName) {
+            // known branch but parent file not in the list — orphaned
+            file._branchColor  = null;
+            file._isBranch     = false;
+            file._isOrphaned   = true;
+            file._isStandalone = false;
         } else if (_familyColors[name]) {
-            file._branchColor = _familyColors[name];
-            file._isBranch    = false;
+            file._branchColor  = _familyColors[name];
+            file._isBranch     = false;
+            file._isOrphaned   = false;
+            file._isStandalone = false;
         } else {
-            file._branchColor = null;
-            file._isBranch    = false;
+            file._branchColor  = null;
+            file._isBranch     = false;
+            file._isOrphaned   = false;
+            file._isStandalone = true;
         }
     }
-}
-
-function _getFileColor(file) {
-    const color = file._branchColor ?? null;
-    if (!color) return null;
-    return file._isBranch ? `${color}55` : color;
 }
 
 function _sortFilesByBranch(files) {
@@ -345,10 +352,7 @@ function _rerenderWithBranches() {
     if (!listEl) return;
     const sorted = _sortMode === 'branch' ? _sortFilesByBranch(_files) : _files;
     _applyFileItems(listEl, sorted);
-    if (_analyserReady) {
-        const anList = _panel?.querySelector('#se-cfm-an-file-list');
-        if (anList) refreshEntries();
-    }
+    if (_analyserReady) refreshAnalyserFileList();
 }
 
 const _LABEL_MAX = 52;
@@ -358,9 +362,19 @@ function _fileItemHtml(chat) {
     const base  = name.replace(/\.jsonl$/, '');
     const label = base.length > _LABEL_MAX ? `${base.slice(0, _LABEL_MAX)}…` : base;
     const date  = _relDate(chat.last_mes);
-    const color = _getFileColor(chat);
-    const style = color ? ` style="--se-cfm-bc:${color}"` : '';
-    const cls   = chat._isBranch ? ' se-cfm-branch-item' : '';
+    const color = chat._branchColor ?? null;
+    let style = '';
+    let cls   = '';
+    if (chat._isBranch && color) {
+        style = ` style="--se-cfm-bg:${color}55"`;
+        cls   = ' se-cfm-branch-item';
+    } else if (!chat._isBranch && color) {
+        style = ` style="--se-cfm-bc:${color}"`;
+    } else if (chat._isOrphaned) {
+        cls = ' se-cfm-orphaned-branch';
+    } else if (chat._isStandalone) {
+        cls = ' se-cfm-no-family';
+    }
     return (
         `<div class="se-cfm-file-item${cls}" data-cfm-file="${escHtml(name)}" title="${escHtml(name)}"${style}>` +
         `<span class="se-cfm-fname"><span class="se-cfm-fname-text">${escHtml(label)}</span></span>` +

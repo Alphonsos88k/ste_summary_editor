@@ -269,6 +269,7 @@
     cursor: pointer;
     border-bottom: 1px solid rgba(58,58,48,0.5);
     border-left: 3px solid var(--se-cfm-bc, transparent);
+    background-color: var(--se-cfm-bg, transparent);
     gap: 0;
     transition: background 0.1s;
     overflow: hidden;
@@ -279,6 +280,11 @@
     border-left: 3px solid var(--se-green);
     padding-left: 1px;
 }
+/* standalone files (no family): subtle grey left border */
+.se-cfm-file-item.se-cfm-no-family      { --se-cfm-bc: rgba(128,128,128,0.28); }
+/* orphaned branches (parent file missing): white left border */
+.se-cfm-file-item.se-cfm-orphaned-branch { --se-cfm-bc: rgba(255,255,255,0.35); }
+/* branch children: indent filename to show hierarchy */
 .se-cfm-branch-item .se-cfm-fname-text { padding-left: 8px; }
 
 
@@ -671,9 +677,12 @@
     color: #ccc;
     border-bottom: 1px solid rgba(58,58,48,0.4);
     border-left: 3px solid var(--se-cfm-bc, transparent);
+    background-color: var(--se-cfm-bg, transparent);
     transition: background 0.1s;
 }
 .se-cfm-an-node-item:hover { background: #2a2a20; }
+.se-cfm-an-node-item.se-cfm-no-family       { --se-cfm-bc: rgba(128,128,128,0.28); }
+.se-cfm-an-node-item.se-cfm-orphaned-branch { --se-cfm-bc: rgba(255,255,255,0.35); }
 .se-cfm-an-node-item.se-cfm-branch-item .se-cfm-an-node-label { padding-left: 8px; }
 
 .se-cfm-an-node-label {
