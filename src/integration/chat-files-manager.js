@@ -255,6 +255,8 @@ async function _fetchBranchData() {
     _rerenderWithBranches();
 }
 
+const _noExt = (n) => (n ?? '').replace(/\.jsonl$/i, '');
+
 async function _fetchOneHeader(file) {
     try {
         const ctx  = SillyTavern.getContext();
@@ -263,20 +265,20 @@ async function _fetchOneHeader(file) {
             headers: { 'Content-Type': 'application/json', ...ctx.getRequestHeaders() },
             body:    JSON.stringify({
                 ch_name:    _currentChar?.name   ?? '',
-                file_name:  (file.file_name ?? '').replace(/\.jsonl$/, ''),
+                file_name:  _noExt(file.file_name),
                 avatar_url: _currentChar?.avatar ?? '',
             }),
         });
         if (!resp.ok) return;
         const data = await resp.json();
-        const header = Array.isArray(data) ? data[0] : null;
-        const parentRaw = header?.chat_metadata?.main_chat ?? null;
+        const header     = Array.isArray(data) ? data[0] : null;
+        const parentRaw  = header?.chat_metadata?.main_chat ?? null;
         if (!parentRaw) return;
-        const childName  = file.file_name ?? '';
-        const parentName = parentRaw.endsWith('.jsonl') ? parentRaw : `${parentRaw}.jsonl`;
-        _parentMap[childName] = parentName;
-        if (!_branchMap[parentName]) _branchMap[parentName] = new Set();
-        _branchMap[parentName].add(childName);
+        const childKey  = _noExt(file.file_name);
+        const parentKey = _noExt(parentRaw);
+        _parentMap[childKey] = parentKey;
+        if (!_branchMap[parentKey]) _branchMap[parentKey] = new Set();
+        _branchMap[parentKey].add(childKey);
     } catch { /* single-file failures are non-fatal */ }
 }
 
@@ -289,23 +291,22 @@ function _assignFamilyColors() {
             idx++;
         }
     }
-    const fileNames = new Set(_files.map(f => f.file_name ?? ''));
+    const fileKeys = new Set(_files.map(f => _noExt(f.file_name)));
     for (const file of _files) {
-        const name       = file.file_name ?? '';
-        const parentName = _parentMap[name];
-        if (parentName && _familyColors[parentName] && fileNames.has(parentName)) {
-            file._branchColor  = _familyColors[parentName];
+        const key        = _noExt(file.file_name);
+        const parentKey  = _parentMap[key];
+        if (parentKey && _familyColors[parentKey] && fileKeys.has(parentKey)) {
+            file._branchColor  = _familyColors[parentKey];
             file._isBranch     = true;
             file._isOrphaned   = false;
             file._isStandalone = false;
-        } else if (parentName) {
-            // known branch but parent file not in the list — orphaned
+        } else if (parentKey) {
             file._branchColor  = null;
             file._isBranch     = false;
             file._isOrphaned   = true;
             file._isStandalone = false;
-        } else if (_familyColors[name]) {
-            file._branchColor  = _familyColors[name];
+        } else if (_familyColors[key]) {
+            file._branchColor  = _familyColors[key];
             file._isBranch     = false;
             file._isOrphaned   = false;
             file._isStandalone = false;
@@ -322,25 +323,24 @@ function _sortFilesByBranch(files) {
     const visited = new Set();
     const groups  = [];
     for (const file of files) {
-        const name = file.file_name ?? '';
-        if (visited.has(name)) continue;
-        visited.add(name);
-        if (_branchMap?.[name]?.size > 0) {
+        const key = _noExt(file.file_name);
+        if (visited.has(key)) continue;
+        visited.add(key);
+        if (_branchMap?.[key]?.size > 0) {
             const children = files
-                .filter(f => _branchMap[name].has(f.file_name ?? ''))
+                .filter(f => _branchMap[key].has(_noExt(f.file_name)))
                 .toSorted((a, b) => _toMs(b.last_mes) - _toMs(a.last_mes));
-            children.forEach(c => visited.add(c.file_name ?? ''));
+            children.forEach(c => visited.add(_noExt(c.file_name)));
             const groupMs = Math.max(_toMs(file.last_mes), ...children.map(c => _toMs(c.last_mes)));
             groups.push({ files: [file, ...children], groupMs });
-        } else if (!_parentMap?.[name]) {
+        } else if (!_parentMap?.[key]) {
             groups.push({ files: [file], groupMs: _toMs(file.last_mes) });
         }
     }
-    // orphaned branches whose parent isn't in the list
     for (const file of files) {
-        if (!visited.has(file.file_name ?? '')) {
+        if (!visited.has(_noExt(file.file_name))) {
             groups.push({ files: [file], groupMs: _toMs(file.last_mes) });
-            visited.add(file.file_name ?? '');
+            visited.add(_noExt(file.file_name));
         }
     }
     groups.sort((a, b) => b.groupMs - a.groupMs);
