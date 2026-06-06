@@ -273,7 +273,10 @@ function _buildGroupedHtml(files) {
         if (seen.has(key)) continue;
         seen.add(key);
         if (_branchMap?.[key]?.size > 0) {
-            const children = files.filter(f => _branchMap[key].has(_noExt(f.file_name)));
+            const children = files.filter(f => {
+                const ck = _noExt(f.file_name);
+                return _branchMap[key].has(ck) && !seen.has(ck);
+            });
             children.forEach(c => seen.add(_noExt(c.file_name)));
             parts.push(_familyGroupHtml(file, children, key));
         } else if (!_parentMap?.[key]) {
