@@ -29,10 +29,11 @@ let _focusLockAbort = null;
 // _familyColors: parentFileName → hex color
 // _sortMode: 'date' | 'branch'
 
-let _branchMap    = null;
-let _parentMap    = null;
-let _familyColors = null;
-let _sortMode     = 'date';
+let _branchMap        = null;
+let _parentMap        = null;
+let _familyColors     = null;
+let _sortMode         = 'date';
+let _collapsedFamilies = new Set();
 
 // 12 visually distinct colors that don't clash with Monokai accent palette
 const _FAMILY_COLORS = [
@@ -96,10 +97,11 @@ export function closeChatFilesManager() {
     _busyTabId           = null;
     _selectedFileName    = null;
     _updateTabScrollbar  = null;
-    _branchMap    = null;
-    _parentMap    = null;
-    _familyColors = null;
-    _sortMode     = 'date';
+    _branchMap         = null;
+    _parentMap         = null;
+    _familyColors      = null;
+    _sortMode          = 'date';
+    _collapsedFamilies = new Set();
 }
 
 // ─── Search focus lock ────────────────────────────────────────
@@ -231,6 +233,15 @@ function _renderFileList(chats) {
 
 function _applyFileItems(listEl, files) {
     listEl.innerHTML = files.map((chat) => _fileItemHtml(chat)).join('');
+    _bindFileListEvents(listEl);
+}
+
+function _applyGroupedItems(listEl, files) {
+    listEl.innerHTML = _buildGroupedHtml(files);
+    _bindFileListEvents(listEl);
+}
+
+function _bindFileListEvents(listEl) {
     listEl.querySelectorAll('[data-cfm-file]').forEach((el) => {
         el.addEventListener('click', () => {
             _selectedFileName = el.dataset.cfmFile;
@@ -239,6 +250,64 @@ function _applyFileItems(listEl, files) {
         });
         _attachMarquee(el);
     });
+    listEl.querySelectorAll('.se-cfm-family-chevron').forEach((chevron) => {
+        chevron.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const group    = chevron.closest('.se-cfm-family-group');
+            const key      = group?.dataset.familyKey;
+            if (!key) return;
+            const children = group.querySelector('.se-cfm-family-children');
+            const isNowCollapsed = children?.classList.toggle('se-cfm-collapsed');
+            chevron.textContent = isNowCollapsed ? '▶' : '▼';
+            if (isNowCollapsed) _collapsedFamilies.add(key);
+            else _collapsedFamilies.delete(key);
+        });
+    });
+}
+
+function _buildGroupedHtml(files) {
+    const parts = [];
+    const seen  = new Set();
+    for (const file of files) {
+        const key = _noExt(file.file_name);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (_branchMap?.[key]?.size > 0) {
+            const children = files.filter(f => _branchMap[key].has(_noExt(f.file_name)));
+            children.forEach(c => seen.add(_noExt(c.file_name)));
+            parts.push(_familyGroupHtml(file, children, key));
+        } else if (!_parentMap?.[key]) {
+            parts.push(_fileItemHtml(file));
+        }
+    }
+    for (const file of files) {
+        if (!seen.has(_noExt(file.file_name))) parts.push(_fileItemHtml(file));
+    }
+    return parts.join('');
+}
+
+function _familyGroupHtml(parent, children, familyKey) {
+    const name  = parent.file_name ?? '';
+    const base  = name.replace(/\.jsonl$/, '');
+    const label = base.length > _LABEL_MAX - 2 ? `${base.slice(0, _LABEL_MAX - 2)}…` : base;
+    const date  = _relDate(parent.last_mes);
+    const color = parent._branchColor ?? null;
+    const style = color ? ` style="--se-cfm-bc:${color}"` : '';
+    const collapsed = _collapsedFamilies.has(familyKey);
+    const chevron   = collapsed ? '▶' : '▼';
+    const childHtml = children
+        .toSorted((a, b) => _toMs(b.last_mes) - _toMs(a.last_mes))
+        .map(c => _fileItemHtml(c)).join('');
+    return (
+        `<div class="se-cfm-family-group" data-family-key="${escHtml(familyKey)}">` +
+        `<div class="se-cfm-file-item se-cfm-family-header" data-cfm-file="${escHtml(name)}" title="${escHtml(name)}"${style}>` +
+        `<span class="se-cfm-family-chevron" title="Collapse / expand">${chevron}</span>` +
+        `<span class="se-cfm-fname"><span class="se-cfm-fname-text">${escHtml(label)}</span></span>` +
+        `<span class="se-cfm-fdate">${date}</span>` +
+        `</div>` +
+        `<div class="se-cfm-family-children${collapsed ? ' se-cfm-collapsed' : ''}">${childHtml}</div>` +
+        `</div>`
+    );
 }
 
 // ─── Branch family helpers ────────────────────────────────────
@@ -345,8 +414,11 @@ function _sortFilesByBranch(files) {
 function _rerenderWithBranches() {
     const listEl = _panel?.querySelector('#se-cfm-file-list');
     if (!listEl) return;
-    const sorted = _sortMode === 'branch' ? _sortFilesByBranch(_files) : _files;
-    _applyFileItems(listEl, sorted);
+    if (_sortMode === 'branch') {
+        _applyGroupedItems(listEl, _sortFilesByBranch(_files));
+    } else {
+        _applyFileItems(listEl, _files);
+    }
     if (_analyserReady) refreshAnalyserFileList();
 }
 
@@ -368,8 +440,12 @@ function _fileItemHtml(chat) {
     } else if (chat._isStandalone) {
         cls = ' se-cfm-no-family';
     }
+    const knownParent = _parentMap ? (_parentMap[_noExt(name)] ?? null) : null;
+    const titleTxt = (chat._isStandalone && knownParent)
+        ? `Parent not in list: ${knownParent}`
+        : name;
     return (
-        `<div class="se-cfm-file-item${cls}" data-cfm-file="${escHtml(name)}" title="${escHtml(name)}"${style}>` +
+        `<div class="se-cfm-file-item${cls}" data-cfm-file="${escHtml(name)}" title="${escHtml(titleTxt)}"${style}>` +
         `<span class="se-cfm-fname"><span class="se-cfm-fname-text">${escHtml(label)}</span></span>` +
         `<span class="se-cfm-fdate">${date}</span>` +
         '</div>'
@@ -480,6 +556,7 @@ function _bindPanelEvents() {
     _panel.querySelectorAll('.se-cfm-sort-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
             _sortMode = btn.dataset.sort ?? 'date';
+            _collapsedFamilies.clear();
             _panel.querySelectorAll('.se-cfm-sort-btn').forEach((b) => b.classList.toggle('active', b === btn));
             _rerenderWithBranches();
         });

@@ -284,6 +284,29 @@
 /* branch children: indent filename to show hierarchy */
 .se-cfm-branch-item .se-cfm-fname-text { padding-left: 8px; }
 
+/* ─── Collapsible family groups (Groups sort mode) ───────────────────────── */
+
+.se-cfm-family-group { display: flex; flex-direction: column; }
+
+.se-cfm-family-header { cursor: pointer; }
+
+.se-cfm-family-chevron {
+    flex-shrink: 0;
+    width: 14px;
+    font-size: 8px;
+    color: rgba(255,255,255,0.3);
+    user-select: none;
+    display: flex;
+    align-items: center;
+    padding-right: 2px;
+    transition: color 0.1s;
+}
+.se-cfm-family-chevron:hover { color: rgba(255,255,255,0.65); }
+
+.se-cfm-family-children { display: flex; flex-direction: column; }
+.se-cfm-family-children.se-cfm-collapsed { display: none; }
+.se-cfm-family-children .se-cfm-file-item { padding-left: 15px; }
+
 
 .se-cfm-fname {
     font-size: 11px;
