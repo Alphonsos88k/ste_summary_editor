@@ -416,8 +416,6 @@ function _renderFileListInto(container) {
             itemCls   = ' se-cfm-branch-item';
         } else if (!f._isBranch && rawColor) {
             itemStyle = ` style="--se-cfm-bc:${rawColor}"`;
-        } else if (f._isOrphaned) {
-            itemCls = ' se-cfm-orphaned-branch';
         } else if (f._isStandalone) {
             itemCls = ' se-cfm-no-family';
         }

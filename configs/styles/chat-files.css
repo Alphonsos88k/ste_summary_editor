@@ -279,10 +279,8 @@
     border-left: 3px solid var(--se-green);
     padding-left: 1px;
 }
-/* standalone files (no family): subtle grey left border */
-.se-cfm-file-item.se-cfm-no-family      { --se-cfm-bc: rgba(128,128,128,0.28); }
-/* orphaned branches (parent file missing): white left border */
-.se-cfm-file-item.se-cfm-orphaned-branch { --se-cfm-bc: rgba(255,255,255,0.35); }
+/* standalone / orphaned (no visible family): subtle grey left border */
+.se-cfm-file-item.se-cfm-no-family { --se-cfm-bc: rgba(128,128,128,0.28); }
 /* branch children: indent filename to show hierarchy */
 .se-cfm-branch-item .se-cfm-fname-text { padding-left: 8px; }
 

@@ -293,27 +293,22 @@ function _assignFamilyColors() {
     }
     const fileKeys = new Set(_files.map(f => _noExt(f.file_name)));
     for (const file of _files) {
-        const key        = _noExt(file.file_name);
-        const parentKey  = _parentMap[key];
-        if (parentKey && _familyColors[parentKey] && fileKeys.has(parentKey)) {
-            file._branchColor  = _familyColors[parentKey];
-            file._isBranch     = true;
-            file._isOrphaned   = false;
-            file._isStandalone = false;
-        } else if (parentKey) {
-            file._branchColor  = null;
-            file._isBranch     = false;
-            file._isOrphaned   = true;
-            file._isStandalone = false;
-        } else if (_familyColors[key]) {
+        const key       = _noExt(file.file_name);
+        const parentKey = _parentMap[key];
+        if (_familyColors[key]) {
+            // parent (has its own branches) — takes priority even if also a branch
             file._branchColor  = _familyColors[key];
             file._isBranch     = false;
-            file._isOrphaned   = false;
+            file._isStandalone = false;
+        } else if (parentKey && _familyColors[parentKey] && fileKeys.has(parentKey)) {
+            // branch child whose parent is present in the list
+            file._branchColor  = _familyColors[parentKey];
+            file._isBranch     = true;
             file._isStandalone = false;
         } else {
+            // standalone, orphaned branch, or unrelated — all grey
             file._branchColor  = null;
             file._isBranch     = false;
-            file._isOrphaned   = false;
             file._isStandalone = true;
         }
     }
@@ -370,8 +365,6 @@ function _fileItemHtml(chat) {
         cls   = ' se-cfm-branch-item';
     } else if (!chat._isBranch && color) {
         style = ` style="--se-cfm-bc:${color}"`;
-    } else if (chat._isOrphaned) {
-        cls = ' se-cfm-orphaned-branch';
     } else if (chat._isStandalone) {
         cls = ' se-cfm-no-family';
     }
