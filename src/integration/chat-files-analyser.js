@@ -412,7 +412,7 @@ function _renderFileListInto(container) {
         let itemStyle = '';
         let itemCls   = '';
         if (f._isBranch && rawColor) {
-            itemStyle = ` style="--se-cfm-bc:${rawColor}A6"`;
+            itemStyle = ` style="--se-cfm-bc:${rawColor}33"`;
             itemCls   = ' se-cfm-branch-item';
         } else if (!f._isBranch && rawColor) {
             itemStyle = ` style="--se-cfm-bc:${rawColor}"`;

@@ -361,7 +361,7 @@ function _fileItemHtml(chat) {
     let style = '';
     let cls   = '';
     if (chat._isBranch && color) {
-        style = ` style="--se-cfm-bc:${color}A6"`;
+        style = ` style="--se-cfm-bc:${color}33"`;
         cls   = ' se-cfm-branch-item';
     } else if (!chat._isBranch && color) {
         style = ` style="--se-cfm-bc:${color}"`;
