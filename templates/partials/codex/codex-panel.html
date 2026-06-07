@@ -6,46 +6,59 @@
     </div>
 </div>
 <div class="se-cx-body">
-    <!-- ── LEFT PAGE ─────────────────────────────────────────────── -->
+
+    <!-- ── LEFT PAGE — always the character portrait ─────────────── -->
     <div class="se-cx-left">
-        <div class="se-cx-char-header">
-            <img class="se-cx-avatar" id="se-cx-avatar" src="" alt="" />
+        <div class="se-cx-portrait" id="se-cx-portrait">
+            <div class="se-cx-avatar-wrap">
+                <img class="se-cx-avatar" id="se-cx-avatar" src="" alt="" />
+            </div>
             <span class="se-cx-char-name" id="se-cx-char-name">—</span>
+            <span class="se-cx-char-sub" id="se-cx-char-sub"></span>
         </div>
-
-        <div class="se-cx-setup" id="se-cx-setup">
-            <div class="se-cx-setup-section">
-                <span class="se-cx-lbl">Character</span>
-                <div class="se-cx-char-pill" id="se-cx-char-pill">Detecting&hellip;</div>
-                <select class="se-cx-char-select" id="se-cx-char-select" style="display:none;"></select>
-                <input class="se-cx-override-input" id="se-cx-override" type="text"
-                       placeholder="Override name (optional)" autocomplete="off" />
-            </div>
-
-            <div class="se-cx-setup-section">
-                <span class="se-cx-lbl">Source Files</span>
-                <label class="se-cx-check-row">
-                    <input type="checkbox" id="se-cx-chk-supp" />
-                    <span>Supplementary files</span>
-                </label>
-                <label class="se-cx-check-row">
-                    <input type="checkbox" id="se-cx-chk-entries" />
-                    <span>Summary entries</span>
-                </label>
-            </div>
-
-            <div class="se-cx-token-row">
-                <span class="se-cx-token-est" id="se-cx-token-est">Select sources above to estimate tokens</span>
-            </div>
-
-            <button class="se-cx-gen-btn" id="se-cx-gen-btn" disabled>Generate Codex</button>
-        </div>
-
-        <button class="se-cx-settings-toggle" id="se-cx-settings-toggle" style="display:none;">&#9881; Settings</button>
     </div>
 
     <!-- ── RIGHT PAGE ────────────────────────────────────────────── -->
     <div class="se-cx-right">
+
+        <!-- Right-page tab bar (visible post-generation) -->
+        <div class="se-cx-rtab-bar" id="se-cx-rtab-bar" style="display:none;">
+            <button class="se-cx-rtab active" data-rtab="sections">Sections</button>
+            <button class="se-cx-rtab" data-rtab="settings">&#9881; Settings</button>
+        </div>
+
+        <!-- ── SETTINGS TAB / pre-gen setup ─────────────────────── -->
+        <div class="se-cx-setup" id="se-cx-setup">
+            <div class="se-cx-setup-inner">
+                <div class="se-cx-setup-section">
+                    <span class="se-cx-lbl">Character</span>
+                    <div class="se-cx-char-pill" id="se-cx-char-pill">Detecting&hellip;</div>
+                    <select class="se-cx-char-select" id="se-cx-char-select" style="display:none;"></select>
+                    <input class="se-cx-override-input" id="se-cx-override" type="text"
+                           placeholder="Override name (optional)" autocomplete="off" />
+                </div>
+
+                <div class="se-cx-setup-section">
+                    <span class="se-cx-lbl">Source Files</span>
+                    <label class="se-cx-check-row">
+                        <input type="checkbox" id="se-cx-chk-supp" />
+                        <span>Supplementary files</span>
+                    </label>
+                    <label class="se-cx-check-row">
+                        <input type="checkbox" id="se-cx-chk-entries" />
+                        <span>Summary entries</span>
+                    </label>
+                </div>
+
+                <div class="se-cx-token-row">
+                    <span class="se-cx-token-est" id="se-cx-token-est">Select sources above to estimate tokens</span>
+                </div>
+
+                <button class="se-cx-gen-btn" id="se-cx-gen-btn" disabled>Generate Codex</button>
+            </div>
+        </div>
+
+        <!-- Progress bar -->
         <div class="se-cx-progress" id="se-cx-progress" style="display:none;">
             <div class="se-cx-progress-bar-wrap">
                 <div class="se-cx-progress-fill" id="se-cx-progress-fill"></div>
@@ -53,14 +66,50 @@
             <span class="se-cx-progress-txt" id="se-cx-progress-txt">Generating&hellip;</span>
         </div>
 
-        <div class="se-cx-empty" id="se-cx-empty">Configure sources and click Generate Codex</div>
+        <!-- ── SECTIONS TAB — paginator view ─────────────────────── -->
+        <div class="se-cx-pager" id="se-cx-pager" style="display:none;">
 
-        <div class="se-cx-cards" id="se-cx-cards" style="display:none;"></div>
+            <!-- Mini TOC: one chip per section, click to jump -->
+            <div class="se-cx-toc" id="se-cx-toc"></div>
 
+            <!-- Paginator nav bar -->
+            <div class="se-cx-pager-nav">
+                <button class="se-cx-nav-btn" id="se-cx-prev" title="Previous section">&#8249;</button>
+                <span class="se-cx-pager-label" id="se-cx-pager-label"></span>
+                <button class="se-cx-nav-btn" id="se-cx-next" title="Next section">&#8250;</button>
+                <span class="se-cx-pager-count" id="se-cx-pager-count"></span>
+                <span class="se-cx-stale-badge" id="se-cx-stale-badge" style="display:none;">&#9888; stale</span>
+                <button class="se-cx-card-edit-btn" id="se-cx-edit-btn" title="Toggle edit">&#x270E;</button>
+                <button class="se-cx-card-regen-btn" id="se-cx-regen-hdr-btn" title="Regenerate">&#x21BB;</button>
+            </div>
+
+            <!-- Section textarea -->
+            <div class="se-cx-pager-body">
+                <div class="se-cx-nsfw-wrap" id="se-cx-nsfw-wrap">
+                    <button class="se-cx-nsfw-toggle" id="se-cx-nsfw-toggle">&#x1F441; Show</button>
+                    <textarea class="se-cx-card-ta se-cx-pager-ta" id="se-cx-pager-ta" readonly></textarea>
+                </div>
+            </div>
+
+            <!-- Feedback -->
+            <div class="se-cx-feedback-row">
+                <input class="se-cx-feedback-inp" id="se-cx-pager-feedback" type="text" placeholder="Feedback for regen&hellip;" />
+                <button class="se-cx-regen-btn" id="se-cx-regen-btn">&#x21BB; Regen</button>
+            </div>
+
+            <!-- System prompt (collapsible) -->
+            <details class="se-cx-prompt-details">
+                <summary>System Prompt</summary>
+                <textarea class="se-cx-prompt-ta" id="se-cx-pager-prompt-ta" placeholder="Generated on first regen&hellip;"></textarea>
+            </details>
+        </div>
+
+        <!-- Bottom bar -->
         <div class="se-cx-bottom-bar" id="se-cx-bottom-bar" style="display:none;">
-            <button class="se-cx-add-btn" id="se-cx-add-section">+ Add Section</button>
-            <button class="se-cx-suggest-btn" id="se-cx-ai-suggest">&#x1F4AC; AI Suggest</button>
+            <button class="se-cx-add-btn" id="se-cx-add-section">+ Add</button>
+            <button class="se-cx-suggest-btn" id="se-cx-ai-suggest">&#x1F4AC; Suggest</button>
             <button class="se-cx-export-btn" id="se-cx-export" disabled>&#x2B07; Export ZIP</button>
         </div>
+
     </div>
 </div>

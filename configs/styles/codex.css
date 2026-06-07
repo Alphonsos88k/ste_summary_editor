@@ -51,7 +51,7 @@
     min-height: 0;
 }
 
-/* ─── Left page ─────────────────────────────────────────────────────────── */
+/* ─── Left page — character portrait ────────────────────────────────────── */
 
 .se-cx-left {
     border-right: 1px solid var(--se-border);
@@ -59,51 +59,225 @@
     flex-direction: column;
     overflow-y: auto;
     overflow-x: hidden;
-    background: #1e1e16;
+    background: #18180f;
     flex-shrink: 0;
 }
 
-.se-cx-char-header {
+.se-cx-portrait {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 10px;
-    padding: 14px 14px 10px;
+    padding: 20px 16px;
     border-bottom: 1px solid var(--se-border);
+}
+
+.se-cx-avatar-wrap {
+    width: 140px;
+    height: 140px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid #3a3a2e;
+    background: #111;
     flex-shrink: 0;
 }
 
 .se-cx-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    border: 2px solid #3a3a2e;
-    flex-shrink: 0;
+    display: block;
 }
 
 .se-cx-char-name {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 700;
     color: var(--se-green);
+    text-align: center;
+    word-break: break-word;
+}
+
+.se-cx-char-sub {
+    font-size: 10px;
+    color: #555;
+    text-align: center;
+}
+
+/* ─── Right-page tab bar ─────────────────────────────────────────────────── */
+
+.se-cx-rtab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--se-border);
+    background: #1a1a14;
+    flex-shrink: 0;
+}
+
+.se-cx-rtab {
+    padding: 6px 18px;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: inherit;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #555;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s;
+    letter-spacing: 0.02em;
+    margin-bottom: -1px;
+}
+.se-cx-rtab:hover { color: #999; }
+.se-cx-rtab.active { color: var(--se-green); border-bottom-color: var(--se-green); }
+
+/* ─── Mini TOC ───────────────────────────────────────────────────────────── */
+
+.se-cx-toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--se-border);
+    background: #18180e;
+    flex-shrink: 0;
+}
+
+.se-cx-toc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid #2e2e24;
+    background: #222218;
+    color: #666;
+    font-size: 9px;
+    font-family: inherit;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: color 0.1s, border-color 0.1s, background 0.1s;
+    white-space: nowrap;
+}
+.se-cx-toc-chip:hover            { color: #bbb; border-color: #444; background: #2a2a20; }
+.se-cx-toc-chip.active           { color: #f8f8f2; border-color: var(--se-green); background: #1a2810; }
+.se-cx-toc-chip.has-content::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--se-green);
+    flex-shrink: 0;
+}
+.se-cx-toc-chip.nsfw-chip.has-content::before { background: #f92672; }
+
+/* ─── Paginator nav ──────────────────────────────────────────────────────── */
+
+.se-cx-pager {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.se-cx-pager-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--se-border);
+    background: #1a1a14;
+    flex-shrink: 0;
+}
+
+.se-cx-nav-btn {
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: 1px solid #2e2e26;
+    border-radius: 4px;
+    color: #888;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.1s, border-color 0.1s, background 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.se-cx-nav-btn:hover:not(:disabled) { color: #f8f8f2; border-color: #555; background: #2a2a20; }
+.se-cx-nav-btn:disabled { opacity: 0.25; cursor: default; }
+
+.se-cx-pager-label {
+    flex: 1;
+    font-size: 11px;
+    font-weight: 600;
+    color: #c8c8b8;
+    text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-/* ─── Setup controls ────────────────────────────────────────────────────── */
+.se-cx-pager-count {
+    font-size: 10px;
+    color: #444;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
 
-.se-cx-setup {
+.se-cx-stale-badge {
+    font-size: 9px;
+    color: #e5c07b;
+    flex-shrink: 0;
+}
+
+/* ─── Pager body (textarea fills remaining space) ────────────────────────── */
+
+.se-cx-pager-body {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 14px;
-    flex-shrink: 0;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.se-cx-pager-ta {
+    flex: 1;
+    resize: none;
+    min-height: 0;
+    height: 100%;
+    max-height: none;
+    field-sizing: unset;
+}
+
+/* ─── Setup controls (right page, pre-gen or Settings tab) ──────────────── */
+
+.se-cx-setup {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.se-cx-setup-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+    max-width: 460px;
+    margin: auto;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .se-cx-setup-section {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 7px;
 }
 
 .se-cx-lbl {

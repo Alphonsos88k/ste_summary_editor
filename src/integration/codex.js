@@ -3,6 +3,9 @@
  * @description Character Codex — generates a multi-section character profile
  * from the active character card and ingested files. Opens as an overlay in
  * the Edit (Arcs) tab, same slot as Chat Files Manager.
+ *
+ * Layout: left page = character portrait (Stage 2: voxel canvas)
+ *         right page = setup pre-gen; sections paginator post-gen
  */
 
 import { escHtml } from '../core/utils.js';
@@ -12,7 +15,7 @@ import { registerPrompt, getPrompt } from '../core/system-prompts.js';
 import { state } from '../core/state.js';
 import { buildZipBlob, downloadFile } from '../export/export.js';
 
-// ─── Prompt registration (self-registering pattern) ──────────────────────
+// ─── Prompt registration ──────────────────────────────────────────────────
 
 registerPrompt('codex-main', 'Character Codex — Generation', '', {
     warnJson: true,
@@ -44,6 +47,7 @@ const SECTION_KEYS = SECTION_DEFS.map(s => s.key);
 let _panel          = null;
 let _char           = null;
 let _generating     = false;
+let _sectionIdx     = 0;
 let _dossier        = {};
 let _dossierPrompts = {};
 let _customSections = [];
@@ -61,6 +65,7 @@ export async function openCodex() {
     document.querySelector('#se-panel-arcs .se-acts-content').appendChild(_panel);
     _detectChar();
     _bindPanel();
+    _showDefaultLayout();  // pager + tab bar visible from the start
     requestAnimationFrame(() => _panel?.classList.add('open'));
 }
 
@@ -69,10 +74,21 @@ export function closeCodex() {
     _panel          = null;
     _char           = null;
     _generating     = false;
+    _sectionIdx     = 0;
     _dossier        = {};
     _dossierPrompts = {};
     _customSections = [];
     _nsfwRevealed   = new Set();
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────
+
+function _allSections() {
+    return [...SECTION_DEFS, ..._customSections.map(s => ({ key: s.key, label: s.label, nsfw: false }))];
+}
+
+function _currentKey() {
+    return _allSections()[_sectionIdx]?.key ?? null;
 }
 
 // ─── Character detection ─────────────────────────────────────────────────
@@ -147,24 +163,20 @@ function _countSourceChars(inclSupp, inclEntries) {
 function _updateTokenEstimate() {
     const el = _panel?.querySelector('#se-cx-token-est');
     if (!el) return;
-
     const inclSupp    = _panel.querySelector('#se-cx-chk-supp')?.checked ?? false;
     const inclEntries = _panel.querySelector('#se-cx-chk-entries')?.checked ?? false;
-
     if (!inclSupp && !inclEntries) {
         el.textContent = 'Select sources above to estimate tokens';
         el.className   = 'se-cx-token-est';
         _updateGenBtn();
         return;
     }
-
     const tok = Math.round(_countSourceChars(inclSupp, inclEntries) / 3.8);
     const fmt = tok >= 1000 ? `~${(tok / 1000).toFixed(1)}k` : `~${tok}`;
     el.textContent = `${fmt} tokens estimated — may incur API cost`;
     el.className   = 'se-cx-token-est';
-    if (tok > 20000)      el.classList.add('se-cx-tok-pink');
-    else if (tok > 8000)  el.classList.add('se-cx-tok-orange');
-
+    if (tok > 20000)     el.classList.add('se-cx-tok-pink');
+    else if (tok > 8000) el.classList.add('se-cx-tok-orange');
     _updateGenBtn();
 }
 
@@ -208,12 +220,10 @@ function _buildContext() {
     const inclSupp    = _panel?.querySelector('#se-cx-chk-supp')?.checked ?? false;
     const inclEntries = _panel?.querySelector('#se-cx-chk-entries')?.checked ?? false;
     const charName    = override || _char?.name || 'the character';
-
-    const parts = _buildCharParts(charName);
+    const parts       = _buildCharParts(charName);
     if (inclSupp && state.supplementaryFiles?.size)  parts.push(..._buildSuppParts());
     if (inclEntries && state.entries?.size)           parts.push(..._buildEntryParts());
     if (state.storyContext) parts.push(`\n--- STORY CONTEXT ---\n${state.storyContext}`);
-
     return { charName, context: parts.join('\n\n') };
 }
 
@@ -255,7 +265,6 @@ function _parseJson(raw) {
 
 async function _generate() {
     if (_generating || !_panel) return;
-
     const inclEntries = _panel.querySelector('#se-cx-chk-entries')?.checked ?? false;
     if (inclEntries && !globalThis.confirm(
         'Including summary entries will send your full story history and may use significantly more tokens. Continue?'
@@ -267,60 +276,70 @@ async function _generate() {
     _customSections = [];
     _nsfwRevealed   = new Set();
     _updateGenBtn();
+    // Switch to Sections tab and show progress overlay
+    _panel.querySelectorAll('.se-cx-rtab').forEach(t => t.classList.toggle('active', t.dataset.rtab === 'sections'));
+    _panel.querySelector('#se-cx-setup').style.display = 'none';
+    _panel.querySelector('#se-cx-pager').style.display = '';
     _setProgress(true, 'Generating codex…', 0);
 
     const { charName, context } = _buildContext();
-    const messages = _buildMessages(getPrompt('codex-main'), context);
-
     try {
-        const parsed = _parseJson(await _callApi(messages, 4000));
+        const parsed = _parseJson(await _callApi(_buildMessages(getPrompt('codex-main'), context), 4000));
         for (const key of SECTION_KEYS) {
             if (parsed[key]) _dossier[key] = parsed[key];
         }
         _setProgress(true, 'Complete', 100);
-        _renderCards(charName);
-        _showPostGenLayout();
+        _showPostGenLayout(charName);
     } catch (err) {
         _setProgress(false, '', 0);
-        _showError(`Generation failed: ${err.message}`);
+        // Switch to Settings tab so user can retry
+        _panel?.querySelectorAll('.se-cx-rtab').forEach(t => t.classList.toggle('active', t.dataset.rtab === 'settings'));
+        _panel?.querySelector('#se-cx-setup')?.style && (_panel.querySelector('#se-cx-setup').style.display = '');
+        _panel?.querySelector('#se-cx-pager')?.style  && (_panel.querySelector('#se-cx-pager').style.display  = 'none');
+        globalThis.alert(`Generation failed: ${err.message}`);
     } finally {
         _generating = false;
         _updateGenBtn();
     }
 }
 
-// ─── Layout helpers ───────────────────────────────────────────────────────
+// ─── Layout transitions ───────────────────────────────────────────────────
+
+function _showDefaultLayout() {
+    // Sections pager + tab bar always visible; settings accessible via ⚙ Settings tab
+    if (!_panel) return;
+    _panel.querySelector('#se-cx-rtab-bar').style.display    = '';
+    _panel.querySelector('#se-cx-pager').style.display       = '';
+    _panel.querySelector('#se-cx-bottom-bar').style.display  = '';
+    _panel.querySelector('#se-cx-setup').style.display       = 'none';
+    _panel.querySelector('#se-cx-progress').style.display    = 'none';
+    _renderToc();
+    _renderPager();
+}
 
 function _setProgress(visible, text, pct) {
     const bar   = _panel?.querySelector('#se-cx-progress');
     const fill  = _panel?.querySelector('#se-cx-progress-fill');
     const txt   = _panel?.querySelector('#se-cx-progress-txt');
-    const empty = _panel?.querySelector('#se-cx-empty');
     if (!bar) return;
-    bar.style.display  = visible ? '' : 'none';
-    if (fill)  fill.style.width  = `${pct}%`;
-    if (txt)   txt.textContent   = text;
-    if (empty && visible) empty.style.display = 'none';
+    bar.style.display = visible ? '' : 'none';
+    if (fill) fill.style.width = `${pct}%`;
+    if (txt)  txt.textContent  = text;
 }
 
-function _showPostGenLayout() {
+function _showPostGenLayout(charName) {
     if (!_panel) return;
-    const empty  = _panel.querySelector('#se-cx-empty');
-    const cards  = _panel.querySelector('#se-cx-cards');
-    const bar    = _panel.querySelector('#se-cx-bottom-bar');
-    const setup  = _panel.querySelector('#se-cx-setup');
-    const toggle = _panel.querySelector('#se-cx-settings-toggle');
-    if (empty)  empty.style.display  = 'none';
-    if (cards)  cards.style.display  = '';
-    if (bar)    bar.style.display    = '';
-    if (setup)  setup.style.display  = 'none';
-    if (toggle) toggle.style.display = '';
+    _setProgress(false, '', 0);
+    // Switch back to Sections tab
+    _panel.querySelectorAll('.se-cx-rtab').forEach(t => t.classList.toggle('active', t.dataset.rtab === 'sections'));
+    _panel.querySelector('#se-cx-setup').style.display  = 'none';
+    _panel.querySelector('#se-cx-pager').style.display  = '';
+    const nameEl = _panel.querySelector('#se-cx-char-name');
+    if (nameEl && charName) nameEl.textContent = charName;
+    _sectionIdx = 0;
+    _renderToc();
+    _renderPager();
     _updateExportBtn();
-}
-
-function _showError(msg) {
-    const empty = _panel?.querySelector('#se-cx-empty');
-    if (empty) { empty.style.display = ''; empty.textContent = msg; }
 }
 
 function _updateExportBtn() {
@@ -328,108 +347,92 @@ function _updateExportBtn() {
     if (btn) btn.disabled = Object.keys(_dossier).length === 0;
 }
 
-// ─── Card rendering ───────────────────────────────────────────────────────
+// ─── Mini TOC ────────────────────────────────────────────────────────────
 
-function _allSections() {
-    return [...SECTION_DEFS, ..._customSections.map(s => ({ key: s.key, label: s.label, nsfw: false }))];
+function _tocChipHtml(s, i) {
+    const active     = i === _sectionIdx ? ' active' : '';
+    const hasCnt     = _dossier[s.key] ? ' has-content' : '';
+    const nsfwCls    = s.nsfw ? ' nsfw-chip' : '';
+    const shortLabel = s.label.split(' ').slice(0, 2).join(' ');
+    return `<button class="se-cx-toc-chip${active}${hasCnt}${nsfwCls}" data-toc-idx="${i}">${escHtml(shortLabel)}</button>`;
 }
 
-function _renderCards(charName) {
-    const container = _panel?.querySelector('#se-cx-cards');
-    if (!container) return;
-    container.innerHTML = _allSections()
-        .filter(s => _dossier[s.key] !== undefined)
-        .map(s => _cardHtml(s.key, s.label, _dossier[s.key] ?? '', s.nsfw))
-        .join('');
-    _bindCardEvents();
-    const nameEl = _panel?.querySelector('#se-cx-char-name');
-    if (nameEl && charName) nameEl.textContent = charName;
-}
-
-function _nsfwWrapHtml(key, content, isNsfw) {
-    const blurCls    = (isNsfw && !_nsfwRevealed.has(key)) ? ' se-cx-nsfw-blur' : '';
-    const nsfwToggle = isNsfw
-        ? `<button class="se-cx-nsfw-toggle" data-nsfw-key="${escHtml(key)}">&#x1F441; Show</button>`
-        : '';
-    return (
-        `<div class="se-cx-nsfw-wrap${blurCls}">` +
-            nsfwToggle +
-            `<textarea class="se-cx-card-ta" data-ta-key="${escHtml(key)}" readonly>${escHtml(content)}</textarea>` +
-        `</div>`
-    );
-}
-
-function _cardHtml(key, label, content, isNsfw) {
-    const promptText = escHtml(_dossierPrompts[key] ?? '');
-    return (
-        `<div class="se-cx-card" data-card-key="${escHtml(key)}">` +
-            `<div class="se-cx-card-hdr">` +
-                `<span class="se-cx-card-label">${escHtml(label)}</span>` +
-                `<span class="se-cx-card-stale" data-stale-key="${escHtml(key)}">&#9888; stale</span>` +
-                `<button class="se-cx-card-edit-btn" data-edit-key="${escHtml(key)}" title="Toggle edit">&#x270E;</button>` +
-                `<button class="se-cx-card-regen-btn" data-regen-key="${escHtml(key)}" title="Regenerate">&#x21BB;</button>` +
-            `</div>` +
-            `<div class="se-cx-card-body">` +
-                _nsfwWrapHtml(key, content, isNsfw) +
-                `<div class="se-cx-feedback-row">` +
-                    `<input class="se-cx-feedback-inp" data-fb-key="${escHtml(key)}" type="text" placeholder="Feedback for regen&hellip;" />` +
-                    `<button class="se-cx-regen-btn" data-regen-key="${escHtml(key)}">&#x21BB; Regen</button>` +
-                `</div>` +
-                `<details class="se-cx-prompt-details">` +
-                    `<summary>System Prompt</summary>` +
-                    `<textarea class="se-cx-prompt-ta" data-prompt-key="${escHtml(key)}" placeholder="Generated on first regen&hellip;">${promptText}</textarea>` +
-                `</details>` +
-            `</div>` +
-        `</div>`
-    );
-}
-
-function _bindEditBtn(cards, btn) {
-    btn.addEventListener('click', () => {
-        const key = btn.dataset.editKey;
-        const ta  = cards.querySelector(`.se-cx-card-ta[data-ta-key="${key}"]`);
-        if (!ta) return;
-        ta.readOnly = !ta.readOnly;
-        if (!ta.readOnly) {
-            ta.focus();
-            ta.addEventListener('input', () => { _dossier[key] = ta.value; _updateExportBtn(); });
-        }
+function _renderToc() {
+    const toc = _panel?.querySelector('#se-cx-toc');
+    if (!toc) return;
+    toc.innerHTML = _allSections().map((s, i) => _tocChipHtml(s, i)).join('');
+    toc.querySelectorAll('[data-toc-idx]').forEach(btn => {
+        btn.addEventListener('click', () => _navTo(Number(btn.dataset.tocIdx)));
     });
 }
 
-function _bindCardEvents() {
-    if (!_panel) return;
-    const cards = _panel.querySelector('#se-cx-cards');
-    if (!cards) return;
-
-    cards.querySelectorAll('.se-cx-nsfw-toggle').forEach(btn => {
-        btn.addEventListener('click', () => {
-            _nsfwRevealed.add(btn.dataset.nsfwKey);
-            btn.closest('.se-cx-nsfw-wrap')?.classList.remove('se-cx-nsfw-blur');
-        });
+function _updateTocActive() {
+    _panel?.querySelectorAll('.se-cx-toc-chip').forEach((chip, i) => {
+        chip.classList.toggle('active', i === _sectionIdx);
+        const key = _allSections()[i]?.key;
+        chip.classList.toggle('has-content', !!_dossier[key]);
     });
+}
 
-    cards.querySelectorAll('.se-cx-card-edit-btn').forEach(btn => _bindEditBtn(cards, btn));
+// ─── Paginator ────────────────────────────────────────────────────────────
 
-    cards.querySelectorAll('.se-cx-regen-btn, .se-cx-card-regen-btn').forEach(btn => {
-        btn.addEventListener('click', () => _regenSection(btn.dataset.regenKey));
-    });
+function _navTo(idx) {
+    const sections = _allSections();
+    if (idx < 0 || idx >= sections.length) return;
+    _sectionIdx = idx;
+    _renderPager();
+    _updateTocActive();
+}
+
+function _renderPager() {
+    const sections = _allSections();
+    const def      = sections[_sectionIdx];
+    if (!def || !_panel) return;
+    const { key, label, nsfw } = def;
+
+    const ta       = _panel.querySelector('#se-cx-pager-ta');
+    const labelEl  = _panel.querySelector('#se-cx-pager-label');
+    const countEl  = _panel.querySelector('#se-cx-pager-count');
+    const prevBtn  = _panel.querySelector('#se-cx-prev');
+    const nextBtn  = _panel.querySelector('#se-cx-next');
+    const stale    = _panel.querySelector('#se-cx-stale-badge');
+    const nsfwWrap = _panel.querySelector('#se-cx-nsfw-wrap');
+    const nsfwBtn  = _panel.querySelector('#se-cx-nsfw-toggle');
+    const promptTa = _panel.querySelector('#se-cx-pager-prompt-ta');
+    const feedback = _panel.querySelector('#se-cx-pager-feedback');
+
+    if (labelEl) labelEl.textContent = label;
+    if (countEl) countEl.textContent = `${_sectionIdx + 1} / ${sections.length}`;
+    if (ta) { ta.value = _dossier[key] ?? ''; ta.readOnly = true; }
+    if (prevBtn) prevBtn.disabled = _sectionIdx === 0;
+    if (nextBtn) nextBtn.disabled = _sectionIdx === sections.length - 1;
+    if (stale)   stale.style.display   = 'none';
+    if (feedback) feedback.value       = '';
+    if (promptTa) promptTa.value       = _dossierPrompts[key] ?? '';
+
+    const isNsfw   = nsfw;
+    const revealed = _nsfwRevealed.has(key);
+    if (nsfwWrap) nsfwWrap.classList.toggle('se-cx-nsfw-blur', isNsfw && !revealed);
+    if (nsfwBtn) {
+        nsfwBtn.style.display    = (isNsfw && !revealed) ? '' : 'none';
+        nsfwBtn.dataset.nsfwKey  = key;
+    }
 }
 
 // ─── Per-section regeneration ─────────────────────────────────────────────
 
-async function _fetchInstruction(key, feedback, context, card) {
+async function _fetchInstruction(key, feedback, context) {
     const existing = (_dossierPrompts[key] ?? '').trim();
-    const promptTa = card.querySelector('.se-cx-prompt-ta');
+    const promptTa = _panel?.querySelector('#se-cx-pager-prompt-ta');
     if (existing) return promptTa?.value.trim() || existing;
 
-    const def          = SECTION_DEFS.find(s => s.key === key) ?? _customSections.find(s => s.key === key);
-    const sectionLabel = def?.label ?? key;
-    const meta         = getPrompt('codex-section-prompt');
-    const metaUser     = `Section: ${sectionLabel}\nFeedback: ${feedback || '(none)'}\n\nCharacter context:\n${context}`;
-    const metaRaw      = await _callApi(_buildMessages(meta, metaUser), 400);
+    const def    = _allSections().find(s => s.key === key);
+    const label  = def?.label ?? key;
+    const meta   = getPrompt('codex-section-prompt');
+    const user   = `Section: ${label}\nFeedback: ${feedback || '(none)'}\n\nCharacter context:\n${context}`;
+    const raw    = await _callApi(_buildMessages(meta, user), 400);
     let instruction;
-    try { instruction = _parseJson(metaRaw).instruction ?? metaRaw; } catch { instruction = metaRaw; }
+    try { instruction = _parseJson(raw).instruction ?? raw; } catch { instruction = raw; }
     _dossierPrompts[key] = instruction;
     if (promptTa) promptTa.value = instruction;
     return instruction;
@@ -437,36 +440,40 @@ async function _fetchInstruction(key, feedback, context, card) {
 
 async function _regenSection(key) {
     if (_generating || !key || !_panel) return;
-    const card = _panel.querySelector(`.se-cx-card[data-card-key="${key}"]`);
-    if (!card) return;
-
-    const feedbackEl  = card.querySelector('.se-cx-feedback-inp');
+    const feedbackEl  = _panel.querySelector('#se-cx-pager-feedback');
     const feedback    = feedbackEl?.value.trim() ?? '';
     const { context } = _buildContext();
 
     _generating = true;
-    card.querySelectorAll('.se-cx-regen-btn, .se-cx-card-regen-btn').forEach(b => { b.disabled = true; });
+    _setRegenBtnsDisabled(true);
 
     try {
-        const instruction = await _fetchInstruction(key, feedback, context, card);
-        const sectionUser = `${instruction}\n\nFeedback: ${feedback || '(none)'}\n\nCharacter context:\n${context}`;
-        const raw         = await _callApi(_buildMessages(getPrompt('codex-main'), sectionUser), 800);
+        const instruction = await _fetchInstruction(key, feedback, context);
+        const user        = `${instruction}\n\nFeedback: ${feedback || '(none)'}\n\nCharacter context:\n${context}`;
+        const raw         = await _callApi(_buildMessages(getPrompt('codex-main'), user), 800);
         let content = raw;
-        try { const p = _parseJson(raw); content = p[key] ?? p.content ?? raw; } catch { /* raw text fallback */ }
+        try { const p = _parseJson(raw); content = p[key] ?? p.content ?? raw; } catch { /* raw fallback */ }
 
         _dossier[key] = content;
-        const ta = card.querySelector('.se-cx-card-ta');
-        if (ta) ta.value = content;
+        if (_currentKey() === key) {
+            const ta = _panel.querySelector('#se-cx-pager-ta');
+            if (ta) ta.value = content;
+        }
         if (feedbackEl) feedbackEl.value = '';
-        card.querySelector('.se-cx-card-stale')?.classList.remove('visible');
+        _updateTocActive();
         _updateExportBtn();
     } catch (err) {
-        const ta = card.querySelector('.se-cx-card-ta');
-        if (ta) ta.value = `[Error: ${err.message}]`;
+        const ta = _panel?.querySelector('#se-cx-pager-ta');
+        if (ta && _currentKey() === key) ta.value = `[Error: ${err.message}]`;
     } finally {
         _generating = false;
-        card.querySelectorAll('.se-cx-regen-btn, .se-cx-card-regen-btn').forEach(b => { b.disabled = false; });
+        _setRegenBtnsDisabled(false);
     }
+}
+
+function _setRegenBtnsDisabled(disabled) {
+    _panel?.querySelector('#se-cx-regen-btn')?.toggleAttribute('disabled', disabled);
+    _panel?.querySelector('#se-cx-regen-hdr-btn')?.toggleAttribute('disabled', disabled);
 }
 
 // ─── Add section ──────────────────────────────────────────────────────────
@@ -481,18 +488,18 @@ function _positionForm(form) {
 
 async function _submitAddForm(label, form) {
     if (!label) return;
+    form.remove();
     const key = `custom_${Date.now()}`;
     _customSections.push({ key, label });
-    form.remove();
     _dossier[key] = '';
-    _appendCard(key, label, '', false);
+    _renderToc();
+    _navTo(_allSections().length - 1);
     await _regenSection(key);
 }
 
 function _openAddForm() {
     const existing = document.getElementById('se-cx-add-form');
     if (existing) { existing.remove(); return; }
-
     const form = document.createElement('div');
     form.id = 'se-cx-add-form';
     form.className = 'se-cx-add-form';
@@ -503,24 +510,13 @@ function _openAddForm() {
             `<button class="se-cx-add-form-cancel">Cancel</button>` +
             `<button class="se-cx-add-form-go">Add &amp; Generate</button>` +
         `</div>`;
-
     _positionForm(form);
     document.body.appendChild(form);
-
     form.querySelector('.se-cx-add-form-cancel').addEventListener('click', () => form.remove());
     form.querySelector('.se-cx-add-form-go').addEventListener('click', () => {
         _submitAddForm(form.querySelector('#se-cx-add-form-label').value.trim(), form);
     });
     form.querySelector('#se-cx-add-form-label').focus();
-}
-
-function _appendCard(key, label, content, isNsfw) {
-    const container = _panel?.querySelector('#se-cx-cards');
-    if (!container) return;
-    const div = document.createElement('div');
-    div.innerHTML = _cardHtml(key, label, content, isNsfw);
-    while (div.firstChild) container.appendChild(div.firstChild);
-    _bindCardEvents();
 }
 
 // ─── AI suggest sections ──────────────────────────────────────────────────
@@ -532,14 +528,14 @@ async function _aiSuggestSections() {
     const prompt   = `Character: ${charName}\n\n${context}\n\nSuggest 3–5 additional biography sections not already covered. Existing: ${existing}. Return JSON: {"suggestions":["Section Name",...]}`;
     _generating = true;
     try {
-        const data        = _parseJson(await _callApi(_buildMessages('', prompt), 300));
-        const suggestions = data.suggestions ?? [];
-        for (const s of suggestions) {
+        const data = _parseJson(await _callApi(_buildMessages('', prompt), 300));
+        for (const s of (data.suggestions ?? [])) {
             if (!globalThis.confirm(`Add section: "${s}"?`)) continue;
             const key = `custom_${Date.now()}`;
             _customSections.push({ key, label: s });
             _dossier[key] = '';
-            _appendCard(key, s, '', false);
+            _renderToc();
+            _navTo(_allSections().length - 1);
             await _regenSection(key);
             break;
         }
@@ -565,12 +561,9 @@ function _splitContent(content, folder, baseName, idx, encoder) {
             size += encoder.encode(content[end]).length;
             end++;
         }
-        const paraBreak = content.lastIndexOf('\n\n', end);
-        if (paraBreak > start) end = paraBreak;
-        files.push({
-            name:    `${folder}/${String(idx).padStart(2, '0')}_${baseName}_part${part}.txt`,
-            content: content.slice(start, end),
-        });
+        const pb = content.lastIndexOf('\n\n', end);
+        if (pb > start) end = pb;
+        files.push({ name: `${folder}/${String(idx).padStart(2, '0')}_${baseName}_part${part}.txt`, content: content.slice(start, end) });
         part++;
         start = end === start ? start + 1 : end;
     }
@@ -578,12 +571,11 @@ function _splitContent(content, folder, baseName, idx, encoder) {
 }
 
 function _exportZip() {
-    const rawName = _panel?.querySelector('#se-cx-char-name')?.textContent ?? 'Character';
+    const rawName  = _panel?.querySelector('#se-cx-char-name')?.textContent ?? 'Character';
     const charName = rawName.replaceAll(' ', '_').replace(/[^a-zA-Z0-9_-]/g, '');
     const folder   = `${charName}_Codex_${new Date().toISOString().slice(0, 10)}`;
     const encoder  = new TextEncoder();
-
-    const files = [];
+    const files    = [];
     let idx = 1;
     for (const def of _allSections()) {
         const content = _dossier[def.key];
@@ -596,12 +588,38 @@ function _exportZip() {
         }
         idx++;
     }
-
     if (!files.length) { globalThis.alert('No content to export.'); return; }
     downloadFile(`${folder}.zip`, buildZipBlob(files), 'application/zip');
 }
 
 // ─── Panel binding ────────────────────────────────────────────────────────
+
+function _bindRightTabs() {
+    _panel?.querySelectorAll('.se-cx-rtab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            _panel.querySelectorAll('.se-cx-rtab').forEach(t => t.classList.toggle('active', t === tab));
+            const showPager = tab.dataset.rtab === 'sections';
+            _panel.querySelector('#se-cx-pager').style.display = showPager ? '' : 'none';
+            _panel.querySelector('#se-cx-setup').style.display = showPager ? 'none' : '';
+        });
+    });
+}
+
+function _bindEditBtn() {
+    _panel?.querySelector('#se-cx-edit-btn')?.addEventListener('click', () => {
+        const ta = _panel.querySelector('#se-cx-pager-ta');
+        if (!ta) return;
+        ta.readOnly = !ta.readOnly;
+        if (!ta.readOnly) {
+            ta.focus();
+            const key = _currentKey();
+            ta.addEventListener('input', () => {
+                if (key) _dossier[key] = ta.value;
+                _updateExportBtn();
+            });
+        }
+    });
+}
 
 function _bindPanel() {
     if (!_panel) return;
@@ -617,19 +635,23 @@ function _bindPanel() {
     _panel.querySelector('#se-cx-chk-supp')?.addEventListener('change', _updateTokenEstimate);
     _panel.querySelector('#se-cx-chk-entries')?.addEventListener('change', _updateTokenEstimate);
     _panel.querySelector('#se-cx-override')?.addEventListener('input', _updateTokenEstimate);
-
     _panel.querySelector('#se-cx-gen-btn')?.addEventListener('click', _generate);
 
-    _panel.querySelector('#se-cx-settings-toggle')?.addEventListener('click', () => {
-        const setup  = _panel.querySelector('#se-cx-setup');
-        const toggle = _panel.querySelector('#se-cx-settings-toggle');
-        if (!setup || !toggle) return;
-        const open = setup.style.display === 'none';
-        setup.style.display  = open ? '' : 'none';
-        toggle.textContent   = open ? '▲ Hide Settings' : '⚙ Settings';
+    _panel.querySelector('#se-cx-prev')?.addEventListener('click', () => _navTo(_sectionIdx - 1));
+    _panel.querySelector('#se-cx-next')?.addEventListener('click', () => _navTo(_sectionIdx + 1));
+
+    _panel.querySelector('#se-cx-nsfw-toggle')?.addEventListener('click', () => {
+        const key = _currentKey();
+        if (key) { _nsfwRevealed.add(key); _renderPager(); }
     });
 
+    _panel.querySelector('#se-cx-regen-btn')?.addEventListener('click',     () => _regenSection(_currentKey()));
+    _panel.querySelector('#se-cx-regen-hdr-btn')?.addEventListener('click', () => _regenSection(_currentKey()));
+
     _panel.querySelector('#se-cx-add-section')?.addEventListener('click', _openAddForm);
-    _panel.querySelector('#se-cx-ai-suggest')?.addEventListener('click', _aiSuggestSections);
+    _panel.querySelector('#se-cx-ai-suggest')?.addEventListener('click',  _aiSuggestSections);
     _panel.querySelector('#se-cx-export')?.addEventListener('click', _exportZip);
+
+    _bindEditBtn();
+    _bindRightTabs();
 }
