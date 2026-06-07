@@ -167,6 +167,8 @@ export const TEMPLATES = Object.freeze({
     ENTRY_ROW:               'entry-row',
     GAP_ROW:                 'gap-row',
     ACT_ITEM:                'act-item',
+    // codex/
+    CODEX_PANEL:               'partials/codex/codex-panel',
     // chat-files/
     CHAT_FILES_MANAGER:        'partials/chat-files/chat-files-manager',
     CHAT_FILES_HELP:           'partials/chat-files/chat-files-help',

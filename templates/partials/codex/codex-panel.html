@@ -1,0 +1,66 @@
+<div class="se-cx-header">
+    <span class="se-cx-title">&#x1F4D6; Character Codex</span>
+    <div class="se-cx-header-btns">
+        <button class="se-close-circle se-cx-fullscreen-btn" id="se-cx-fullscreen-btn" title="Fullscreen">&#x26F6;</button>
+        <button class="se-close-circle se-cx-close-btn" id="se-cx-close-btn" title="Close">&times;</button>
+    </div>
+</div>
+<div class="se-cx-body">
+    <!-- ── LEFT PAGE ─────────────────────────────────────────────── -->
+    <div class="se-cx-left">
+        <div class="se-cx-char-header">
+            <img class="se-cx-avatar" id="se-cx-avatar" src="" alt="" />
+            <span class="se-cx-char-name" id="se-cx-char-name">—</span>
+        </div>
+
+        <div class="se-cx-setup" id="se-cx-setup">
+            <div class="se-cx-setup-section">
+                <span class="se-cx-lbl">Character</span>
+                <div class="se-cx-char-pill" id="se-cx-char-pill">Detecting&hellip;</div>
+                <select class="se-cx-char-select" id="se-cx-char-select" style="display:none;"></select>
+                <input class="se-cx-override-input" id="se-cx-override" type="text"
+                       placeholder="Override name (optional)" autocomplete="off" />
+            </div>
+
+            <div class="se-cx-setup-section">
+                <span class="se-cx-lbl">Source Files</span>
+                <label class="se-cx-check-row">
+                    <input type="checkbox" id="se-cx-chk-supp" />
+                    <span>Supplementary files</span>
+                </label>
+                <label class="se-cx-check-row">
+                    <input type="checkbox" id="se-cx-chk-entries" />
+                    <span>Summary entries</span>
+                </label>
+            </div>
+
+            <div class="se-cx-token-row">
+                <span class="se-cx-token-est" id="se-cx-token-est">Select sources above to estimate tokens</span>
+            </div>
+
+            <button class="se-cx-gen-btn" id="se-cx-gen-btn" disabled>Generate Codex</button>
+        </div>
+
+        <button class="se-cx-settings-toggle" id="se-cx-settings-toggle" style="display:none;">&#9881; Settings</button>
+    </div>
+
+    <!-- ── RIGHT PAGE ────────────────────────────────────────────── -->
+    <div class="se-cx-right">
+        <div class="se-cx-progress" id="se-cx-progress" style="display:none;">
+            <div class="se-cx-progress-bar-wrap">
+                <div class="se-cx-progress-fill" id="se-cx-progress-fill"></div>
+            </div>
+            <span class="se-cx-progress-txt" id="se-cx-progress-txt">Generating&hellip;</span>
+        </div>
+
+        <div class="se-cx-empty" id="se-cx-empty">Configure sources and click Generate Codex</div>
+
+        <div class="se-cx-cards" id="se-cx-cards" style="display:none;"></div>
+
+        <div class="se-cx-bottom-bar" id="se-cx-bottom-bar" style="display:none;">
+            <button class="se-cx-add-btn" id="se-cx-add-section">+ Add Section</button>
+            <button class="se-cx-suggest-btn" id="se-cx-ai-suggest">&#x1F4AC; AI Suggest</button>
+            <button class="se-cx-export-btn" id="se-cx-export" disabled>&#x2B07; Export ZIP</button>
+        </div>
+    </div>
+</div>
