@@ -20,56 +20,82 @@ Return ONLY valid JSON — no markdown fences, no explanation.
   },
   "tattoos": [],
   "accessories": [],
+  "custom_parts": [],
   "lighting": "standard",
   "backdrop": []
 }
 
 ━━━ FIELD NOTES ━━━
 
-template:    "humanoid" | "robot" | "anthro_biped" | "monster"
-             Use humanoid unless the character is clearly non-human.
+template:    "humanoid" | "anthro_biped" | "robot" | "monster"
+
+             humanoid     — standard biped. No head modifications.
+             anthro_biped — biped with animal muzzle/snout + side ears rendered
+                            automatically on the head block. Use for any furry,
+                            anthro animal, beastkin, kemonomimi, or creature that
+                            walks on two legs and has animal head features.
+             robot        — same frame as humanoid (future: panel detail).
+             monster      — same frame as humanoid (future: heavier proportions).
 
 tier:        Preserve whatever tier was requested — do NOT change it.
 
 build:       "slim" | "medium" | "stocky" | "tall" | "short"
 
 hair_style:  "short" | "long" | "bun" | "spiky" | "bald"
+             For anthro characters, hair = fur cap/crest colour. Use hair_style
+             that best matches the character's head fur or mane.
 
 lighting:    "standard" | "warm" | "cool" | "dramatic" | "eerie"
-             Choose based on character tone — a mage gets "cool" or "dramatic",
-             a vampire gets "eerie", a friendly human gets "warm" or "standard".
+             Match to character tone.
 
-backdrop:    Array of 0–2 scene elements. Each element is a string naming a scene.
-             Maximum 2 elements — the renderer silently ignores any beyond the second.
-             Empty array [] means floor only (always rendered).
+backdrop:    Array of 0–2 scene elements (strings). Max 2 — extras ignored.
+             Empty [] means floor only.
 
-             Named scenes (renderer has dedicated geometry for these):
-               "floor"   — stone tile floor (always present, you don't need to include it)
-               "castle"  — back wall + corner towers
-               "forest"  — tree trunks with leaf cap blocks
-               "lake"    — water plane + shore rocks
-               "cave"    — rock side walls + ceiling arch
-               "dungeon" — stone back wall + pillars + torch blocks
-               "clouds"  — floating block cloud clusters above the scene
+             Named scenes (dedicated geometry):
+               "castle"   — back wall + corner towers
+               "forest"   — tree trunks with leaf caps
+               "lake"     — water plane + shore rocks + trees
+               "cave"     — rock side walls + ceiling arch
+               "dungeon"  — stone back wall + pillars + torches
+               "clouds"   — floating block clusters above scene
 
-             Free-text scenes: if none of the named scenes match, the renderer picks a
-             palette and simple geometry based on keywords in the name (e.g. "volcano",
-             "arctic tundra", "golden palace"). Use short descriptive phrases.
+             Free-text scenes (keyword-matched palette + wall geometry):
+               city / urban / downtown / night / street / neon
+                 → dark blue-grey concrete walls + amber window lights + moon (high)
+               sky / field / meadow / outdoor / plain
+                 → green walls
+               water / ocean / sea / river / beach
+                 → deep blue walls
+               fire / lava / volcano / hell / inferno
+                 → dark red walls
+               ice / snow / frozen / tundra / arctic
+                 → pale blue-grey walls
+               dark / void / shadow / abyss
+                 → near-black walls
+               gold / throne / palace / royal
+                 → gold-brown walls
+               magic / arcane / mystic / ruin
+                 → deep purple walls
+               Any other phrase → generic stone grey walls
 
              Pairing examples:
-               ["castle", "clouds"]   — castle with overcast sky
-               ["forest", "lake"]     — woodland lake scene
-               ["cave", "dungeon"]    — underground ruins
-               ["clouds"]             — open sky, minimal background
+               ["city night"]           — urban scene with window lights
+               ["castle", "clouds"]     — castle with overcast sky
+               ["forest", "lake"]       — woodland lake
+               ["cave", "dungeon"]      — underground ruins
+               ["city night", "clouds"] — rooftop under overcast city sky
 
-             Tier limits — silently dropped/reduced if tier is too low:
-               minimum: backdrop is always just the plain floor — all elements ignored
-               medium:  "floor", "forest", "castle", "cave", "clouds" supported;
-                        "lake", "dungeon", and free-text fall back to generic geometry
+             Tier limits:
+               minimum: all backdrop elements ignored — floor only
+               medium:  castle/forest/cave/clouds + free-text supported;
+                        lake and dungeon fall back to generic geometry
                high:    all named and free-text scenes fully rendered
 
-             Keep it thematic and complementary — the backdrop should hint at the
-             character's world without distracting from them.
+━━━ SHOES / HOOVES / PAWS ━━━
+
+There is no separate shoe type for hooves or paws — the base body always
+renders shoe blocks. To convey hooves: set "shoes" to a very dark brown
+(e.g. "#1a0a04"). To convey paws: set "shoes" to match the fur/skin colour.
 
 ━━━ TATTOOS ━━━
 
@@ -77,7 +103,7 @@ Each tattoo is an object in the "tattoos" array:
 
   { "location": "left_arm", "color": "#ff3333", "pattern": "tribal", "size": "medium" }
 
-location:  "chest" | "left_arm" | "right_arm" | "left_leg" | "right_leg" | "back" | "neck" | "face"
+location:  "chest" | "left_arm" | "right_arm" | "left_leg" | "right_leg" | "back" | "neck" | "face" | "lower_back"
 pattern:   any short text label (e.g. "tribal", "dragon", "runes", "floral", "geometric", "flame")
 size:      "small" | "medium" | "large"
 color:     any valid CSS hex code
@@ -90,48 +116,94 @@ Each accessory is an object in the "accessories" array:
 
 Supported types and their valid positions:
 
-  hat         → head_top
-  crown       → head_top
-  halo        → head_above
-  glasses     → face_front
-  scarf       → neck
-  cape        → upper_back
-  wings       → upper_back | mid_back
-  belt        → waist
-  tail        → lower_back
-  horns       → head_top
+  hat          → head_top
+  crown        → head_top
+  halo         → head_above
+  glasses      → face_front
+  scarf        → neck
+  cape         → upper_back
+  wings        → upper_back | mid_back
+  belt         → waist
+  tail         → lower_back
+  horns        → head_top   (curved — use for demons, bulls, devils)
+  antlers      → head_top   (wide palmate branches — use for deer, reindeer, moose, elk)
+  necklace     → (no position needed — chain + pendant at collar)
   shoulder_pad → left_shoulder | right_shoulder | both_shoulders
-  armor_chest → chest_front
-  gloves      → left_hand | right_hand | both_hands
+  armor_chest  → chest_front
+  gloves       → left_hand | right_hand | both_hands
 
 size:     "small" | "medium" | "large"
 color:    any valid CSS hex code (leave "" to inherit accent color)
-position: use the location hints above; omit if only one valid location exists
+position: use the hints above; omit if only one valid location exists
+
+━━━ CUSTOM PARTS — freeform voxel geometry ━━━
+
+Use "custom_parts" for body features that have no matching accessory type:
+extra heads, missing/replaced limbs, tentacles, wings used as arms, non-standard
+body segments, creature-specific anatomy, etc.
+
+Each element is a box placed in world space:
+
+  { "w": 0.4, "h": 0.4, "d": 0.4, "color": "#8a2020", "x": 0.8, "y": 2.5, "z": 0.3 }
+
+Coordinate reference (biped centre at x=0, z=0):
+  x: left = negative, right = positive (arms reach ±0.8)
+  y: floor = -1.05, shoe top ≈ -0.2, hip ≈ 0.7, chest ≈ 1.9,
+     collar ≈ 2.5, chin ≈ 2.2, eye level ≈ 3.1, head top ≈ 3.6,
+     hair/horn tips ≈ 3.8–4.2
+  z: front of body ≈ +0.5, back ≈ -0.5
+
+Use multiple small boxes (0.1–0.5 range) to sculpt detail. Limit to 12 boxes
+total at medium tier, 24 at high. Do not use custom_parts at minimum tier.
+
+Examples:
+  — Third eye on forehead: { "w":0.14,"h":0.14,"d":0.06,"color":"#cc2222","x":0,"y":2.85,"z":0.48 }
+  — Tentacle segment:      { "w":0.18,"h":0.35,"d":0.18,"color":"#4a2a5a","x":0.9,"y":0.4,"z":0.2 }
+  — Snout extension:       { "w":0.3,"h":0.22,"d":0.28,"color":"#a06030","x":0,"y":2.38,"z":0.72 }
+  — Dog head on right arm: { "w":0.55,"h":0.55,"d":0.55,"color":"#c8a06a","x":1.2,"y":1.0,"z":0 }
 
 ━━━ TIER COMPLEXITY BUDGETS ━━━
 
-Minimum tier — very low geometry budget:
-  • Max 2 accessories total
-  • No tattoos (too little voxel resolution to show them)
-  • Wings must be "small" at most
-  • No shoulder_pads or armor_chest (geometry too complex)
-  • If the character description would normally need more, pick the 2 most iconic ones
+Minimum tier:
+  • Max 2 accessories total (hat, belt, cape, scarf, horns, antlers, tail only)
+  • No tattoos, no custom_parts
+  • No backdrop (floor only)
 
-Medium tier — moderate budget:
+Medium tier:
   • Max 4 accessories total
-  • Max 2 tattoos (only on large body areas: arm, chest, back)
+  • Max 2 tattoos (arm, chest, back only)
+  • Max 12 custom_part boxes
   • Wings max "medium"
   • Shoulder pads allowed
 
-High tier — full geometry:
+High tier:
   • Max 6 accessories total
-  • Tattoos allowed on any location
+  • Tattoos on any location
+  • Max 24 custom_part boxes
   • All sizes and types allowed
 
-If the user's description would exceed the budget for the active tier, SILENTLY drop the least
-important items and fill in what fits. Never exceed the budget. Never apologise — just return valid JSON.
+Silently drop least-important items if budget exceeded. Never apologise.
 
 ━━━ EXAMPLES ━━━
+
+Anthro reindeer in city, high tier:
+{
+  "template": "anthro_biped", "tier": "high", "build": "stocky",
+  "colors": { "skin": "#8a5a2a", "hair": "#5c3010", "hair_style": "short",
+              "eye": "#3a7a3a", "shirt": "#4a5a7a", "pants": "#6a4a28",
+              "shoes": "#1a0a04", "accent": "#c8a870" },
+  "tattoos": [],
+  "accessories": [
+    { "type": "antlers",  "color": "#6a4018", "size": "large"  },
+    { "type": "scarf",    "color": "#c83038", "size": "medium" },
+    { "type": "gloves",   "color": "#2a1808", "size": "medium", "position": "both_hands" },
+    { "type": "necklace", "color": "#c8a030", "size": "small"  },
+    { "type": "belt",     "color": "#4a2a10", "size": "small"  }
+  ],
+  "custom_parts": [],
+  "lighting": "cool",
+  "backdrop": ["city night"]
+}
 
 A winged angel in golden armor, high tier:
 {
@@ -142,11 +214,13 @@ A winged angel in golden armor, high tier:
   "tattoos": [],
   "accessories": [
     { "type": "wings",       "color": "#f8f0d0", "size": "large",  "position": "upper_back" },
-    { "type": "halo",        "color": "#ffee80", "size": "medium", "position": "head_above" },
-    { "type": "armor_chest", "color": "#d4a030", "size": "medium", "position": "chest_front" },
-    { "type": "crown",       "color": "#ffcc00", "size": "small",  "position": "head_top" }
+    { "type": "halo",        "color": "#ffee80", "size": "medium" },
+    { "type": "armor_chest", "color": "#d4a030", "size": "medium" },
+    { "type": "crown",       "color": "#ffcc00", "size": "small"  }
   ],
-  "lighting": "dramatic"
+  "custom_parts": [],
+  "lighting": "dramatic",
+  "backdrop": ["castle", "clouds"]
 }
 
 A tattooed street punk, medium tier:
@@ -156,12 +230,14 @@ A tattooed street punk, medium tier:
               "eye": "#cc2222", "shirt": "#2a2a2a", "pants": "#1a1a3a",
               "shoes": "#0a0a0a", "accent": "#ff3333" },
   "tattoos": [
-    { "location": "left_arm",  "color": "#cc2222", "pattern": "tribal", "size": "large" },
-    { "location": "neck",      "color": "#ff3333", "pattern": "runes",  "size": "small" }
+    { "location": "left_arm", "color": "#cc2222", "pattern": "tribal", "size": "large" },
+    { "location": "neck",     "color": "#ff3333", "pattern": "runes",  "size": "small" }
   ],
   "accessories": [
     { "type": "belt",    "color": "#cc0000", "size": "medium" },
-    { "type": "glasses", "color": "#111111", "size": "small",  "position": "face_front" }
+    { "type": "glasses", "color": "#111111", "size": "small"  }
   ],
-  "lighting": "cool"
+  "custom_parts": [],
+  "lighting": "cool",
+  "backdrop": ["city night"]
 }

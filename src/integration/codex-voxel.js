@@ -413,20 +413,35 @@ function _addClouds(group) {
 // ── Generic environment (free-text fallback) ──────────────────────────────
 
 function _addGenericEnv(group, name, tier) {
-    const has   = kw => name.includes(kw);
-    let wallA   = '#3a3530';
-    let wallB   = '#2a2520';
-    if      (has('sky') || has('field') || has('plain') || has('outdoor') || has('meadow'))   { wallA = '#5a8a5a'; wallB = '#3a6a3a'; }
-    else if (has('water') || has('ocean') || has('sea') || has('river') || has('beach'))       { wallA = '#1a4a7a'; wallB = '#0a2a5a'; }
-    else if (has('fire') || has('lava') || has('volcano') || has('hell') || has('inferno'))    { wallA = '#8a2a0a'; wallB = '#6a1a00'; }
-    else if (has('ice') || has('snow') || has('frozen') || has('tundra') || has('arctic'))     { wallA = '#8ab0c8'; wallB = '#6a90a8'; }
-    else if (has('dark') || has('void') || has('shadow') || has('abyss'))                      { wallA = '#151210'; wallB = '#0a0808'; }
-    else if (has('gold') || has('throne') || has('palace') || has('royal'))                    { wallA = '#7a6020'; wallB = '#5a4010'; }
-    else if (has('magic') || has('arcane') || has('myst') || has('ruin'))                      { wallA = '#3a2a5a'; wallB = '#2a1a4a'; }
+    const has = kw => name.includes(kw);
+    let wallA = '#3a3530', wallB = '#2a2520', variant = 'default';
+
+    if      (has('city') || has('urban') || has('downtown') || has('street') || has('neon') || has('night'))  { wallA = '#1a1e2a'; wallB = '#0e121a'; variant = 'city'; }
+    else if (has('sky') || has('field') || has('plain') || has('outdoor') || has('meadow'))    { wallA = '#5a8a5a'; wallB = '#3a6a3a'; }
+    else if (has('water') || has('ocean') || has('sea') || has('river') || has('beach'))        { wallA = '#1a4a7a'; wallB = '#0a2a5a'; }
+    else if (has('fire') || has('lava') || has('volcano') || has('hell') || has('inferno'))     { wallA = '#8a2a0a'; wallB = '#6a1a00'; }
+    else if (has('ice') || has('snow') || has('frozen') || has('tundra') || has('arctic'))      { wallA = '#8ab0c8'; wallB = '#6a90a8'; }
+    else if (has('dark') || has('void') || has('shadow') || has('abyss'))                       { wallA = '#151210'; wallB = '#0a0808'; }
+    else if (has('gold') || has('throne') || has('palace') || has('royal'))                     { wallA = '#7a6020'; wallB = '#5a4010'; }
+    else if (has('magic') || has('arcane') || has('myst') || has('ruin'))                       { wallA = '#3a2a5a'; wallB = '#2a1a4a'; }
 
     _boxes(group, wallA, _WALL_X.map(x => [0.92, 1, 0.3, x, -0.15, -2.1]));
     _boxes(group, wallB, _WALL_X.map(x => [0.92, 1, 0.3, x,  0.85, -2.1]));
-    if (tier === 'high') {
+    _addGenericEnvDetail(group, variant, tier, wallA, wallB);
+}
+
+function _addGenericEnvDetail(group, variant, tier, wallA, wallB) {
+    if (variant === 'city') {
+        // Amber windows on back wall
+        _boxes(group, '#c89018', [
+            [0.22, 0.2, 0.05, -2,    0.5,  -2.07],
+            [0.22, 0.2, 0.05,  0,    0.7,  -2.07],
+            [0.22, 0.2, 0.05,  2,    0.4,  -2.07],
+            [0.22, 0.2, 0.05, -1,   -0.1,  -2.07],
+            [0.22, 0.2, 0.05,  1,    0.8,  -2.07],
+        ]);
+        if (tier === 'high') group.add(_box(0.28, 0.28, 0.06, '#e4e0c0', 2.6, 2, -2.04));
+    } else if (tier === 'high') {
         group.add(_box(0.6, 0.6, 0.6, wallA, 0, -0.7, -1.6));
         group.add(_box(0.4, 0.4, 0.4, wallB, 0, -0.1, -1.6));
     }
@@ -459,6 +474,18 @@ function _addBaseBody(g, c, bx, bz) {
     ]);
 }
 
+// ─── Anthro body features — added when template === 'anthro_biped' ─────────
+
+function _addAnthroFeatures(g, c) {
+    // Muzzle — protrudes from lower front of head block
+    g.add(_box(0.44, 0.28, 0.3, _lighten(c.skin, -0.07), 0, 2.38, 0.58));
+    // Animal ears on top-sides of head (drawn in hair/fur colour)
+    _boxes(g, c.hair, [
+        [0.16, 0.3, 0.14, -0.52, 3.06, 0],
+        [0.16, 0.3, 0.14,  0.52, 3.06, 0],
+    ]);
+}
+
 // ─── MINIMUM tier ─────────────────────────────────────────────────────────
 // Budget: max 2 accessories, no tattoos
 
@@ -467,12 +494,16 @@ function _buildMinimum(spec) {
     const c = spec.colors ?? _defaultSpec().colors;
     const { bx, bz } = _buildScale(spec.build);
     _addBaseBody(g, c, bx, bz);
-    const simpleTypes = new Set(['hat', 'belt', 'cape', 'scarf']);
+    const simpleTypes = new Set(['hat', 'belt', 'cape', 'scarf', 'horns', 'antlers', 'tail']);
     (spec.accessories ?? []).slice(0, 2)
         .filter(a => simpleTypes.has(_accType(a)))
         .forEach(a => _renderAccessory(g, a, c, 'minimum'));
     g.position.y = -0.5;
     return g;
+}
+
+function _renderCustomParts(g, parts = [], limit = 24) {
+    parts.slice(0, limit).forEach(p => g.add(_box(p.w, p.h, p.d, p.color, p.x, p.y, p.z)));
 }
 
 // ─── MEDIUM tier ──────────────────────────────────────────────────────────
@@ -484,10 +515,12 @@ function _buildMedium(spec) {
     const { bx, bz } = _buildScale(spec.build);
     _addBaseBody(g, c, bx, bz);
     _addHairMedium(g, c);
+    if ((spec.template ?? 'humanoid') === 'anthro_biped') _addAnthroFeatures(g, c);
     (spec.accessories ?? []).slice(0, 4).forEach(a => _renderAccessory(g, a, c, 'medium'));
     const tattooLocs = new Set(['chest', 'left_arm', 'right_arm', 'back']);
     const tattoos = (spec.tattoos ?? []).filter(t => tattooLocs.has(t.location)).slice(0, 2);
     _addTattoos(g, tattoos, bx, bz);
+    _renderCustomParts(g, spec.custom_parts, 12);
     g.position.y = -0.5;
     return g;
 }
@@ -501,6 +534,7 @@ function _buildHigh(spec) {
     const { bx, bz } = _buildScale(spec.build);
     _addBaseBody(g, c, bx, bz);
     _addHairMedium(g, c);
+    if ((spec.template ?? 'humanoid') === 'anthro_biped') _addAnthroFeatures(g, c);
     // Eye blocks + collar + arm cuffs
     _boxes(g, c.eye, [[0.16, 0.14, 0.06, -0.22, 2.68, 0.46], [0.16, 0.14, 0.06, 0.22, 2.68, 0.46]]);
     g.add(_box(0.85, 0.12, 0.62, _lighten(c.shirt, 0.2),  0,     _Y.COLLAR, 0));
@@ -510,6 +544,7 @@ function _buildHigh(spec) {
     ]);
     (spec.accessories ?? []).slice(0, 6).forEach(a => _renderAccessory(g, a, c, 'high'));
     _addTattoos(g, spec.tattoos ?? [], bx, bz);
+    _renderCustomParts(g, spec.custom_parts, 24);
     g.position.y = -0.5;
     return g;
 }
@@ -531,6 +566,8 @@ function _renderAccessory(group, acc, c, tier) {
         case 'cape':         _addCape(group, color, sc);                                   break;
         case 'belt':         _addBelt(group, color);                                       break;
         case 'horns':        _addHorns(group, color, sc);                                  break;
+        case 'antlers':      _addAntlers(group, color, sc);                                break;
+        case 'necklace':     _addNecklace(group, color);                                   break;
         case 'wings':        _addWings(group, color, sc);                                  break;
         case 'tail':         _addTail(group, _accColor(acc, c.hair));                      break;
         case 'shoulder_pad': _addShoulderPad(group, color, sc, pos);                       break;
@@ -601,6 +638,29 @@ function _addHorns(group, color, sc) {
         [0.18, 0.55 * sc, 0.18, -0.28, 3.42, 0],
         [0.18, 0.55 * sc, 0.18,  0.28, 3.42, 0],
     ]);
+}
+
+function _addAntlers(group, color, sc = 1) {
+    // Palmate antlers — wide branching spread from crown of head
+    _boxes(group, color || '#7a5018', [
+        // Left: trunk → palm bar → 3 tines
+        [0.1 * sc, 0.62 * sc, 0.1 * sc, -0.28,  3.3,  0],
+        [0.5 * sc, 0.1  * sc, 0.1 * sc, -0.52,  3.75, 0],
+        [0.1 * sc, 0.24 * sc, 0.1 * sc, -0.28,  3.82, 0],
+        [0.1 * sc, 0.2  * sc, 0.1 * sc, -0.72,  3.82, 0],
+        [0.1 * sc, 0.14 * sc, 0.1 * sc, -0.12,  3.82, 0],
+        // Right: mirrored
+        [0.1 * sc, 0.62 * sc, 0.1 * sc,  0.28,  3.3,  0],
+        [0.5 * sc, 0.1  * sc, 0.1 * sc,  0.52,  3.75, 0],
+        [0.1 * sc, 0.24 * sc, 0.1 * sc,  0.28,  3.82, 0],
+        [0.1 * sc, 0.2  * sc, 0.1 * sc,  0.72,  3.82, 0],
+        [0.1 * sc, 0.14 * sc, 0.1 * sc,  0.12,  3.82, 0],
+    ]);
+}
+
+function _addNecklace(group, color) {
+    group.add(_box(0.72, 0.04, 0.04, _lighten(color, 0.15), 0, 2,    0.34));  // chain band
+    group.add(_box(0.14, 0.14, 0.06, color,                 0, 1.87, 0.34));  // pendant
 }
 
 function _addWings(group, color, sc) {
