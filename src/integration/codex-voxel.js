@@ -288,13 +288,14 @@ function _buildBackdrop(spec) {
     else if (spec.backdrop)            rawList = [String(spec.backdrop)];
     else                               rawList = [];
 
-    // Minimum: no backdrop geometry — just wireframe grid
+    // No backdrop specified or minimum tier — just floor + sky horizon
     if (tier === 'minimum' || rawList.length === 0) {
-        _addGridBackdrop(g);
+        _addDefaultBackdrop(g);
         return g;
     }
 
     _addFloor(g);
+    _addSkyHorizon(g);
 
     rawList.forEach(raw => {
         const name = String(raw).toLowerCase().trim();
@@ -312,13 +313,20 @@ function _buildBackdrop(spec) {
     return g;
 }
 
-// ── Default backdrop — grid + wireframe back plane ────────────────────────
+// ── Sky horizon strip — always rendered behind scene walls (z=-3) ─────────
 
-function _addGridBackdrop(group) {
+function _addSkyHorizon(group) {
+    _boxes(group, '#252d38', _WALL_X.map(x => [0.92, 0.88, 0.2, x, -0.18, -3]));
+    _boxes(group, '#2e3d52', _WALL_X.map(x => [0.92, 0.88, 0.2, x,  0.7,  -3]));
+    _boxes(group, '#364860', _WALL_X.map(x => [0.92, 0.88, 0.2, x,  1.58, -3]));
+}
+
+// ── Default (no backdrop) — minimal grey grid + wireframe hint ────────────
+
+function _addDefaultBackdrop(group) {
     const grid = new THREE.GridHelper(8, 8, 0x484848, 0x303030);
     grid.position.y = -1.05;
     group.add(grid);
-
     const bgGeo = new THREE.PlaneGeometry(8, 5);
     const bgMat = new THREE.MeshBasicMaterial({ color: 0x2a2a38, wireframe: true, transparent: true, opacity: 0.28 });
     const bgPlane = new THREE.Mesh(bgGeo, bgMat);
