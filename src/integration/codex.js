@@ -30,6 +30,10 @@ registerPrompt('codex-voxel-spec', 'Character Codex — Voxel Spec Generator', '
     location: 'Edit › Character Codex (voxel render)',
 });
 
+registerPrompt('codex-voxel-quick', 'Character Codex — Voxel Quick Description', '', {
+    location: 'Edit › Character Codex (quick voxel description from biography)',
+});
+
 // ─── Section definitions ─────────────────────────────────────────────────
 
 /** @type {Array<{key:string, label:string, nsfw:boolean}>} */
@@ -717,7 +721,7 @@ async function _initVoxel() {
 }
 
 function _setVoxelBtnsEnabled(enabled) {
-    ['#se-cx-vctl-front', '#se-cx-vctl-spin', '#se-cx-vctl-regen'].forEach(id => {
+    ['#se-cx-vctl-front', '#se-cx-vctl-spin', '#se-cx-vctl-regen', '#se-cx-vctl-quick'].forEach(id => {
         const btn = _panel?.querySelector(id);
         if (btn) btn.disabled = !enabled;
     });
@@ -751,6 +755,33 @@ async function _generateVoxelSpec() {
     }
 }
 
+async function _quickGenVoxelDesc() {
+    if (_generating || !_panel) return;
+    const appearance  = (_dossier.appearance  ?? '').trim();
+    const personality = (_dossier.personality ?? '').trim();
+    if (!appearance || !personality) {
+        globalThis.alert('Quick gen requires both Appearance & Quirks and Personality sections — generate the Codex first.');
+        return;
+    }
+
+    _generating = true;
+    const btn = _panel.querySelector('#se-cx-vctl-quick');
+    if (btn) btn.textContent = '…';
+
+    try {
+        const sys    = getPrompt('codex-voxel-quick');
+        const userMsg = `Tier: ${_voxelTier}\n\nPersonality:\n${personality}\n\nAppearance & Quirks:\n${appearance}`;
+        const raw    = await _callApi(_buildMessages(sys, userMsg), 300);
+        const notes  = _panel.querySelector('#se-cx-voxel-notes');
+        if (notes) notes.value = raw.trim();
+    } catch (err) {
+        globalThis.alert(`Quick gen failed: ${err.message}`);
+    } finally {
+        _generating = false;
+        if (btn) btn.textContent = '⚡';
+    }
+}
+
 function _bindVoxelControls() {
     _panel?.querySelector('#se-cx-vctl-front')?.addEventListener('click', () => setView('front'));
 
@@ -760,6 +791,7 @@ function _bindVoxelControls() {
     });
 
     _panel?.querySelector('#se-cx-vctl-regen')?.addEventListener('click', _generateVoxelSpec);
+    _panel?.querySelector('#se-cx-vctl-quick')?.addEventListener('click', _quickGenVoxelDesc);
 
     _panel?.querySelectorAll('.se-cx-tier-btn').forEach(btn => {
         btn.addEventListener('click', () => {

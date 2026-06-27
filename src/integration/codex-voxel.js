@@ -256,11 +256,17 @@ function _accScale(a) {
 function _defaultSpec() {
     return {
         template: 'humanoid',
-        tier:     'minimum',
+        tier:     'high',
         build:    'medium',
         colors: {
-            skin: '#f4c08a', hair: '#3a2010', hair_style: 'short',
-            eye: '#4a6a8a', shirt: '#3a5a9a', pants: '#2a2a4a', shoes: '#1a1218', accent: '#c8a030',
+            skin:       '#c8a06a',
+            hair:       '#2c1a08',
+            hair_style: 'short',
+            eye:        '#3a6a3a',
+            shirt:      '#2a3a5a',
+            pants:      '#2a2218',
+            shoes:      '#181008',
+            accent:     '#8a6030',
         },
         tattoos:     [],
         accessories: [],
