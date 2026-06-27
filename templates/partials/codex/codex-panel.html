@@ -2,114 +2,82 @@
     <span class="se-cx-title">&#x1F4D6; Character Codex</span>
     <div class="se-cx-header-btns">
         <button class="se-close-circle se-cx-fullscreen-btn" id="se-cx-fullscreen-btn" title="Fullscreen">&#x26F6;</button>
-        <button class="se-close-circle se-cx-close-btn" id="se-cx-close-btn" title="Close">&times;</button>
+        <button class="se-close-circle se-cx-close-btn"     id="se-cx-close-btn"      title="Close">&times;</button>
     </div>
 </div>
-<div class="se-cx-body">
 
-    <!-- ── LEFT PAGE — always the character portrait ─────────────── -->
-    <div class="se-cx-left">
-        <div class="se-cx-portrait" id="se-cx-portrait">
-            <div class="se-cx-avatar-wrap">
+<div class="se-cx-book">
+
+    <!-- ── LEFT PAGE — always fixed ─────────────────────────────────── -->
+    <div class="se-cx-page-left">
+
+        <!-- Voxel viewer row: canvas + 3 control buttons -->
+        <div class="se-cx-voxel-row">
+            <div class="se-cx-voxel-frame" id="se-cx-voxel-frame">
                 <img class="se-cx-avatar" id="se-cx-avatar" src="" alt="" />
+                <!-- Stage 2: Three.js canvas injected here -->
             </div>
-            <span class="se-cx-char-name" id="se-cx-char-name">—</span>
-            <span class="se-cx-char-sub" id="se-cx-char-sub"></span>
+            <div class="se-cx-voxel-ctrls">
+                <button class="se-cx-vctl" id="se-cx-vctl-front" title="Front view (Stage 2)" disabled>&#9673;</button>
+                <button class="se-cx-vctl" id="se-cx-vctl-spin"  title="Auto-spin (Stage 2)"  disabled>&#10227;</button>
+                <button class="se-cx-vctl" id="se-cx-vctl-regen" title="Generate voxel (Stage 2)" disabled>&#10022;</button>
+            </div>
+        </div>
+
+        <!-- Config fields below the voxel viewer -->
+        <div class="se-cx-left-fields" id="se-cx-left-fields">
+
+            <div class="se-cx-field-group">
+                <span class="se-cx-field-lbl">Character</span>
+                <div class="se-cx-char-pill" id="se-cx-char-pill">Detecting&hellip;</div>
+                <select class="se-cx-char-select" id="se-cx-char-select" style="display:none;"></select>
+            </div>
+
+            <input class="se-cx-override-input" id="se-cx-override" type="text"
+                   placeholder="Override character name (optional)" autocomplete="off" />
+
+            <div class="se-cx-field-group">
+                <span class="se-cx-field-lbl">Include in context</span>
+                <label class="se-cx-check-row">
+                    <input type="checkbox" id="se-cx-chk-supp" />
+                    <span>Supplementary files</span>
+                </label>
+                <label class="se-cx-check-row">
+                    <input type="checkbox" id="se-cx-chk-entries" />
+                    <span>Summary entries</span>
+                </label>
+            </div>
+
+            <div class="se-cx-token-row" id="se-cx-token-row">
+                <span class="se-cx-token-est" id="se-cx-token-est">Select sources above to estimate tokens</span>
+            </div>
+
+            <button class="se-cx-gen-btn" id="se-cx-gen-btn" disabled>Generate Codex</button>
+
         </div>
     </div>
 
-    <!-- ── RIGHT PAGE ────────────────────────────────────────────── -->
-    <div class="se-cx-right">
+    <!-- ── RIGHT PAGE — content changes per page ────────────────────── -->
+    <div class="se-cx-page-right">
 
-        <!-- Right-page tab bar (visible post-generation) -->
-        <div class="se-cx-rtab-bar" id="se-cx-rtab-bar" style="display:none;">
-            <button class="se-cx-rtab active" data-rtab="sections">Sections</button>
-            <button class="se-cx-rtab" data-rtab="settings">&#9881; Settings</button>
-        </div>
-
-        <!-- ── SETTINGS TAB / pre-gen setup ─────────────────────── -->
-        <div class="se-cx-setup" id="se-cx-setup">
-            <div class="se-cx-setup-inner">
-                <div class="se-cx-setup-section">
-                    <span class="se-cx-lbl">Character</span>
-                    <div class="se-cx-char-pill" id="se-cx-char-pill">Detecting&hellip;</div>
-                    <select class="se-cx-char-select" id="se-cx-char-select" style="display:none;"></select>
-                    <input class="se-cx-override-input" id="se-cx-override" type="text"
-                           placeholder="Override name (optional)" autocomplete="off" />
-                </div>
-
-                <div class="se-cx-setup-section">
-                    <span class="se-cx-lbl">Source Files</span>
-                    <label class="se-cx-check-row">
-                        <input type="checkbox" id="se-cx-chk-supp" />
-                        <span>Supplementary files</span>
-                    </label>
-                    <label class="se-cx-check-row">
-                        <input type="checkbox" id="se-cx-chk-entries" />
-                        <span>Summary entries</span>
-                    </label>
-                </div>
-
-                <div class="se-cx-token-row">
-                    <span class="se-cx-token-est" id="se-cx-token-est">Select sources above to estimate tokens</span>
-                </div>
-
-                <button class="se-cx-gen-btn" id="se-cx-gen-btn" disabled>Generate Codex</button>
-            </div>
-        </div>
-
-        <!-- Progress bar -->
-        <div class="se-cx-progress" id="se-cx-progress" style="display:none;">
+        <!-- Progress overlay (covers right page during generation) -->
+        <div class="se-cx-progress-overlay" id="se-cx-progress-overlay" style="display:none;">
             <div class="se-cx-progress-bar-wrap">
                 <div class="se-cx-progress-fill" id="se-cx-progress-fill"></div>
             </div>
             <span class="se-cx-progress-txt" id="se-cx-progress-txt">Generating&hellip;</span>
         </div>
 
-        <!-- ── SECTIONS TAB — paginator view ─────────────────────── -->
-        <div class="se-cx-pager" id="se-cx-pager" style="display:none;">
+        <!-- Dynamic right-page content (TOC or section) -->
+        <div class="se-cx-right-content" id="se-cx-right-content"></div>
 
-            <!-- Mini TOC: one chip per section, click to jump -->
-            <div class="se-cx-toc" id="se-cx-toc"></div>
-
-            <!-- Paginator nav bar -->
-            <div class="se-cx-pager-nav">
-                <button class="se-cx-nav-btn" id="se-cx-prev" title="Previous section">&#8249;</button>
-                <span class="se-cx-pager-label" id="se-cx-pager-label"></span>
-                <button class="se-cx-nav-btn" id="se-cx-next" title="Next section">&#8250;</button>
-                <span class="se-cx-pager-count" id="se-cx-pager-count"></span>
-                <span class="se-cx-stale-badge" id="se-cx-stale-badge" style="display:none;">&#9888; stale</span>
-                <button class="se-cx-card-edit-btn" id="se-cx-edit-btn" title="Toggle edit">&#x270E;</button>
-                <button class="se-cx-card-regen-btn" id="se-cx-regen-hdr-btn" title="Regenerate">&#x21BB;</button>
-            </div>
-
-            <!-- Section textarea -->
-            <div class="se-cx-pager-body">
-                <div class="se-cx-nsfw-wrap" id="se-cx-nsfw-wrap">
-                    <button class="se-cx-nsfw-toggle" id="se-cx-nsfw-toggle">&#x1F441; Show</button>
-                    <textarea class="se-cx-card-ta se-cx-pager-ta" id="se-cx-pager-ta" readonly></textarea>
-                </div>
-            </div>
-
-            <!-- Feedback -->
-            <div class="se-cx-feedback-row">
-                <input class="se-cx-feedback-inp" id="se-cx-pager-feedback" type="text" placeholder="Feedback for regen&hellip;" />
-                <button class="se-cx-regen-btn" id="se-cx-regen-btn">&#x21BB; Regen</button>
-            </div>
-
-            <!-- System prompt (collapsible) -->
-            <details class="se-cx-prompt-details">
-                <summary>System Prompt</summary>
-                <textarea class="se-cx-prompt-ta" id="se-cx-pager-prompt-ta" placeholder="Generated on first regen&hellip;"></textarea>
-            </details>
-        </div>
-
-        <!-- Bottom bar -->
-        <div class="se-cx-bottom-bar" id="se-cx-bottom-bar" style="display:none;">
-            <button class="se-cx-add-btn" id="se-cx-add-section">+ Add</button>
-            <button class="se-cx-suggest-btn" id="se-cx-ai-suggest">&#x1F4AC; Suggest</button>
-            <button class="se-cx-export-btn" id="se-cx-export" disabled>&#x2B07; Export ZIP</button>
+        <!-- Paginator footer — always visible -->
+        <div class="se-cx-paginator">
+            <button class="se-cx-pager-arrow" id="se-cx-prev" disabled>&#8592;</button>
+            <div class="se-cx-pager-dots" id="se-cx-pager-dots"></div>
+            <button class="se-cx-pager-arrow" id="se-cx-next">&#8594;</button>
         </div>
 
     </div>
+
 </div>

@@ -1,11 +1,8 @@
 /**
  * @module codex
- * @description Character Codex — generates a multi-section character profile
- * from the active character card and ingested files. Opens as an overlay in
- * the Edit (Arcs) tab, same slot as Chat Files Manager.
- *
- * Layout: left page = character portrait (Stage 2: voxel canvas)
- *         right page = setup pre-gen; sections paginator post-gen
+ * Character Codex — multi-section character profile panel.
+ * Left page: always fixed (voxel canvas Stage 2 / avatar Stage 1 + config fields).
+ * Right page: TOC (page 0) then one section per page; paginator footer navigates.
  */
 
 import { escHtml } from '../core/utils.js';
@@ -42,12 +39,12 @@ const SECTION_DEFS = [
 
 const SECTION_KEYS = SECTION_DEFS.map(s => s.key);
 
-// ─── Module state (all session-only) ─────────────────────────────────────
+// ─── Module state ─────────────────────────────────────────────────────────
 
 let _panel          = null;
 let _char           = null;
 let _generating     = false;
-let _sectionIdx     = 0;
+let _pageIdx        = 0;      // 0 = TOC, 1-N = section pages
 let _dossier        = {};
 let _dossierPrompts = {};
 let _customSections = [];
@@ -59,13 +56,15 @@ export async function openCodex() {
     closeCodex();
     const html = await loadTemplate(TEMPLATES.CODEX_PANEL);
     _panel = document.createElement('div');
-    _panel.id = 'se-cx-panel';
+    _panel.id        = 'se-cx-panel';
     _panel.className = 'se-cx-panel';
     _panel.innerHTML = html;
     document.querySelector('#se-panel-arcs .se-acts-content').appendChild(_panel);
     _detectChar();
     _bindPanel();
-    _showDefaultLayout();  // pager + tab bar visible from the start
+    _pageIdx = 0;
+    _renderPage();
+    _updatePaginator();
     requestAnimationFrame(() => _panel?.classList.add('open'));
 }
 
@@ -74,21 +73,34 @@ export function closeCodex() {
     _panel          = null;
     _char           = null;
     _generating     = false;
-    _sectionIdx     = 0;
+    _pageIdx        = 0;
     _dossier        = {};
     _dossierPrompts = {};
     _customSections = [];
     _nsfwRevealed   = new Set();
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────
+// ─── Page model ──────────────────────────────────────────────────────────
 
-function _allSections() {
-    return [...SECTION_DEFS, ..._customSections.map(s => ({ key: s.key, label: s.label, nsfw: false }))];
+function _pages() {
+    return [
+        { type: 'toc' },
+        ...SECTION_DEFS.map(s => ({ type: 'section', ...s })),
+        ..._customSections.map(s => ({ type: 'section', key: s.key, label: s.label, nsfw: false })),
+    ];
 }
 
 function _currentKey() {
-    return _allSections()[_sectionIdx]?.key ?? null;
+    const p = _pages()[_pageIdx];
+    return (p?.type === 'section') ? p.key : null;
+}
+
+function _goToPage(idx) {
+    const pages = _pages();
+    if (idx < 0 || idx >= pages.length) return;
+    _pageIdx = idx;
+    _renderPage();
+    _updatePaginator();
 }
 
 // ─── Character detection ─────────────────────────────────────────────────
@@ -98,10 +110,9 @@ function _detectChar() {
     const ctx    = SillyTavern.getContext();
     const charId = ctx.characterId;
     const chars  = ctx.characters ?? [];
-
     if (charId !== undefined && chars[charId]) {
         _char = chars[charId];
-        _setCharHeader(_char);
+        _setCharDisplay(_char);
         const pill = _panel.querySelector('#se-cx-char-pill');
         if (pill) pill.textContent = _char.name;
     } else {
@@ -111,11 +122,9 @@ function _detectChar() {
     _updateTokenEstimate();
 }
 
-function _setCharHeader(char) {
+function _setCharDisplay(char) {
     if (!_panel || !char) return;
-    const nameEl   = _panel.querySelector('#se-cx-char-name');
     const avatarEl = _panel.querySelector('#se-cx-avatar');
-    if (nameEl)   nameEl.textContent = char.name ?? '—';
     if (avatarEl && char.avatar) avatarEl.src = `/characters/${char.avatar}`;
 }
 
@@ -137,7 +146,7 @@ function _showCharDropdown(chars) {
         const idx = Number(select.value);
         if (!Number.isNaN(idx) && chars[idx]) {
             _char = chars[idx];
-            _setCharHeader(_char);
+            _setCharDisplay(_char);
         }
         _updateTokenEstimate();
     });
@@ -276,10 +285,6 @@ async function _generate() {
     _customSections = [];
     _nsfwRevealed   = new Set();
     _updateGenBtn();
-    // Switch to Sections tab and show progress overlay
-    _panel.querySelectorAll('.se-cx-rtab').forEach(t => t.classList.toggle('active', t.dataset.rtab === 'sections'));
-    _panel.querySelector('#se-cx-setup').style.display = 'none';
-    _panel.querySelector('#se-cx-pager').style.display = '';
     _setProgress(true, 'Generating codex…', 0);
 
     const { charName, context } = _buildContext();
@@ -288,14 +293,9 @@ async function _generate() {
         for (const key of SECTION_KEYS) {
             if (parsed[key]) _dossier[key] = parsed[key];
         }
-        _setProgress(true, 'Complete', 100);
         _showPostGenLayout(charName);
     } catch (err) {
         _setProgress(false, '', 0);
-        // Switch to Settings tab so user can retry
-        _panel?.querySelectorAll('.se-cx-rtab').forEach(t => t.classList.toggle('active', t.dataset.rtab === 'settings'));
-        _panel?.querySelector('#se-cx-setup')?.style && (_panel.querySelector('#se-cx-setup').style.display = '');
-        _panel?.querySelector('#se-cx-pager')?.style  && (_panel.querySelector('#se-cx-pager').style.display  = 'none');
         globalThis.alert(`Generation failed: ${err.message}`);
     } finally {
         _generating = false;
@@ -303,26 +303,14 @@ async function _generate() {
     }
 }
 
-// ─── Layout transitions ───────────────────────────────────────────────────
-
-function _showDefaultLayout() {
-    // Sections pager + tab bar always visible; settings accessible via ⚙ Settings tab
-    if (!_panel) return;
-    _panel.querySelector('#se-cx-rtab-bar').style.display    = '';
-    _panel.querySelector('#se-cx-pager').style.display       = '';
-    _panel.querySelector('#se-cx-bottom-bar').style.display  = '';
-    _panel.querySelector('#se-cx-setup').style.display       = 'none';
-    _panel.querySelector('#se-cx-progress').style.display    = 'none';
-    _renderToc();
-    _renderPager();
-}
+// ─── Layout helpers ───────────────────────────────────────────────────────
 
 function _setProgress(visible, text, pct) {
-    const bar   = _panel?.querySelector('#se-cx-progress');
-    const fill  = _panel?.querySelector('#se-cx-progress-fill');
-    const txt   = _panel?.querySelector('#se-cx-progress-txt');
-    if (!bar) return;
-    bar.style.display = visible ? '' : 'none';
+    const overlay = _panel?.querySelector('#se-cx-progress-overlay');
+    const fill    = _panel?.querySelector('#se-cx-progress-fill');
+    const txt     = _panel?.querySelector('#se-cx-progress-txt');
+    if (!overlay) return;
+    overlay.style.display = visible ? '' : 'none';
     if (fill) fill.style.width = `${pct}%`;
     if (txt)  txt.textContent  = text;
 }
@@ -330,103 +318,192 @@ function _setProgress(visible, text, pct) {
 function _showPostGenLayout(charName) {
     if (!_panel) return;
     _setProgress(false, '', 0);
-    // Switch back to Sections tab
-    _panel.querySelectorAll('.se-cx-rtab').forEach(t => t.classList.toggle('active', t.dataset.rtab === 'sections'));
-    _panel.querySelector('#se-cx-setup').style.display  = 'none';
-    _panel.querySelector('#se-cx-pager').style.display  = '';
-    const nameEl = _panel.querySelector('#se-cx-char-name');
-    if (nameEl && charName) nameEl.textContent = charName;
-    _sectionIdx = 0;
-    _renderToc();
-    _renderPager();
-    _updateExportBtn();
-}
-
-function _updateExportBtn() {
-    const btn = _panel?.querySelector('#se-cx-export');
-    if (btn) btn.disabled = Object.keys(_dossier).length === 0;
-}
-
-// ─── Mini TOC ────────────────────────────────────────────────────────────
-
-function _tocChipHtml(s, i) {
-    const active     = i === _sectionIdx ? ' active' : '';
-    const hasCnt     = _dossier[s.key] ? ' has-content' : '';
-    const nsfwCls    = s.nsfw ? ' nsfw-chip' : '';
-    const shortLabel = s.label.split(' ').slice(0, 2).join(' ');
-    return `<button class="se-cx-toc-chip${active}${hasCnt}${nsfwCls}" data-toc-idx="${i}">${escHtml(shortLabel)}</button>`;
-}
-
-function _renderToc() {
-    const toc = _panel?.querySelector('#se-cx-toc');
-    if (!toc) return;
-    toc.innerHTML = _allSections().map((s, i) => _tocChipHtml(s, i)).join('');
-    toc.querySelectorAll('[data-toc-idx]').forEach(btn => {
-        btn.addEventListener('click', () => _navTo(Number(btn.dataset.tocIdx)));
-    });
-}
-
-function _updateTocActive() {
-    _panel?.querySelectorAll('.se-cx-toc-chip').forEach((chip, i) => {
-        chip.classList.toggle('active', i === _sectionIdx);
-        const key = _allSections()[i]?.key;
-        chip.classList.toggle('has-content', !!_dossier[key]);
-    });
+    const pill = _panel.querySelector('#se-cx-char-pill');
+    if (pill && charName) pill.textContent = charName;
+    _pageIdx = 1;
+    _renderPage();
+    _updatePaginator();
 }
 
 // ─── Paginator ────────────────────────────────────────────────────────────
 
-function _navTo(idx) {
-    const sections = _allSections();
-    if (idx < 0 || idx >= sections.length) return;
-    _sectionIdx = idx;
-    _renderPager();
-    _updateTocActive();
+function _updatePaginator() {
+    const pages  = _pages();
+    const total  = pages.length;
+    const dotsEl = _panel?.querySelector('#se-cx-pager-dots');
+    const prev   = _panel?.querySelector('#se-cx-prev');
+    const next   = _panel?.querySelector('#se-cx-next');
+
+    if (prev) prev.disabled = _pageIdx === 0;
+    if (next) next.disabled = _pageIdx === total - 1;
+
+    if (!dotsEl) return;
+
+    if (total <= 10) {
+        dotsEl.className = 'se-cx-pager-dots';
+        dotsEl.innerHTML = pages.map((p, i) => {
+            const hasCnt = (p.type === 'section' && _dossier[p.key]) ? ' has-content' : '';
+            return `<span class="se-cx-pdot${i === _pageIdx ? ' active' : ''}${hasCnt}" data-pdot="${i}"></span>`;
+        }).join('');
+        dotsEl.querySelectorAll('[data-pdot]').forEach(dot => {
+            dot.addEventListener('click', () => _goToPage(Number(dot.dataset.pdot)));
+        });
+    } else {
+        dotsEl.className = 'se-cx-pager-dots';
+        dotsEl.innerHTML = `<span class="se-cx-pager-count">${_pageIdx + 1}&thinsp;/&thinsp;${total}</span>`;
+    }
 }
 
-function _renderPager() {
-    const sections = _allSections();
-    const def      = sections[_sectionIdx];
-    if (!def || !_panel) return;
-    const { key, label, nsfw } = def;
+// ─── Page rendering ───────────────────────────────────────────────────────
 
-    const ta       = _panel.querySelector('#se-cx-pager-ta');
-    const labelEl  = _panel.querySelector('#se-cx-pager-label');
-    const countEl  = _panel.querySelector('#se-cx-pager-count');
-    const prevBtn  = _panel.querySelector('#se-cx-prev');
-    const nextBtn  = _panel.querySelector('#se-cx-next');
-    const stale    = _panel.querySelector('#se-cx-stale-badge');
-    const nsfwWrap = _panel.querySelector('#se-cx-nsfw-wrap');
-    const nsfwBtn  = _panel.querySelector('#se-cx-nsfw-toggle');
-    const promptTa = _panel.querySelector('#se-cx-pager-prompt-ta');
-    const feedback = _panel.querySelector('#se-cx-pager-feedback');
+function _renderPage() {
+    const container = _panel?.querySelector('#se-cx-right-content');
+    if (!container) return;
+    const page = _pages()[_pageIdx];
+    if (!page) return;
 
-    if (labelEl) labelEl.textContent = label;
-    if (countEl) countEl.textContent = `${_sectionIdx + 1} / ${sections.length}`;
-    if (ta) { ta.value = _dossier[key] ?? ''; ta.readOnly = true; }
-    if (prevBtn) prevBtn.disabled = _sectionIdx === 0;
-    if (nextBtn) nextBtn.disabled = _sectionIdx === sections.length - 1;
-    if (stale)   stale.style.display   = 'none';
-    if (feedback) feedback.value       = '';
-    if (promptTa) promptTa.value       = _dossierPrompts[key] ?? '';
-
-    const isNsfw   = nsfw;
-    const revealed = _nsfwRevealed.has(key);
-    if (nsfwWrap) nsfwWrap.classList.toggle('se-cx-nsfw-blur', isNsfw && !revealed);
-    if (nsfwBtn) {
-        nsfwBtn.style.display    = (isNsfw && !revealed) ? '' : 'none';
-        nsfwBtn.dataset.nsfwKey  = key;
+    if (page.type === 'toc') {
+        container.innerHTML = _tocPageHtml();
+    } else {
+        container.innerHTML = _sectionPageHtml(page);
     }
+    _bindPageEvents(container, page);
+}
+
+// ─── TOC page HTML ────────────────────────────────────────────────────────
+
+function _tocDotClass(p) {
+    if (!_dossier[p.key]) return '';
+    return p.nsfw ? ' nsfw-filled' : ' filled';
+}
+
+function _tocRow(p, pageIdx) {
+    const dotCls = _tocDotClass(p);
+    return `<div class="se-cx-toc-row" data-goto="${pageIdx}">` +
+        `<span class="se-cx-toc-dot${dotCls}"></span>` +
+        `<span class="se-cx-toc-label">${escHtml(p.label)}</span>` +
+        `<span class="se-cx-toc-chevron">&#8250;</span>` +
+        `</div>`;
+}
+
+function _tocPageHtml() {
+    const pages    = _pages();
+    const hasAny   = Object.keys(_dossier).length > 0;
+    const rows     = pages.map((p, i) => (p.type === 'section' ? _tocRow(p, i) : '')).join('');
+    return `<div class="se-cx-toc-page">` +
+        `<div class="se-cx-toc-heading">Contents</div>` +
+        `<div class="se-cx-toc-list">${rows}</div>` +
+        `<div class="se-cx-toc-actions">` +
+            `<button class="se-cx-add-btn" id="se-cx-add-section">+ Add</button>` +
+            `<button class="se-cx-suggest-btn" id="se-cx-ai-suggest">&#x1F4AC; Suggest</button>` +
+            `<button class="se-cx-export-btn" id="se-cx-export" ${hasAny ? '' : 'disabled'}>&#x2B07; Export ZIP</button>` +
+        `</div>` +
+        `</div>`;
+}
+
+// ─── Section page HTML ────────────────────────────────────────────────────
+
+function _nsfwToggleHtml(nsfw, revealed) {
+    if (!nsfw || revealed) return '';
+    return `<button class="se-cx-nsfw-toggle">&#x1F441; Show</button>`;
+}
+
+function _sectionPageHtml(p) {
+    const { key, label, nsfw } = p;
+    const content  = _dossier[key] ?? '';
+    const revealed = _nsfwRevealed.has(key);
+    const blurCls  = (nsfw && !revealed) ? ' blurred' : '';
+    const hasAny   = Object.keys(_dossier).length > 0;
+    return `<div class="se-cx-section-page">` +
+        `<div class="se-cx-section-hdr">` +
+            `<span class="se-cx-section-title">${escHtml(label)}</span>` +
+            (nsfw ? `<span class="se-cx-nsfw-badge">NSFW</span>` : '') +
+            `<button class="se-cx-edit-btn" title="Toggle edit">&#x270E;</button>` +
+            `<button class="se-cx-regen-hdr-btn" title="Regenerate">&#x21BB;</button>` +
+        `</div>` +
+        `<div class="se-cx-nsfw-wrap${blurCls}">` +
+            _nsfwToggleHtml(nsfw, revealed) +
+            `<textarea class="se-cx-section-ta" readonly>${escHtml(content)}</textarea>` +
+        `</div>` +
+        `<div class="se-cx-feedback-row">` +
+            `<input class="se-cx-feedback-inp" type="text" placeholder="Feedback for regen&hellip;" />` +
+            `<button class="se-cx-regen-btn">&#x21BB; Regen</button>` +
+        `</div>` +
+        `<details class="se-cx-prompt-details">` +
+            `<summary>System Prompt</summary>` +
+            `<textarea class="se-cx-prompt-ta">${escHtml(_dossierPrompts[key] ?? '')}</textarea>` +
+        `</details>` +
+        `<div class="se-cx-section-actions">` +
+            `<button class="se-cx-add-btn" id="se-cx-add-section">+ Add</button>` +
+            `<button class="se-cx-suggest-btn" id="se-cx-ai-suggest">&#x1F4AC; Suggest</button>` +
+            `<button class="se-cx-export-btn" id="se-cx-export" ${hasAny ? '' : 'disabled'}>&#x2B07; Export ZIP</button>` +
+        `</div>` +
+        `</div>`;
+}
+
+// ─── Dynamic event binding ────────────────────────────────────────────────
+
+function _bindTocEvents(container) {
+    container.querySelectorAll('[data-goto]').forEach(row => {
+        row.addEventListener('click', () => _goToPage(Number(row.dataset.goto)));
+    });
+}
+
+function _bindSectionEditEvents(container, key) {
+    const ta = container.querySelector('.se-cx-section-ta');
+    if (ta) {
+        ta.addEventListener('input', () => {
+            if (!ta.readOnly) {
+                _dossier[key] = ta.value;
+                _updatePaginator();
+            }
+        });
+    }
+    container.querySelector('.se-cx-edit-btn')?.addEventListener('click', () => {
+        if (!ta) return;
+        ta.readOnly = !ta.readOnly;
+        if (!ta.readOnly) ta.focus();
+    });
+}
+
+function _bindNsfwToggle(container, key) {
+    container.querySelector('.se-cx-nsfw-toggle')?.addEventListener('click', () => {
+        _nsfwRevealed.add(key);
+        const wrap = container.querySelector('.se-cx-nsfw-wrap');
+        if (wrap) wrap.classList.remove('blurred');
+        container.querySelector('.se-cx-nsfw-toggle')?.remove();
+    });
+}
+
+function _bindPageEvents(container, page) {
+    container.querySelector('#se-cx-add-section')?.addEventListener('click', _openAddForm);
+    container.querySelector('#se-cx-ai-suggest')?.addEventListener('click',  _aiSuggestSections);
+    container.querySelector('#se-cx-export')?.addEventListener('click', _exportZip);
+
+    if (page.type === 'toc') {
+        _bindTocEvents(container);
+        return;
+    }
+
+    const { key, nsfw } = page;
+    _bindSectionEditEvents(container, key);
+    container.querySelector('.se-cx-regen-hdr-btn')?.addEventListener('click', () => _regenSection(key));
+    container.querySelector('.se-cx-regen-btn')?.addEventListener('click',     () => _regenSection(key));
+    if (nsfw) _bindNsfwToggle(container, key);
 }
 
 // ─── Per-section regeneration ─────────────────────────────────────────────
 
+function _contentEl(sel) {
+    return _panel?.querySelector(`#se-cx-right-content ${sel}`);
+}
+
 async function _fetchInstruction(key, feedback, context) {
+    const promptTa = _contentEl('.se-cx-prompt-ta');
     const existing = (_dossierPrompts[key] ?? '').trim();
-    const promptTa = _panel?.querySelector('#se-cx-pager-prompt-ta');
     if (existing) return promptTa?.value.trim() || existing;
 
-    const def    = _allSections().find(s => s.key === key);
+    const def    = _pages().find(p => p.key === key);
     const label  = def?.label ?? key;
     const meta   = getPrompt('codex-section-prompt');
     const user   = `Section: ${label}\nFeedback: ${feedback || '(none)'}\n\nCharacter context:\n${context}`;
@@ -438,9 +515,14 @@ async function _fetchInstruction(key, feedback, context) {
     return instruction;
 }
 
+function _setRegenBtnsDisabled(disabled) {
+    _contentEl('.se-cx-regen-btn')?.toggleAttribute('disabled', disabled);
+    _contentEl('.se-cx-regen-hdr-btn')?.toggleAttribute('disabled', disabled);
+}
+
 async function _regenSection(key) {
     if (_generating || !key || !_panel) return;
-    const feedbackEl  = _panel.querySelector('#se-cx-pager-feedback');
+    const feedbackEl  = _contentEl('.se-cx-feedback-inp');
     const feedback    = feedbackEl?.value.trim() ?? '';
     const { context } = _buildContext();
 
@@ -456,30 +538,26 @@ async function _regenSection(key) {
 
         _dossier[key] = content;
         if (_currentKey() === key) {
-            const ta = _panel.querySelector('#se-cx-pager-ta');
+            const ta = _contentEl('.se-cx-section-ta');
             if (ta) ta.value = content;
+            if (feedbackEl) feedbackEl.value = '';
         }
-        if (feedbackEl) feedbackEl.value = '';
-        _updateTocActive();
-        _updateExportBtn();
+        _updatePaginator();
     } catch (err) {
-        const ta = _panel?.querySelector('#se-cx-pager-ta');
-        if (ta && _currentKey() === key) ta.value = `[Error: ${err.message}]`;
+        if (_currentKey() === key) {
+            const ta = _contentEl('.se-cx-section-ta');
+            if (ta) ta.value = `[Error: ${err.message}]`;
+        }
     } finally {
         _generating = false;
         _setRegenBtnsDisabled(false);
     }
 }
 
-function _setRegenBtnsDisabled(disabled) {
-    _panel?.querySelector('#se-cx-regen-btn')?.toggleAttribute('disabled', disabled);
-    _panel?.querySelector('#se-cx-regen-hdr-btn')?.toggleAttribute('disabled', disabled);
-}
-
 // ─── Add section ──────────────────────────────────────────────────────────
 
 function _positionForm(form) {
-    const btn = _panel?.querySelector('#se-cx-add-section');
+    const btn = _panel?.querySelector('#se-cx-right-content #se-cx-add-section');
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
     form.style.bottom = `${window.innerHeight - rect.top + 6}px`;
@@ -492,8 +570,7 @@ async function _submitAddForm(label, form) {
     const key = `custom_${Date.now()}`;
     _customSections.push({ key, label });
     _dossier[key] = '';
-    _renderToc();
-    _navTo(_allSections().length - 1);
+    _goToPage(_pages().length - 1);
     await _regenSection(key);
 }
 
@@ -501,11 +578,11 @@ function _openAddForm() {
     const existing = document.getElementById('se-cx-add-form');
     if (existing) { existing.remove(); return; }
     const form = document.createElement('div');
-    form.id = 'se-cx-add-form';
+    form.id        = 'se-cx-add-form';
     form.className = 'se-cx-add-form';
     form.innerHTML =
         `<span class="se-cx-add-form-lbl">New Section Label</span>` +
-        `<input class="se-cx-add-form-inp" id="se-cx-add-form-label" type="text" placeholder="e.g. Combat Style" autocomplete="off" />` +
+        `<input class="se-cx-add-form-inp" id="se-cx-add-form-inp" type="text" placeholder="e.g. Combat Style" autocomplete="off" />` +
         `<div class="se-cx-add-form-foot">` +
             `<button class="se-cx-add-form-cancel">Cancel</button>` +
             `<button class="se-cx-add-form-go">Add &amp; Generate</button>` +
@@ -514,9 +591,9 @@ function _openAddForm() {
     document.body.appendChild(form);
     form.querySelector('.se-cx-add-form-cancel').addEventListener('click', () => form.remove());
     form.querySelector('.se-cx-add-form-go').addEventListener('click', () => {
-        _submitAddForm(form.querySelector('#se-cx-add-form-label').value.trim(), form);
+        _submitAddForm(form.querySelector('#se-cx-add-form-inp').value.trim(), form);
     });
-    form.querySelector('#se-cx-add-form-label').focus();
+    form.querySelector('#se-cx-add-form-inp').focus();
 }
 
 // ─── AI suggest sections ──────────────────────────────────────────────────
@@ -524,7 +601,7 @@ function _openAddForm() {
 async function _aiSuggestSections() {
     if (_generating || !_panel) return;
     const { charName, context } = _buildContext();
-    const existing = _allSections().map(s => s.label).join(', ');
+    const existing = _pages().filter(p => p.type === 'section').map(p => p.label).join(', ');
     const prompt   = `Character: ${charName}\n\n${context}\n\nSuggest 3–5 additional biography sections not already covered. Existing: ${existing}. Return JSON: {"suggestions":["Section Name",...]}`;
     _generating = true;
     try {
@@ -534,8 +611,7 @@ async function _aiSuggestSections() {
             const key = `custom_${Date.now()}`;
             _customSections.push({ key, label: s });
             _dossier[key] = '';
-            _renderToc();
-            _navTo(_allSections().length - 1);
+            _goToPage(_pages().length - 1);
             await _regenSection(key);
             break;
         }
@@ -562,8 +638,11 @@ function _splitContent(content, folder, baseName, idx, encoder) {
             end++;
         }
         const pb = content.lastIndexOf('\n\n', end);
-        if (pb > start) end = pb;
-        files.push({ name: `${folder}/${String(idx).padStart(2, '0')}_${baseName}_part${part}.txt`, content: content.slice(start, end) });
+        if (pb > start) { end = pb; }
+        files.push({
+            name: `${folder}/${String(idx).padStart(2, '0')}_${baseName}_part${part}.txt`,
+            content: content.slice(start, end),
+        });
         part++;
         start = end === start ? start + 1 : end;
     }
@@ -571,20 +650,19 @@ function _splitContent(content, folder, baseName, idx, encoder) {
 }
 
 function _exportZip() {
-    const rawName  = _panel?.querySelector('#se-cx-char-name')?.textContent ?? 'Character';
-    const charName = rawName.replaceAll(' ', '_').replace(/[^a-zA-Z0-9_-]/g, '');
+    const charName = (_char?.name ?? 'Character').replaceAll(' ', '_').replace(/[^a-zA-Z0-9_-]/g, '');
     const folder   = `${charName}_Codex_${new Date().toISOString().slice(0, 10)}`;
     const encoder  = new TextEncoder();
     const files    = [];
     let idx = 1;
-    for (const def of _allSections()) {
-        const content = _dossier[def.key];
+    for (const p of _pages().filter(pg => pg.type === 'section')) {
+        const content = _dossier[p.key];
         if (!content) continue;
-        const baseName = def.label.toLowerCase().replaceAll(' ', '_').replace(/[^a-z0-9_]/g, '');
+        const base = p.label.toLowerCase().replaceAll(' ', '_').replace(/[^a-z0-9_]/g, '');
         if (encoder.encode(content).length <= _MAX_BYTES) {
-            files.push({ name: `${folder}/${String(idx).padStart(2, '0')}_${baseName}.txt`, content });
+            files.push({ name: `${folder}/${String(idx).padStart(2, '0')}_${base}.txt`, content });
         } else {
-            files.push(..._splitContent(content, folder, baseName, idx, encoder));
+            files.push(..._splitContent(content, folder, base, idx, encoder));
         }
         idx++;
     }
@@ -593,33 +671,6 @@ function _exportZip() {
 }
 
 // ─── Panel binding ────────────────────────────────────────────────────────
-
-function _bindRightTabs() {
-    _panel?.querySelectorAll('.se-cx-rtab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            _panel.querySelectorAll('.se-cx-rtab').forEach(t => t.classList.toggle('active', t === tab));
-            const showPager = tab.dataset.rtab === 'sections';
-            _panel.querySelector('#se-cx-pager').style.display = showPager ? '' : 'none';
-            _panel.querySelector('#se-cx-setup').style.display = showPager ? 'none' : '';
-        });
-    });
-}
-
-function _bindEditBtn() {
-    _panel?.querySelector('#se-cx-edit-btn')?.addEventListener('click', () => {
-        const ta = _panel.querySelector('#se-cx-pager-ta');
-        if (!ta) return;
-        ta.readOnly = !ta.readOnly;
-        if (!ta.readOnly) {
-            ta.focus();
-            const key = _currentKey();
-            ta.addEventListener('input', () => {
-                if (key) _dossier[key] = ta.value;
-                _updateExportBtn();
-            });
-        }
-    });
-}
 
 function _bindPanel() {
     if (!_panel) return;
@@ -632,26 +683,11 @@ function _bindPanel() {
         this.title     = isFull ? 'Exit fullscreen' : 'Fullscreen';
     });
 
-    _panel.querySelector('#se-cx-chk-supp')?.addEventListener('change', _updateTokenEstimate);
-    _panel.querySelector('#se-cx-chk-entries')?.addEventListener('change', _updateTokenEstimate);
-    _panel.querySelector('#se-cx-override')?.addEventListener('input', _updateTokenEstimate);
-    _panel.querySelector('#se-cx-gen-btn')?.addEventListener('click', _generate);
+    _panel.querySelector('#se-cx-chk-supp')?.addEventListener('change',    _updateTokenEstimate);
+    _panel.querySelector('#se-cx-chk-entries')?.addEventListener('change',  _updateTokenEstimate);
+    _panel.querySelector('#se-cx-override')?.addEventListener('input',      _updateTokenEstimate);
+    _panel.querySelector('#se-cx-gen-btn')?.addEventListener('click',       _generate);
 
-    _panel.querySelector('#se-cx-prev')?.addEventListener('click', () => _navTo(_sectionIdx - 1));
-    _panel.querySelector('#se-cx-next')?.addEventListener('click', () => _navTo(_sectionIdx + 1));
-
-    _panel.querySelector('#se-cx-nsfw-toggle')?.addEventListener('click', () => {
-        const key = _currentKey();
-        if (key) { _nsfwRevealed.add(key); _renderPager(); }
-    });
-
-    _panel.querySelector('#se-cx-regen-btn')?.addEventListener('click',     () => _regenSection(_currentKey()));
-    _panel.querySelector('#se-cx-regen-hdr-btn')?.addEventListener('click', () => _regenSection(_currentKey()));
-
-    _panel.querySelector('#se-cx-add-section')?.addEventListener('click', _openAddForm);
-    _panel.querySelector('#se-cx-ai-suggest')?.addEventListener('click',  _aiSuggestSections);
-    _panel.querySelector('#se-cx-export')?.addEventListener('click', _exportZip);
-
-    _bindEditBtn();
-    _bindRightTabs();
+    _panel.querySelector('#se-cx-prev')?.addEventListener('click', () => _goToPage(_pageIdx - 1));
+    _panel.querySelector('#se-cx-next')?.addEventListener('click', () => _goToPage(_pageIdx + 1));
 }
