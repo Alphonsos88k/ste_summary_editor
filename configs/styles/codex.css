@@ -44,7 +44,7 @@
 
 .se-cx-book {
     display: grid;
-    grid-template-columns: 270px 1fr;
+    grid-template-columns: 45% 55%;
     flex: 1;
     min-height: 0;
     overflow: hidden;
@@ -639,6 +639,90 @@
 }
 .se-cx-export-btn:hover:not(:disabled) { color: #a6e22e; border-color: #3a5828; }
 .se-cx-export-btn:disabled { opacity: 0.2; cursor: default; }
+
+/* ─── Voxel prompt section (shown after Three.js loads) ─────────────────── */
+
+.se-cx-voxel-prompt-section {
+    padding: 0 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.se-cx-voxel-notes {
+    background: #0c0c08;
+    border: 1px solid #252518;
+    border-radius: 4px;
+    color: #c8c8b8;
+    font-family: inherit;
+    font-size: 10px;
+    line-height: 1.5;
+    padding: 6px 8px;
+    resize: none;
+    height: 54px;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+}
+.se-cx-voxel-notes:focus { border-color: var(--se-green); }
+.se-cx-voxel-notes::placeholder { color: #2a2a1e; }
+
+.se-cx-tier-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.se-cx-tier-btns {
+    display: flex;
+    gap: 3px;
+}
+
+.se-cx-tier-btn {
+    padding: 2px 9px;
+    background: #1a1a12;
+    border: 1px solid #2a2a1c;
+    border-radius: 3px;
+    color: #444;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.1s, border-color 0.1s, background 0.1s;
+    letter-spacing: 0.03em;
+}
+.se-cx-tier-btn:hover    { color: #888; border-color: #3a3a2c; }
+.se-cx-tier-btn.active   { color: #a6e22e; border-color: #3a5828; background: #1a2810; }
+
+/* ─── Back-to-TOC button (in section page header) ───────────────────────── */
+
+.se-cx-back-toc {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: #333;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 2px 6px;
+    transition: color 0.1s, border-color 0.1s;
+    flex-shrink: 0;
+    margin-right: 4px;
+}
+.se-cx-back-toc:hover { color: #888; border-color: #2e2e22; }
+
+/* ─── TOC last-edited timestamp ─────────────────────────────────────────── */
+
+.se-cx-toc-edited {
+    font-size: 9px;
+    color: #333;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-right: 6px;
+    font-variant-numeric: tabular-nums;
+}
 
 /* ─── Add section float form ────────────────────────────────────────────── */
 

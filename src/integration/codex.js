@@ -11,6 +11,7 @@ import { TEMPLATES } from '../core/constants.js';
 import { registerPrompt, getPrompt } from '../core/system-prompts.js';
 import { state } from '../core/state.js';
 import { buildZipBlob, downloadFile } from '../export/export.js';
+import { initVoxel, disposeVoxel, setVoxelSpec, setView, toggleSpin, defaultSpec } from './codex-voxel.js';
 
 // ─── Prompt registration ──────────────────────────────────────────────────
 
@@ -22,6 +23,11 @@ registerPrompt('codex-main', 'Character Codex — Generation', '', {
 registerPrompt('codex-section-prompt', 'Character Codex — Section Regen Prompt', '', {
     warnJson: true,
     location: 'Edit › Character Codex (per-section regeneration)',
+});
+
+registerPrompt('codex-voxel-spec', 'Character Codex — Voxel Spec Generator', '', {
+    warnJson: true,
+    location: 'Edit › Character Codex (voxel render)',
 });
 
 // ─── Section definitions ─────────────────────────────────────────────────
@@ -47,8 +53,11 @@ let _generating     = false;
 let _pageIdx        = 0;      // 0 = TOC, 1-N = section pages
 let _dossier        = {};
 let _dossierPrompts = {};
+let _dossierEdited  = {};     // key → timestamp of last edit/gen
 let _customSections = [];
 let _nsfwRevealed   = new Set();
+let _voxelSpec  = null;
+let _voxelTier  = 'minimum';
 
 // ─── Public API ──────────────────────────────────────────────────────────
 
@@ -66,9 +75,11 @@ export async function openCodex() {
     _renderPage();
     _updatePaginator();
     requestAnimationFrame(() => _panel?.classList.add('open'));
+    _initVoxel();
 }
 
 export function closeCodex() {
+    disposeVoxel();
     _panel?.remove();
     _panel          = null;
     _char           = null;
@@ -76,8 +87,10 @@ export function closeCodex() {
     _pageIdx        = 0;
     _dossier        = {};
     _dossierPrompts = {};
+    _dossierEdited  = {};
     _customSections = [];
     _nsfwRevealed   = new Set();
+    _voxelSpec      = null;
 }
 
 // ─── Page model ──────────────────────────────────────────────────────────
@@ -290,8 +303,9 @@ async function _generate() {
     const { charName, context } = _buildContext();
     try {
         const parsed = _parseJson(await _callApi(_buildMessages(getPrompt('codex-main'), context), 4000));
+        const now = Date.now();
         for (const key of SECTION_KEYS) {
-            if (parsed[key]) _dossier[key] = parsed[key];
+            if (parsed[key]) { _dossier[key] = parsed[key]; _dossierEdited[key] = now; }
         }
         _showPostGenLayout(charName);
     } catch (err) {
@@ -378,10 +392,13 @@ function _tocDotClass(p) {
 }
 
 function _tocRow(p, pageIdx) {
-    const dotCls = _tocDotClass(p);
+    const dotCls   = _tocDotClass(p);
+    const edited   = _editedLabel(p.key);
+    const editedHtml = edited ? `<span class="se-cx-toc-edited">${escHtml(edited)}</span>` : '';
     return `<div class="se-cx-toc-row" data-goto="${pageIdx}">` +
         `<span class="se-cx-toc-dot${dotCls}"></span>` +
         `<span class="se-cx-toc-label">${escHtml(p.label)}</span>` +
+        editedHtml +
         `<span class="se-cx-toc-chevron">&#8250;</span>` +
         `</div>`;
 }
@@ -416,6 +433,7 @@ function _sectionPageHtml(p) {
     const hasAny   = Object.keys(_dossier).length > 0;
     return `<div class="se-cx-section-page">` +
         `<div class="se-cx-section-hdr">` +
+            `<button class="se-cx-back-toc" title="Back to Contents">&#8592;</button>` +
             `<span class="se-cx-section-title">${escHtml(label)}</span>` +
             (nsfw ? `<span class="se-cx-nsfw-badge">NSFW</span>` : '') +
             `<button class="se-cx-edit-btn" title="Toggle edit">&#x270E;</button>` +
@@ -450,11 +468,14 @@ function _bindTocEvents(container) {
 }
 
 function _bindSectionEditEvents(container, key) {
+    container.querySelector('.se-cx-back-toc')?.addEventListener('click', () => _goToPage(0));
+
     const ta = container.querySelector('.se-cx-section-ta');
     if (ta) {
         ta.addEventListener('input', () => {
             if (!ta.readOnly) {
                 _dossier[key] = ta.value;
+                _dossierEdited[key] = Date.now();
                 _updatePaginator();
             }
         });
@@ -537,6 +558,7 @@ async function _regenSection(key) {
         try { const p = _parseJson(raw); content = p[key] ?? p.content ?? raw; } catch { /* raw fallback */ }
 
         _dossier[key] = content;
+        _dossierEdited[key] = Date.now();
         if (_currentKey() === key) {
             const ta = _contentEl('.se-cx-section-ta');
             if (ta) ta.value = content;
@@ -670,6 +692,87 @@ function _exportZip() {
     downloadFile(`${folder}.zip`, buildZipBlob(files), 'application/zip');
 }
 
+// ─── Last-edited label ────────────────────────────────────────────────────
+
+function _editedLabel(key) {
+    const ts = _dossierEdited[key];
+    if (!ts) return '';
+    const mins = Math.floor((Date.now() - ts) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+// ─── Voxel integration ────────────────────────────────────────────────────
+
+async function _initVoxel() {
+    const frame = _panel?.querySelector('#se-cx-voxel-frame');
+    if (!frame) return;
+    const ok = await initVoxel(frame, _voxelSpec ?? defaultSpec());
+    const promptSec = _panel?.querySelector('#se-cx-voxel-prompt-section');
+    if (promptSec) promptSec.style.display = ok ? '' : 'none';
+    _setVoxelBtnsEnabled(ok);
+}
+
+function _setVoxelBtnsEnabled(enabled) {
+    ['#se-cx-vctl-front', '#se-cx-vctl-spin', '#se-cx-vctl-regen'].forEach(id => {
+        const btn = _panel?.querySelector(id);
+        if (btn) btn.disabled = !enabled;
+    });
+}
+
+async function _generateVoxelSpec() {
+    if (_generating || !_panel) return;
+    const notes   = _panel.querySelector('#se-cx-voxel-notes')?.value.trim() ?? '';
+    const { context } = _buildContext();
+    const userMsg = notes
+        ? `Character context:\n${context}\n\nAdditional voxel notes:\n${notes}`
+        : `Character context:\n${context}`;
+
+    _generating = true;
+    const btn = _panel.querySelector('#se-cx-vctl-regen');
+    if (btn) btn.textContent = '…';
+
+    try {
+        const sys = getPrompt('codex-voxel-spec');
+        const raw = await _callApi(_buildMessages(sys, userMsg), 600);
+        const spec = _parseJson(raw);
+        spec.tier  = _voxelTier;
+        _voxelSpec = spec;
+        const frame = _panel?.querySelector('#se-cx-voxel-frame');
+        if (frame) setVoxelSpec(spec);
+    } catch (err) {
+        globalThis.alert(`Voxel spec failed: ${err.message}`);
+    } finally {
+        _generating = false;
+        if (btn) btn.textContent = '✦';
+    }
+}
+
+function _bindVoxelControls() {
+    _panel?.querySelector('#se-cx-vctl-front')?.addEventListener('click', () => setView('front'));
+
+    _panel?.querySelector('#se-cx-vctl-spin')?.addEventListener('click', function () {
+        const spinning = toggleSpin();
+        this.style.color = spinning ? 'var(--se-green)' : '';
+    });
+
+    _panel?.querySelector('#se-cx-vctl-regen')?.addEventListener('click', _generateVoxelSpec);
+
+    _panel?.querySelectorAll('.se-cx-tier-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            _voxelTier = btn.dataset.tier ?? 'minimum';
+            _panel.querySelectorAll('.se-cx-tier-btn').forEach(b => b.classList.toggle('active', b === btn));
+            if (_voxelSpec) {
+                _voxelSpec.tier = _voxelTier;
+                setVoxelSpec(_voxelSpec);
+            }
+        });
+    });
+}
+
 // ─── Panel binding ────────────────────────────────────────────────────────
 
 function _bindPanel() {
@@ -690,4 +793,6 @@ function _bindPanel() {
 
     _panel.querySelector('#se-cx-prev')?.addEventListener('click', () => _goToPage(_pageIdx - 1));
     _panel.querySelector('#se-cx-next')?.addEventListener('click', () => _goToPage(_pageIdx + 1));
+
+    _bindVoxelControls();
 }
