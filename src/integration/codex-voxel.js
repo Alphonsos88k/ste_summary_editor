@@ -36,6 +36,29 @@ const _Y = {
     CUFF:    0.8,
 };
 
+// ─── Backdrop geometry constants ──────────────────────────────────────────
+
+const _WALL_X = [-3, -2, -1, 0, 1, 2, 3];   // shared wall x-positions
+
+// Cloud cluster shape: [[w, h, d, dx, dy, dz], color] — offsets from cluster centre
+/** @type {Array<[number[], string]>} */
+const _CLOUD_SHAPE = [
+    [[1.4, 0.4, 0.7,  0,    0,    0], '#d8dde8'],
+    [[0.9, 0.4, 0.6, -0.6, -0.2,  0], '#b0b8c8'],
+    [[0.9, 0.4, 0.6,  0.5, -0.2,  0], '#d8dde8'],
+];
+
+// Tree parts: [[w, h, d, yOffset], color] — tx/tz applied per tree position
+/** @type {Array<[number[], string]>} */
+const _TREE_PARTS = [
+    [[0.35, 1.3, 0.35, -0.45], '#5c3a1e'],
+    [[1.1,  0.7, 1.1,   0.7 ], '#2d6a2d'],
+    [[0.7,  0.6, 0.7,   1.2 ], '#1e4a1e'],
+];
+
+// Lake rock positions: [x, y, z]
+const _LAKE_ROCKS = [[0.5, -1, 1.8], [2.8, -0.9, 0.5], [3.2, -0.95, 1.6]];
+
 // ─── Hair style geometry data ─────────────────────────────────────────────
 // Each entry is an array of [w, h, d, x, y, z] specs, all drawn in hair colour.
 
@@ -213,10 +236,11 @@ function _box(w, h, d, color, x, y, z) {
     return mesh;
 }
 
-// Batch helper — adds multiple boxes of the same color to a group.
+// Same-color batch: specs are [w, h, d, x, y, z]
 function _boxes(group, color, specs) {
     specs.forEach(([w, h, d, x, y, z]) => group.add(_box(w, h, d, color, x, y, z)));
 }
+
 
 // ─── Accessory object helpers ─────────────────────────────────────────────
 
@@ -310,17 +334,15 @@ function _addFloor(group) {
 
 function _addCastle(group, tier) {
     const wall = '#5a5048', stone = '#4a4038';
-    for (let x = -3; x <= 3; x++) {
-        group.add(_box(0.92, 1, 0.3, wall,  x, -0.55, -2));
-        group.add(_box(0.92, 1, 0.3, stone, x,  0.45, -2));
-    }
+    _boxes(group, wall,  _WALL_X.map(x => [0.92, 1, 0.3, x, -0.55, -2]));
+    _boxes(group, stone, _WALL_X.map(x => [0.92, 1, 0.3, x,  0.45, -2]));
     [-3.5, 3.5].forEach(tx => {
         group.add(_box(1.1, 2.2, 1.1, stone, tx, 0, -2));
         if (tier === 'high') {
-            [-0.28, 0.28].forEach(bx => {
-                group.add(_box(0.28, 0.4, 0.28, wall, tx + bx, 1.25, -2));
-                group.add(_box(0.28, 0.4, 0.28, wall, tx,      1.25, -2 + bx));
-            });
+            _boxes(group, wall, [-0.28, 0.28].flatMap(bx => [
+                [0.28, 0.4, 0.28, tx + bx, 1.25, -2     ],
+                [0.28, 0.4, 0.28, tx,      1.25, -2 + bx],
+            ]));
         }
     });
 }
@@ -328,12 +350,11 @@ function _addCastle(group, tier) {
 // ── Forest ───────────────────────────────────────────────────────────────
 
 function _addForest(group, tier) {
-    const trunk = '#5c3a1e', leaves = '#2d6a2d', leafDk = '#1e4a1e';
     const pos = tier === 'high' ? [[-2.2, -1.5], [2.2, -1.5], [-1.5, -2]] : [[-2.2, -1.5], [2.2, -1.5]];
     pos.forEach(([tx, tz]) => {
-        group.add(_box(0.35, 1.3, 0.35, trunk,  tx, -0.45, tz));
-        group.add(_box(1.1,  0.7, 1.1,  leaves, tx,  0.7,  tz));
-        group.add(_box(0.7,  0.6, 0.7,  leafDk, tx,  1.2,  tz));
+        _TREE_PARTS.forEach(([[w, h, d, dy], color]) => {
+            group.add(_box(w, h, d, color, tx, dy, tz));
+        });
     });
 }
 
@@ -341,9 +362,7 @@ function _addForest(group, tier) {
 
 function _addLake(group) {
     group.add(_box(4, 0.12, 2.5, '#1a4a7a', 1.5, -1.08, 0));
-    [[0.5, -1, 1.8], [2.8, -0.9, 0.5], [3.2, -0.95, 1.6]].forEach(([x, y, z]) => {
-        group.add(_box(0.55, 0.45, 0.5, '#4a4848', x, y, z));
-    });
+    _boxes(group, '#4a4848', _LAKE_ROCKS.map(([x, y, z]) => [0.55, 0.45, 0.5, x, y, z]));
     _addForest(group, 'medium');
 }
 
@@ -368,18 +387,20 @@ function _addCave(group, tier) {
 
 function _addDungeon(group) {
     const stone = '#3a3530', mortar = '#2a2520';
-    for (let x = -3; x <= 3; x++) group.add(_box(0.92, 3.2, 0.3, x % 2 === 0 ? stone : mortar, x, 0.5, -2.2));
+    _WALL_X.forEach(x => group.add(_box(0.92, 3.2, 0.3, x % 2 === 0 ? stone : mortar, x, 0.5, -2.2)));
     [-2, 2].forEach(px => group.add(_box(0.55, 3, 0.55, stone, px, 0.4, -0.5)));
     [-1.5, 1.5].forEach(tx => group.add(_box(0.18, 0.28, 0.18, '#fd971f', tx, 1.1, -2.05)));
 }
 
 // ── Clouds ────────────────────────────────────────────────────────────────
 
+const _CLOUD_CENTRES = [[-2.2, 4.2, -1.2], [0.5, 4.5, -1.8], [2.4, 4.1, -1]];
+
 function _addClouds(group) {
-    [[-2.2, 4.2, -1.2], [0.5, 4.5, -1.8], [2.4, 4.1, -1]].forEach(([cx, cy, cz]) => {
-        group.add(_box(1.4, 0.4, 0.7, '#d8dde8', cx,       cy,       cz));
-        group.add(_box(0.9, 0.4, 0.6, '#b0b8c8', cx - 0.6, cy - 0.2, cz));
-        group.add(_box(0.9, 0.4, 0.6, '#d8dde8', cx + 0.5, cy - 0.2, cz));
+    _CLOUD_CENTRES.forEach(([cx, cy, cz]) => {
+        _CLOUD_SHAPE.forEach(([[w, h, d, dx, dy, dz], color]) => {
+            group.add(_box(w, h, d, color, cx + dx, cy + dy, cz + dz));
+        });
     });
 }
 
@@ -397,10 +418,8 @@ function _addGenericEnv(group, name, tier) {
     else if (has('gold') || has('throne') || has('palace') || has('royal'))                    { wallA = '#7a6020'; wallB = '#5a4010'; }
     else if (has('magic') || has('arcane') || has('myst') || has('ruin'))                      { wallA = '#3a2a5a'; wallB = '#2a1a4a'; }
 
-    for (let x = -3; x <= 3; x++) {
-        group.add(_box(0.92, 1, 0.3, wallA, x, -0.15, -2.1));
-        group.add(_box(0.92, 1, 0.3, wallB, x,  0.85, -2.1));
-    }
+    _boxes(group, wallA, _WALL_X.map(x => [0.92, 1, 0.3, x, -0.15, -2.1]));
+    _boxes(group, wallB, _WALL_X.map(x => [0.92, 1, 0.3, x,  0.85, -2.1]));
     if (tier === 'high') {
         group.add(_box(0.6, 0.6, 0.6, wallA, 0, -0.7, -1.6));
         group.add(_box(0.4, 0.4, 0.4, wallB, 0, -0.1, -1.6));
