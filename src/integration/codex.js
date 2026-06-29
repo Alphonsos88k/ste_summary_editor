@@ -721,7 +721,7 @@ async function _initVoxel() {
 }
 
 function _setVoxelBtnsEnabled(enabled) {
-    ['#se-cx-vctl-front', '#se-cx-vctl-spin', '#se-cx-vctl-regen', '#se-cx-vctl-quick'].forEach(id => {
+    ['#se-cx-vctl-front', '#se-cx-vctl-spin', '#se-cx-vctl-regen', '#se-cx-vctl-quick', '#se-cx-vctl-fit'].forEach(id => {
         const btn = _panel?.querySelector(id);
         if (btn) btn.disabled = !enabled;
     });
@@ -792,6 +792,7 @@ function _bindVoxelControls() {
 
     _panel?.querySelector('#se-cx-vctl-regen')?.addEventListener('click', _generateVoxelSpec);
     _panel?.querySelector('#se-cx-vctl-quick')?.addEventListener('click', _quickGenVoxelDesc);
+    _panel?.querySelector('#se-cx-vctl-fit')?.addEventListener('click', () => setView('fit'));
 
     _panel?.querySelectorAll('.se-cx-tier-btn').forEach(btn => {
         btn.addEventListener('click', () => {

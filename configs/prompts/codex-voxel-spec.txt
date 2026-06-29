@@ -20,6 +20,7 @@ Return ONLY valid JSON — no markdown fences, no explanation.
   },
   "tattoos": [],
   "accessories": [],
+  "zones": {},
   "custom_parts": [],
   "lighting": "standard",
   "backdrop": []
@@ -90,6 +91,24 @@ backdrop:    Array of 0–2 scene elements (strings). Max 2 — extras ignored.
                medium:  castle/forest/cave/clouds + free-text supported;
                         lake and dungeon fall back to generic geometry
                high:    all named and free-text scenes fully rendered
+
+━━━ ZONES — colour regions for anthro/creature detail ━━━
+
+"zones" is optional. Populate it for anthro_biped or any character with
+distinct body-region colouring. All keys are optional hex strings.
+
+  {
+    "belly":      "#f5e8d0",   // lighter chest/belly fur strip on torso front
+    "face_mask":  "#c05510",   // muzzle/snout colour (overrides darkened skin default)
+    "ear_inner":  "#f8b090"    // inner ear pad (overrides lightened hair default)
+  }
+
+Rules:
+  - Only populate zones that matter for this character's appearance.
+  - For a plain humanoid with no fur pattern, leave zones: {}
+  - belly is rendered as a narrow overlay strip on the torso — keep it lighter
+    than shirt/skin so the stripe is visible.
+  - face_mask replaces the auto-darkened muzzle colour for anthro_biped.
 
 ━━━ SHOES / HOOVES / PAWS ━━━
 

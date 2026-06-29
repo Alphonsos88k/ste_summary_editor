@@ -23,6 +23,9 @@ let _container     = null;
 let _lightAmb      = null;
 let _lightDir      = null;
 let _lightFill     = null;
+let _lightTop      = null;
+// Limb pivot groups — referenced by idle animation in _loop
+let _armL = null, _armR = null, _legL = null, _legR = null;
 
 // ─── Body landmark Y positions ────────────────────────────────────────────
 
@@ -62,11 +65,17 @@ const _LAKE_ROCKS = [[0.5, -1, 1.8], [2.8, -0.9, 0.5], [3.2, -0.95, 1.6]];
 // ─── Hair style geometry data ─────────────────────────────────────────────
 // Each entry is an array of [w, h, d, x, y, z] specs, all drawn in hair colour.
 
+// All hair geometry is positioned so NO face coincides with a head face (avoids z-fighting).
+// Head outer faces: top y=3.10, back z=-0.45, sides x=±0.45.
 const _HAIR_STYLE = {
-    long:  [[0.85, 0.8, 0.18, 0, 2.7, -0.55], [0.18, 0.6, 0.18, -0.44, 2.5, -0.1], [0.18, 0.6, 0.18, 0.44, 2.5, -0.1]],
-    bun:   [[0.5, 0.4, 0.5, 0, 3.46, -0.2]],
-    spiky: [[0.2, 0.5, 0.18, -0.22, 3.48, 0], [0.2, 0.5, 0.18, 0, 3.52, 0], [0.2, 0.5, 0.18, 0.22, 3.48, 0]],
-    short: [[0.88, 0.18, 0.3, 0, 2.98, -0.3]],
+    // Back tuft visible from behind; extends clearly past head-back face
+    short: [[0.92, 0.28, 0.2, 0, 3.18, -0.47]],
+    // Curtain hangs behind + side locks hang beside head
+    long:  [[0.88, 0.85, 0.16, 0, 2.62, -0.52], [0.16, 0.6, 0.16, -0.47, 2.45, 0], [0.16, 0.6, 0.16, 0.47, 2.45, 0]],
+    // Ball sits above head, centred behind
+    bun:   [[0.5, 0.42, 0.4, 0, 3.5, -0.45]],
+    // Spikes fully above head top (y>3.10)
+    spiky: [[0.2, 0.55, 0.16, -0.22, 3.52, 0], [0.2, 0.58, 0.16, 0, 3.56, 0], [0.2, 0.55, 0.16, 0.22, 3.52, 0]],
 };
 
 // ─── Public API ───────────────────────────────────────────────────────────
@@ -84,21 +93,24 @@ export async function initVoxel(container, spec) {
     const w = container.offsetWidth  || 200;
     const h = container.offsetHeight || 200;
 
-    _camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100);
+    _camera = new THREE.PerspectiveCamera(65, w / h, 0.1, 100);
     _setCamera('front');
 
-    _lightAmb  = new THREE.AmbientLight(0xffffff, 0.55);
-    _lightDir  = new THREE.DirectionalLight(0xffffff, 0.75);
-    _lightFill = new THREE.DirectionalLight(0x8888ff, 0.25);
-    _lightDir.position.set(3, 5, 4);
-    _lightFill.position.set(-3, 0, -2);
+    _lightAmb  = new THREE.AmbientLight(0xffffff, 0.15);
+    _lightDir  = new THREE.DirectionalLight(0xffffff, 1.2);
+    _lightFill = new THREE.DirectionalLight(0x8888ff, 0.3);
+    _lightTop  = new THREE.DirectionalLight(0xffffff, 0.5);
+    _lightDir.position.set(3, 6, 5);
+    _lightFill.position.set(-3, 1, -2);
+    _lightTop.position.set(0, 10, 1);
     _scene.add(_lightAmb);
     _scene.add(_lightDir);
     _scene.add(_lightFill);
+    _scene.add(_lightTop);
 
     _applyLighting(spec?.lighting ?? 'standard');
 
-    _renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false });
+    _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     _renderer.setSize(w, h);
     container.innerHTML = '';
@@ -128,10 +140,12 @@ export function disposeVoxel() {
     _backdropGroup = null;
     _scene         = null;
     _camera        = null;
-    _lightAmb      = null;
-    _lightDir      = null;
-    _lightFill     = null;
-    _autoSpin      = false;
+    _lightAmb  = null;
+    _lightDir  = null;
+    _lightFill = null;
+    _lightTop  = null;
+    _armL = null; _armR = null; _legL = null; _legR = null;
+    _autoSpin  = false;
 }
 
 export function setVoxelSpec(spec) {
@@ -167,16 +181,35 @@ export function defaultSpec() { return _defaultSpec(); }
 
 function _setCamera(type) {
     if (!_camera) return;
-    const targets = { front: [0, 0, 6.5], quarter: [4.5, 0.5, 4.5], back: [0, 0, -6.5] };
+    const targets = {
+        front:   [0,   1.1, 5.5],
+        quarter: [3,   1,   4  ],
+        back:    [0,   1,  -5.5],
+        fit:     [0,   1,   7.5],
+    };
     _camera.position.set(...(targets[type] ?? targets.front));
-    _camera.lookAt(0, 0.5, 0);
+    _camera.lookAt(0, 1, 0);
 }
 
 // ─── Render loop ──────────────────────────────────────────────────────────
 
 function _loop() {
     _animId = requestAnimationFrame(_loop);
-    if (_autoSpin && _charGroup) _charGroup.rotation.y += 0.008;
+    const t = Date.now() * 0.001;
+    if (_charGroup) {
+        if (_autoSpin) {
+            _charGroup.rotation.y += 0.008;
+        } else {
+            // Breathing bob — oscillates ±0.022 around base y offset
+            _charGroup.position.y = -0.5 + Math.sin(t * 0.9) * 0.022;
+        }
+        // Idle arm swing (opposite phase, small angle)
+        if (_armL) _armL.rotation.x = Math.sin(t * 0.9 + Math.PI) * 0.09;
+        if (_armR) _armR.rotation.x = Math.sin(t * 0.9) * 0.09;
+        // Subtle leg counter-swing
+        if (_legL) _legL.rotation.x = -Math.sin(t * 0.9 + Math.PI) * 0.04;
+        if (_legR) _legR.rotation.x = -Math.sin(t * 0.9) * 0.04;
+    }
     if (_renderer && _scene && _camera) _renderer.render(_scene, _camera);
 }
 
@@ -186,11 +219,11 @@ function _applyLighting(mode) {
     if (!_lightAmb || !_lightDir || !_lightFill) return;
     const presets = {
         //               bg        amb               dir                        fill
-        standard: { bg: 0x181b22, amb: [0xffffff, 0.55], dir: [0xffffff, 0.75, [ 3,  5,  4]], fill: [0x8888ff, 0.25, [-3,  0, -2]] },
-        warm:     { bg: 0x1a1008, amb: [0xffe0c0, 0.6],  dir: [0xffcc88, 0.8,  [ 2,  5,  3]], fill: [0xcc8844, 0.2,  [-2,  0, -2]] },
-        cool:     { bg: 0x0c1020, amb: [0xc0d0ff, 0.5],  dir: [0x88aaff, 0.75, [ 3,  5,  4]], fill: [0xaaccff, 0.3,  [-3,  0, -2]] },
-        dramatic: { bg: 0x050508, amb: [0x111111, 0.3],  dir: [0xffffff, 1.2,  [ 5,  8,  3]], fill: [0x000088, 0.15, [-4,  0, -3]] },
-        eerie:    { bg: 0x020a02, amb: [0x002200, 0.4],  dir: [0x00ff66, 0.5,  [ 1,  6,  2]], fill: [0x220033, 0.5,  [-2,  0, -3]] },
+        standard: { bg: 0x181b22, amb: [0xffffff, 0.15], dir: [0xffffff, 1.2,  [ 3,  6,  5]], fill: [0x8888ff, 0.3,  [-3,  1, -2]] },
+        warm:     { bg: 0x1a1008, amb: [0xffe0c0, 0.15], dir: [0xffcc88, 1.3,  [ 2,  6,  4]], fill: [0xcc8844, 0.25, [-2,  1, -2]] },
+        cool:     { bg: 0x0c1020, amb: [0xc0d0ff, 0.12], dir: [0x88aaff, 1.1,  [ 3,  6,  5]], fill: [0xaaccff, 0.35, [-3,  1, -2]] },
+        dramatic: { bg: 0x050508, amb: [0x111111, 0.08], dir: [0xffffff, 1.5,  [ 5,  8,  3]], fill: [0x000088, 0.15, [-4,  0, -3]] },
+        eerie:    { bg: 0x020a02, amb: [0x002200, 0.1],  dir: [0x00ff66, 0.7,  [ 1,  6,  2]], fill: [0x220033, 0.5,  [-2,  0, -3]] },
     };
     const p = presets[mode] ?? presets.standard;
     if (_scene) _scene.background = new THREE.Color(p.bg);
@@ -270,10 +303,35 @@ function _defaultSpec() {
         },
         tattoos:     [],
         accessories: [],
+        zones:       {},
         lighting:    'standard',
         backdrop:    [],
     };
 }
+
+// Lighter belly fur strip overlaid on torso front — anthro medium/high only
+function _addBellyZone(g, c, bx, bz) {
+    const bellyColor = c.zones?.belly;
+    if (!bellyColor) return;
+    g.add(_box(bx * 0.65, 0.85, 0.06, bellyColor, 0, _Y.CHEST - 0.1, bz * 0.5 + 0.04));
+}
+
+// Raised voxel platform used when a backdrop has ground
+function _addGroundPlate(g, topColor, rimColor) {
+    g.add(_box(5.2, 0.3,  4.4, topColor, 0, -1.05, 0.5));
+    g.add(_box(5.6, 0.22, 4.8, rimColor, 0, -1.33, 0.5));
+}
+
+function _sceneGroundColors(name) {
+    if (/castle|dungeon|stone/.test(name))              return { top: '#5a5248', rim: '#3a3030' };
+    if (/forest|field|meadow|outdoor|autumn|fall/.test(name)) return { top: '#5a7a3a', rim: '#3a5228' };
+    if (/lake|ocean|sea|river|beach|water/.test(name))  return { top: '#c8b870', rim: '#a09050' };
+    if (/cave/.test(name))                              return { top: '#303035', rim: '#202025' };
+    if (/city|urban|downtown|street|neon/.test(name))   return { top: '#3e3e48', rim: '#28282e' };
+    return { top: '#3c3c45', rim: '#28282e' };
+}
+
+const _SKY_ONLY = new Set(['clouds', 'sky', 'void', 'dark', 'abyss', 'shadow']);
 
 // ─── Backdrop builder ─────────────────────────────────────────────────────
 
@@ -288,17 +346,24 @@ function _buildBackdrop(spec) {
     else if (spec.backdrop)            rawList = [String(spec.backdrop)];
     else                               rawList = [];
 
-    // No backdrop specified or minimum tier — just floor + sky horizon
+    // No backdrop specified or minimum tier — plain grid, no plate
     if (tier === 'minimum' || rawList.length === 0) {
         _addDefaultBackdrop(g);
         return g;
     }
 
-    _addFloor(g);
+    // Determine if any scene element implies a ground surface
+    const names = rawList.map(r => String(r).toLowerCase().trim());
+    const hasGround = names.some(n => n !== 'none' && n !== 'floor' && !_SKY_ONLY.has(n));
+    if (hasGround) {
+        // Merge ground colors from first ground-type element
+        const groundName = names.find(n => !_SKY_ONLY.has(n) && n !== 'none') ?? '';
+        const { top, rim } = _sceneGroundColors(groundName);
+        _addGroundPlate(g, top, rim);
+    }
     _addSkyHorizon(g);
 
-    rawList.forEach(raw => {
-        const name = String(raw).toLowerCase().trim();
+    names.forEach(name => {
         if (name === 'none' || name === 'floor') return;
         if (tier === 'medium' && !_BACKDROP_MED.has(name)) { _addGenericEnv(g, name, tier); return; }
         if      (name === 'castle')  _addCastle(g, tier);
@@ -321,27 +386,12 @@ function _addSkyHorizon(group) {
     _boxes(group, '#364860', _WALL_X.map(x => [0.92, 0.88, 0.2, x,  1.58, -3]));
 }
 
-// ── Default (no backdrop) — minimal grey grid + wireframe hint ────────────
+// ── Default (no backdrop) — minimal grid so depth is readable ────────────
 
 function _addDefaultBackdrop(group) {
     const grid = new THREE.GridHelper(8, 8, 0x484848, 0x303030);
     grid.position.y = -1.05;
     group.add(grid);
-    const bgGeo = new THREE.PlaneGeometry(8, 5);
-    const bgMat = new THREE.MeshBasicMaterial({ color: 0x2a2a38, wireframe: true, transparent: true, opacity: 0.28 });
-    const bgPlane = new THREE.Mesh(bgGeo, bgMat);
-    bgPlane.position.set(0, 1, -3);
-    group.add(bgPlane);
-}
-
-// ── Solid floor ───────────────────────────────────────────────────────────
-
-function _addFloor(group) {
-    for (let x = -3; x <= 3; x++) {
-        for (let z = -2; z <= 3; z++) {
-            group.add(_box(0.96, 0.18, 0.96, (x + z) % 2 === 0 ? '#2e2e2e' : '#252525', x, -1.1, z));
-        }
-    }
 }
 
 // ── Castle ───────────────────────────────────────────────────────────────
@@ -464,34 +514,88 @@ function _buildCharacter(spec) {
     return _buildMinimum(spec);
 }
 
-// Shared base body — called by all 3 tiers.
+// Shared base body — Minecraft-biped proportions, limbs in pivot groups for idle animation.
+// _armL/_armR/_legL/_legR are module-level so _loop can animate them.
 function _addBaseBody(g, c, bx, bz) {
-    _boxes(g, c.skin, [
-        [0.9,  0.9,  0.9,  0,                   _Y.HEAD,  0   ],
-        [0.4,  1.1,  0.4, -(bx * 0.5 + 0.25),  _Y.CHEST,  0   ],
-        [0.4,  1.1,  0.4,   bx * 0.5 + 0.25,   _Y.CHEST,  0   ],
-    ]);
+    // Head — 1.0 cube (Minecraft 8×8×8 pixel ratio)
+    g.add(_box(1, 1, 1, c.skin, 0, _Y.HEAD, 0));
+
+    // Torso (shirt block)
     g.add(_box(bx, 1.2, bz, c.shirt, 0, _Y.CHEST, 0));
-    _boxes(g, c.pants, [
-        [0.42 * bx, 1.2,  0.5 * bz, -0.22, _Y.HIP,  0   ],
-        [0.42 * bx, 1.2,  0.5 * bz,  0.22, _Y.HIP,  0   ],
-    ]);
-    _boxes(g, c.shoes, [
-        [0.48 * bx, 0.28, 0.65,      -0.22, _Y.SHOE, 0.05],
-        [0.48 * bx, 0.28, 0.65,       0.22, _Y.SHOE, 0.05],
-    ]);
+
+    // Arm pivot groups: shoulder joint at y=2.0 (top of torso)
+    // In local space the arm mesh hangs 0.55 below the pivot centre
+    const shoulderY = _Y.CHEST + 0.6;   // 2.0
+    const armX      = bx * 0.5 + 0.25; // centre of arm (inner edge flush with torso)
+    _armL = new THREE.Group();
+    _armL.position.set(-armX, shoulderY, 0);
+    _armL.add(_box(0.5, 1.1, 0.5, c.skin, 0, -0.55, 0));
+    g.add(_armL);
+
+    _armR = new THREE.Group();
+    _armR.position.set(armX, shoulderY, 0);
+    _armR.add(_box(0.5, 1.1, 0.5, c.skin, 0, -0.55, 0));
+    g.add(_armR);
+
+    // Leg pivot groups: hip joint at y=0.8 (top of leg).
+    // Pants + shoe both live inside so they animate with the leg.
+    const hipTopY = _Y.HIP + 0.6;    // 0.8
+    _legL = new THREE.Group();
+    _legL.position.set(-0.22, hipTopY, 0);
+    _legL.add(_box(0.42 * bx, 1.2, 0.5 * bz, c.pants, 0, -0.6,  0    ));
+    _legL.add(_box(0.48 * bx, 0.28, 0.65,    c.shoes, 0, -1.26, 0.05 ));
+    g.add(_legL);
+
+    _legR = new THREE.Group();
+    _legR.position.set(0.22, hipTopY, 0);
+    _legR.add(_box(0.42 * bx, 1.2, 0.5 * bz, c.pants, 0, -0.6,  0    ));
+    _legR.add(_box(0.48 * bx, 0.28, 0.65,    c.shoes, 0, -1.26, 0.05 ));
+    g.add(_legR);
 }
 
 // ─── Anthro body features — added when template === 'anthro_biped' ─────────
 
 function _addAnthroFeatures(g, c) {
-    // Muzzle — protrudes from lower front of head block
-    g.add(_box(0.44, 0.28, 0.3, _lighten(c.skin, -0.07), 0, 2.38, 0.58));
-    // Animal ears on top-sides of head (drawn in hair/fur colour)
+    const zones = c.zones ?? {};
+    // Muzzle — protrudes from lower front of head; face_mask zone or darkened skin
+    const muzzleColor = zones.face_mask ?? _lighten(c.skin, -0.07);
+    g.add(_box(0.44, 0.28, 0.3, muzzleColor, 0, 2.38, 0.58));
+    // Outer ears in fur/hair colour
     _boxes(g, c.hair, [
         [0.16, 0.3, 0.14, -0.52, 3.06, 0],
         [0.16, 0.3, 0.14,  0.52, 3.06, 0],
     ]);
+    // Inner ear — ear_inner zone or a lightened hair colour
+    const earInner = zones.ear_inner ?? _lighten(c.hair, 0.22);
+    _boxes(g, earInner, [
+        [0.08, 0.2, 0.08, -0.52, 3.1,  0.05],
+        [0.08, 0.2, 0.08,  0.52, 3.1,  0.05],
+    ]);
+}
+
+// ─── Face features — eyes + nose/nostrils for all tiers ──────────────────
+
+function _addFace(g, c, template) {
+    // Eyes: z=0.50 is 0.05 proud of head front face (z=0.45) — clearly visible
+    _boxes(g, c.eye, [
+        [0.18, 0.14, 0.08, -0.22, 2.68, 0.5],
+        [0.18, 0.14, 0.08,  0.22, 2.68, 0.5],
+    ]);
+    if (template === 'anthro_biped') {
+        // Nostrils on tip of muzzle (muzzle front face ≈ z=0.73)
+        _boxes(g, '#080806', [
+            [0.07, 0.07, 0.05, -0.1, 2.36, 0.74],
+            [0.07, 0.07, 0.05,  0.1, 2.36, 0.74],
+        ]);
+    } else {
+        // Nose bridge
+        g.add(_box(0.12, 0.18, 0.08, _lighten(c.skin, -0.08), 0, 2.48, 0.5));
+        // Nostrils
+        _boxes(g, '#080806', [
+            [0.05, 0.07, 0.05, -0.07, 2.43, 0.53],
+            [0.05, 0.07, 0.05,  0.07, 2.43, 0.53],
+        ]);
+    }
 }
 
 // ─── MINIMUM tier ─────────────────────────────────────────────────────────
@@ -502,7 +606,11 @@ function _buildMinimum(spec) {
     const c = spec.colors ?? _defaultSpec().colors;
     const { bx, bz } = _buildScale(spec.build);
     _addBaseBody(g, c, bx, bz);
-    const simpleTypes = new Set(['hat', 'belt', 'cape', 'scarf', 'horns', 'antlers', 'tail']);
+    // All tiers get hair + face; anthro features (ears/muzzle) always rendered
+    _addHairMedium(g, c);
+    if ((spec.template ?? 'humanoid') === 'anthro_biped') _addAnthroFeatures(g, c);
+    _addFace(g, c, spec.template ?? 'humanoid');
+    const simpleTypes = new Set(['hat', 'belt', 'cape', 'scarf', 'horns', 'antlers', 'tail', 'wings', 'necklace']);
     (spec.accessories ?? []).slice(0, 2)
         .filter(a => simpleTypes.has(_accType(a)))
         .forEach(a => _renderAccessory(g, a, c, 'minimum'));
@@ -522,8 +630,18 @@ function _buildMedium(spec) {
     const c = spec.colors ?? _defaultSpec().colors;
     const { bx, bz } = _buildScale(spec.build);
     _addBaseBody(g, c, bx, bz);
+    // Shirt sleeves on upper arms (medium+)
+    const sleeveColor = _lighten(c.shirt, 0.04);
+    if (_armL) _armL.add(_box(0.52, 0.65, 0.52, sleeveColor, 0, -0.25, 0));
+    if (_armR) _armR.add(_box(0.52, 0.65, 0.52, sleeveColor, 0, -0.25, 0));
+    // Collar strip at neck
+    g.add(_box(0.85, 0.12, 0.62, _lighten(c.shirt, 0.2), 0, _Y.COLLAR, 0));
     _addHairMedium(g, c);
-    if ((spec.template ?? 'humanoid') === 'anthro_biped') _addAnthroFeatures(g, c);
+    if ((spec.template ?? 'humanoid') === 'anthro_biped') {
+        _addAnthroFeatures(g, c);
+        _addBellyZone(g, c, bx, bz);
+    }
+    _addFace(g, c, spec.template ?? 'humanoid');
     (spec.accessories ?? []).slice(0, 4).forEach(a => _renderAccessory(g, a, c, 'medium'));
     const tattooLocs = new Set(['chest', 'left_arm', 'right_arm', 'back']);
     const tattoos = (spec.tattoos ?? []).filter(t => tattooLocs.has(t.location)).slice(0, 2);
@@ -541,15 +659,25 @@ function _buildHigh(spec) {
     const c = spec.colors ?? _defaultSpec().colors;
     const { bx, bz } = _buildScale(spec.build);
     _addBaseBody(g, c, bx, bz);
+    // Full sleeves + wrist cuffs on arm groups
+    const sleeveColor = _lighten(c.shirt, 0.04);
+    const cuffColor   = _lighten(c.shirt, 0.18);
+    if (_armL) {
+        _armL.add(_box(0.52, 0.65, 0.52, sleeveColor, 0, -0.25, 0));
+        _armL.add(_box(0.54, 0.15, 0.54, cuffColor,   0, -1.02, 0));
+    }
+    if (_armR) {
+        _armR.add(_box(0.52, 0.65, 0.52, sleeveColor, 0, -0.25, 0));
+        _armR.add(_box(0.54, 0.15, 0.54, cuffColor,   0, -1.02, 0));
+    }
+    // Collar strip at neck
+    g.add(_box(0.85, 0.12, 0.62, _lighten(c.shirt, 0.2), 0, _Y.COLLAR, 0));
     _addHairMedium(g, c);
-    if ((spec.template ?? 'humanoid') === 'anthro_biped') _addAnthroFeatures(g, c);
-    // Eye blocks + collar + arm cuffs
-    _boxes(g, c.eye, [[0.16, 0.14, 0.06, -0.22, 2.68, 0.46], [0.16, 0.14, 0.06, 0.22, 2.68, 0.46]]);
-    g.add(_box(0.85, 0.12, 0.62, _lighten(c.shirt, 0.2),  0,     _Y.COLLAR, 0));
-    _boxes(g, _lighten(c.shirt, 0.15), [
-        [0.42, 0.14, 0.42, -0.53, _Y.CUFF, 0],
-        [0.42, 0.14, 0.42,  0.53, _Y.CUFF, 0],
-    ]);
+    if ((spec.template ?? 'humanoid') === 'anthro_biped') {
+        _addAnthroFeatures(g, c);
+        _addBellyZone(g, c, bx, bz);
+    }
+    _addFace(g, c, spec.template ?? 'humanoid');
     (spec.accessories ?? []).slice(0, 6).forEach(a => _renderAccessory(g, a, c, 'high'));
     _addTattoos(g, spec.tattoos ?? [], bx, bz);
     _renderCustomParts(g, spec.custom_parts, 24);
@@ -587,9 +715,10 @@ function _renderAccessory(group, acc, c, tier) {
 // ─── Hair ─────────────────────────────────────────────────────────────────
 
 function _addHairMedium(group, c) {
-    _boxes(group, c.hair, [[0.92, 0.22, 0.92, 0, _Y.HAIR, 0]]);
+    // Cap bottom at 3.12 — clear of head top face (3.10) by 0.02 to prevent z-fighting
+    _boxes(group, c.hair, [[0.96, 0.26, 0.96, 0, 3.25, 0]]);
     _boxes(group, c.hair, _HAIR_STYLE[c.hair_style] ?? _HAIR_STYLE.short);
-    _boxes(group, c.hair, [[0.18, 0.5, 0.18, -0.46, _Y.HEAD, 0], [0.18, 0.5, 0.18, 0.46, _Y.HEAD, 0]]);
+    _boxes(group, c.hair, [[0.18, 0.5, 0.18, -0.47, _Y.HEAD, 0], [0.18, 0.5, 0.18, 0.47, _Y.HEAD, 0]]);
 }
 
 // ─── Accessories ──────────────────────────────────────────────────────────
@@ -764,4 +893,9 @@ function _bindDrag(canvas) {
         _drag.lastX = e.touches[0].clientX;
     }, { passive: true });
     canvas.addEventListener('touchend', stop);
+    canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        if (!_camera) return;
+        _camera.position.z = Math.max(2, Math.min(22, _camera.position.z + e.deltaY * 0.02));
+    }, { passive: false });
 }
