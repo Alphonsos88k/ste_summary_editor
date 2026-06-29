@@ -165,11 +165,11 @@ Each element is a box placed in world space:
 
   { "w": 0.4, "h": 0.4, "d": 0.4, "color": "#8a2020", "x": 0.8, "y": 2.5, "z": 0.3 }
 
-Coordinate reference (biped centre at x=0, z=0):
-  x: left = negative, right = positive (arms reach ±0.8)
-  y: floor = -1.05, shoe top ≈ -0.2, hip ≈ 0.7, chest ≈ 1.9,
-     collar ≈ 2.5, chin ≈ 2.2, eye level ≈ 3.1, head top ≈ 3.6,
-     hair/horn tips ≈ 3.8–4.2
+Coordinate reference (group-local space; biped centre at x=0, z=0):
+  x: left = negative, right = positive (arms reach ±0.75)
+  y: floor ≈ -0.6, shoe top ≈ -0.3, hip ≈ 0.2, chest ≈ 1.4,
+     collar ≈ 2.1, chin ≈ 2.15, eye level ≈ 2.7, head top ≈ 3.15,
+     hair/horn tips ≈ 3.5–4.2
   z: front of body ≈ +0.5, back ≈ -0.5
 
 Use multiple small boxes (0.1–0.5 range) to sculpt detail. Limit to 12 boxes
@@ -183,10 +183,11 @@ Examples:
 
 ━━━ TIER COMPLEXITY BUDGETS ━━━
 
-Minimum tier:
-  • Max 2 accessories total (hat, belt, cape, scarf, horns, antlers, tail only)
-  • No tattoos, no custom_parts
-  • No backdrop (floor only)
+Minimum tier (Minecraft-style biped):
+  • All tiers render full body: hair, face, eyes, anthro ears/muzzle always present
+  • Max 2 accessories (hat, belt, cape, scarf, horns, antlers, tail, wings, necklace)
+  • No tattoos, no custom_parts, no zones applied
+  • No backdrop (grid only)
 
 Medium tier:
   • Max 4 accessories total

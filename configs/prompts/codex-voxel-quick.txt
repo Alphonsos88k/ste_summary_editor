@@ -14,9 +14,15 @@ Output SHORT plain-text (2–5 sentences). No JSON, no bullets, no headers, no e
                         MANDATORY at every tier.
 
 3. FACIAL & IMMEDIATE   Hair style (short/long/bun/spiky/bald) and colour, eye colour,
-   FEATURES             any notable facial or neck markings described in Appearance.
-                        e.g. "Cropped silver hair, ice-blue eyes, a jagged scar across the left cheek."
-                        MANDATORY at medium and high. SKIP at minimum.
+   FEATURES             any notable facial or body markings.
+                        For anthro/furry characters ALSO describe:
+                          — Belly/chest fur colour if distinct from main fur (e.g. "cream belly")
+                          — Muzzle/face mask colour if distinct (e.g. "dark orange face mask")
+                          — Inner ear colour if visible (e.g. "pink inner ears")
+                        These zone colours are used by the renderer to paint distinct body regions.
+                        e.g. "Cropped silver hair, ice-blue eyes. Orange fur with cream belly and
+                              dark face mask."
+                        MANDATORY at all tiers.
 
 4. PERSONALITY ADDS     Accessories or colour accent driven by personality traits.
                         Warriors → belt/armor_chest; scholars → glasses; wanderers → scarf/cape;
@@ -35,7 +41,7 @@ Output SHORT plain-text (2–5 sentences). No JSON, no bullets, no headers, no e
 
 ━━━ TIER RULES ━━━
 
-minimum  Apply principles 1 and 2 only. Maximum 2 sentences.
+minimum  Apply principles 1, 2, 3 (hair/eyes/anthro zones). Skip 4 and 5. Maximum 2 sentences.
 medium   Apply principles 1, 2, 3 and light 4 (1 accessory max) and light 5 (lighting only).
          Maximum 4 sentences.
 high     Apply all 5 principles fully. Maximum 5 sentences.
