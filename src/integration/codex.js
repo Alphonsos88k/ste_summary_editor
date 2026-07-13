@@ -5,13 +5,13 @@
  * Right page: TOC (page 0) then one section per page; paginator footer navigates.
  */
 
-import { escHtml } from '../core/utils.js';
+import { escHtml, makeDraggable } from '../core/utils.js';
 import { loadTemplate } from '../core/template-loader.js';
 import { TEMPLATES } from '../core/constants.js';
 import { registerPrompt, getPrompt } from '../core/system-prompts.js';
 import { state } from '../core/state.js';
 import { buildZipBlob, downloadFile } from '../export/export.js';
-import { initVoxel, disposeVoxel, setVoxelSpec, setView, toggleSpin, defaultSpec } from './codex-voxel.js';
+import { initVoxel, disposeVoxel, setVoxelSpec, setView, setStageTone, toggleSpin, defaultSpec } from './codex-voxel.js';
 
 // ─── Prompt registration ──────────────────────────────────────────────────
 
@@ -49,6 +49,25 @@ const SECTION_DEFS = [
 
 const SECTION_KEYS = SECTION_DEFS.map(s => s.key);
 
+// ─── Settings ─────────────────────────────────────────────────────────────
+
+const _SETTINGS_KEY = 'se-cx-settings';
+const _SETTINGS_DEF = {
+    defaultTier: 'minimum', voxelTokens: 900, quickTokens: 300, regenTokens: 800,
+    stageTone: 'auto', voxCamera: 'front',
+};
+
+function _loadSettings() {
+    try { return { ..._SETTINGS_DEF, ...JSON.parse(localStorage.getItem(_SETTINGS_KEY) ?? '{}') }; }
+    catch { return { ..._SETTINGS_DEF }; }
+}
+
+function _saveSettings(s) {
+    localStorage.setItem(_SETTINGS_KEY, JSON.stringify(s));
+}
+
+let _settings = _loadSettings();
+
 // ─── Module state ─────────────────────────────────────────────────────────
 
 let _panel          = null;
@@ -61,11 +80,13 @@ let _dossierEdited  = {};     // key → timestamp of last edit/gen
 let _customSections = [];
 let _nsfwRevealed   = new Set();
 let _voxelSpec  = null;
-let _voxelTier  = 'minimum';
+let _voxelTier  = _settings.defaultTier;
 
 // ─── Public API ──────────────────────────────────────────────────────────
 
 export async function openCodex() {
+    _settings  = _loadSettings();
+    _voxelTier = _settings.defaultTier;
     closeCodex();
     const html = await loadTemplate(TEMPLATES.CODEX_PANEL);
     _panel = document.createElement('div');
@@ -83,6 +104,8 @@ export async function openCodex() {
 }
 
 export function closeCodex() {
+    document.getElementById('se-cx-help-dlg')?.remove();
+    document.getElementById('se-cx-set-dlg')?.remove();
     disposeVoxel();
     _panel?.remove();
     _panel          = null;
@@ -283,8 +306,12 @@ async function _callApi(messages, maxTokens = 2000) {
 }
 
 function _parseJson(raw) {
-    const cleaned = raw.replace(/^```\w*\n?/, '').replace(/\n?```$/, '').trim();
-    return JSON.parse(cleaned);
+    let s = raw.replace(/^```\w*\n?/, '').replace(/\n?```$/, '').trim();
+    if (!s.startsWith('{')) {
+        const m = s.match(/\{[\s\S]*\}/);
+        if (m) s = m[0];
+    }
+    return JSON.parse(s);
 }
 
 // ─── Generation ───────────────────────────────────────────────────────────
@@ -556,10 +583,10 @@ async function _regenSection(key) {
 
     try {
         const instruction = await _fetchInstruction(key, feedback, context);
-        const user        = `${instruction}\n\nFeedback: ${feedback || '(none)'}\n\nCharacter context:\n${context}`;
-        const raw         = await _callApi(_buildMessages(getPrompt('codex-main'), user), 800);
-        let content = raw;
-        try { const p = _parseJson(raw); content = p[key] ?? p.content ?? raw; } catch { /* raw fallback */ }
+        const fbLine      = feedback ? '\n\nFeedback: ' + feedback : '';
+        const user        = `Character context:\n${context}${fbLine}`;
+        const raw         = await _callApi(_buildMessages(instruction, user), _settings.regenTokens);
+        const content     = raw.trim();
 
         _dossier[key] = content;
         _dossierEdited[key] = Date.now();
@@ -715,6 +742,10 @@ async function _initVoxel() {
     const frame = _panel?.querySelector('#se-cx-voxel-frame');
     if (!frame) return;
     const ok = await initVoxel(frame, _voxelSpec ?? defaultSpec());
+    if (ok) {
+        setStageTone(_settings.stageTone);
+        setView(_settings.voxCamera);
+    }
     const promptSec = _panel?.querySelector('#se-cx-voxel-prompt-section');
     if (promptSec) promptSec.style.display = ok ? '' : 'none';
     _setVoxelBtnsEnabled(ok);
@@ -741,7 +772,7 @@ async function _generateVoxelSpec() {
 
     try {
         const sys = getPrompt('codex-voxel-spec');
-        const raw = await _callApi(_buildMessages(sys, userMsg), 600);
+        const raw = await _callApi(_buildMessages(sys, userMsg), _settings.voxelTokens);
         const spec = _parseJson(raw);
         spec.tier  = _voxelTier;
         _voxelSpec = spec;
@@ -771,7 +802,7 @@ async function _quickGenVoxelDesc() {
     try {
         const sys    = getPrompt('codex-voxel-quick');
         const userMsg = `Tier: ${_voxelTier}\n\nPersonality:\n${personality}\n\nAppearance & Quirks:\n${appearance}`;
-        const raw    = await _callApi(_buildMessages(sys, userMsg), 300);
+        const raw    = await _callApi(_buildMessages(sys, userMsg), _settings.quickTokens);
         const notes  = _panel.querySelector('#se-cx-voxel-notes');
         if (notes) notes.value = raw.trim();
     } catch (err) {
@@ -783,7 +814,8 @@ async function _quickGenVoxelDesc() {
 }
 
 function _bindVoxelControls() {
-    _panel?.querySelector('#se-cx-vctl-front')?.addEventListener('click', () => setView('front'));
+    // Reset returns to the user's preferred default angle (⚙ Settings → Camera)
+    _panel?.querySelector('#se-cx-vctl-front')?.addEventListener('click', () => setView(_settings.voxCamera));
 
     _panel?.querySelector('#se-cx-vctl-spin')?.addEventListener('click', function () {
         const spinning = toggleSpin();
@@ -795,15 +827,125 @@ function _bindVoxelControls() {
     _panel?.querySelector('#se-cx-vctl-fit')?.addEventListener('click', () => setView('fit'));
 
     _panel?.querySelectorAll('.se-cx-tier-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            _voxelTier = btn.dataset.tier ?? 'minimum';
-            _panel.querySelectorAll('.se-cx-tier-btn').forEach(b => b.classList.toggle('active', b === btn));
-            if (_voxelSpec) {
-                _voxelSpec.tier = _voxelTier;
-                setVoxelSpec(_voxelSpec);
-            }
-        });
+        btn.addEventListener('click', () => _applyTier(btn.dataset.tier ?? 'minimum'));
     });
+
+    _applyTier(_voxelTier);
+}
+
+// ─── Help dialog ─────────────────────────────────────────────────────────
+
+async function _openHelpDialog() {
+    const existing = document.getElementById('se-cx-help-dlg');
+    if (existing) { existing.remove(); return; }
+
+    const dlg = document.createElement('div');
+    dlg.id        = 'se-cx-help-dlg';
+    dlg.className = 'se-cfm-an-help-dlg';
+    dlg.innerHTML = await loadTemplate(TEMPLATES.CODEX_HELP);
+    document.body.appendChild(dlg);
+
+    const rect = _panel?.getBoundingClientRect();
+    if (rect) {
+        dlg.style.left = `${rect.left + 40}px`;
+        dlg.style.top  = `${rect.top  + 40}px`;
+    }
+    makeDraggable(dlg, dlg.querySelector('.se-cx-help-hdr'));
+    dlg.querySelector('.se-cx-help-close')?.addEventListener('click', () => dlg.remove());
+
+    const navItems = [...dlg.querySelectorAll('.se-cfm-an-help-nav-item')];
+    const sections = [...dlg.querySelectorAll('.se-cfm-an-help-sec')];
+
+    navItems.forEach(btn => btn.addEventListener('click', () => {
+        const sec = dlg.querySelector(`.se-cfm-an-help-sec[data-sec="${btn.dataset.sec}"]`);
+        if (!sec) return;
+        sections.forEach(s => s.classList.remove('active'));
+        navItems.forEach(n => n.classList.remove('active'));
+        sec.classList.add('active');
+        btn.classList.add('active');
+    }));
+}
+
+async function _openSettingsDialog() {
+    try {
+        const existing = document.getElementById('se-cx-set-dlg');
+        if (existing) { existing.remove(); return; }
+
+        const dlg = document.createElement('div');
+        dlg.id        = 'se-cx-set-dlg';
+        dlg.className = 'se-cx-set-dlg';
+        dlg.innerHTML = await loadTemplate(TEMPLATES.CODEX_SETTINGS);
+        document.body.appendChild(dlg);
+
+        const rect = _panel?.getBoundingClientRect();
+        const lft  = Math.min((rect?.left ?? 0) + 60, window.innerWidth  - 300);
+        const top  = Math.min((rect?.top  ?? 0) + 36, window.innerHeight - 250);
+        dlg.style.left = `${Math.max(0, lft)}px`;
+        dlg.style.top  = `${Math.max(0, top)}px`;
+
+        makeDraggable(dlg, dlg.querySelector('.se-cx-set-hdr'));
+        dlg.querySelector('.se-cx-set-close')?.addEventListener('click', () => dlg.remove());
+
+    const tierSel = dlg.querySelector('#se-cx-set-tier');
+    const vTok    = dlg.querySelector('#se-cx-set-vtok');
+    const qTok    = dlg.querySelector('#se-cx-set-qtok');
+
+    const rTok = dlg.querySelector('#se-cx-set-rtok');
+
+    if (tierSel) tierSel.value = _settings.defaultTier;
+    if (vTok)    vTok.value    = _settings.voxelTokens;
+    if (qTok)    qTok.value    = _settings.quickTokens;
+    if (rTok)    rTok.value    = _settings.regenTokens;
+
+    tierSel?.addEventListener('change', () => {
+        _settings.defaultTier = tierSel.value;
+        _saveSettings(_settings);
+        _applyTier(tierSel.value);
+    });
+    vTok?.addEventListener('change', () => {
+        _settings.voxelTokens = Math.max(400, Math.min(2000, Number(vTok.value) || 900));
+        vTok.value = _settings.voxelTokens;
+        _saveSettings(_settings);
+    });
+    qTok?.addEventListener('change', () => {
+        _settings.quickTokens = Math.max(100, Math.min(600, Number(qTok.value) || 300));
+        qTok.value = _settings.quickTokens;
+        _saveSettings(_settings);
+    });
+    rTok?.addEventListener('change', () => {
+        _settings.regenTokens = Math.max(200, Math.min(1500, Number(rTok.value) || 800));
+        rTok.value = _settings.regenTokens;
+        _saveSettings(_settings);
+    });
+
+    const stageSel = dlg.querySelector('#se-cx-set-stage');
+    const camSel   = dlg.querySelector('#se-cx-set-cam');
+    if (stageSel) stageSel.value = _settings.stageTone;
+    if (camSel)   camSel.value   = _settings.voxCamera;
+    stageSel?.addEventListener('change', () => {
+        _settings.stageTone = stageSel.value;
+        _saveSettings(_settings);
+        setStageTone(stageSel.value);   // applies live to the current render
+    });
+    camSel?.addEventListener('change', () => {
+        _settings.voxCamera = camSel.value;
+        _saveSettings(_settings);
+        setView(camSel.value);
+    });
+    } catch (err) {
+        globalThis.alert(`Settings error: ${err.message}`);
+    }
+}
+
+function _applyTier(tier) {
+    _voxelTier = tier;
+    _panel?.querySelectorAll('.se-cx-tier-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.tier === tier);
+    });
+    if (_voxelSpec) {
+        _voxelSpec.tier = tier;
+        setVoxelSpec(_voxelSpec);
+    }
 }
 
 // ─── Panel binding ────────────────────────────────────────────────────────
@@ -812,6 +954,8 @@ function _bindPanel() {
     if (!_panel) return;
 
     _panel.querySelector('#se-cx-close-btn')?.addEventListener('click', closeCodex);
+    _panel.querySelector('#se-cx-help-btn')?.addEventListener('click', _openHelpDialog);
+    _panel.querySelector('#se-cx-settings-btn')?.addEventListener('click', _openSettingsDialog);
 
     _panel.querySelector('#se-cx-fullscreen-btn')?.addEventListener('click', function () {
         const isFull = _panel.classList.toggle('se-cx-fullscreen');

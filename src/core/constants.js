@@ -169,6 +169,8 @@ export const TEMPLATES = Object.freeze({
     ACT_ITEM:                'act-item',
     // codex/
     CODEX_PANEL:               'partials/codex/codex-panel',
+    CODEX_HELP:                'partials/codex/codex-help',
+    CODEX_SETTINGS:            'partials/codex/codex-settings',
     // chat-files/
     CHAT_FILES_MANAGER:        'partials/chat-files/chat-files-manager',
     CHAT_FILES_HELP:           'partials/chat-files/chat-files-help',

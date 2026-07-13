@@ -4,7 +4,7 @@ Given the character context and any user feedback, produce a single focused inst
 
 Return ONLY a JSON object with this exact format — no preamble, no commentary:
 {
-  "instruction": "Rewrite the [section name] section, emphasising [key traits]. Incorporate the following feedback: [user feedback]. Keep third person voice and preserve any {{...}} placeholders."
+  "instruction": "Rewrite the [section name] section for [character name], emphasising [key traits]. Incorporate the following feedback: [user feedback]. Keep third-person voice, preserve any {{...}} placeholders, and output plain prose text only — no JSON, no markdown fences, no section headers."
 }
 
 Make the instruction direct and actionable. Reference specific character traits from the provided context. If no feedback was given, focus on making the section more vivid and detailed.

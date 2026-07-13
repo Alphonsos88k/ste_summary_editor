@@ -24,6 +24,12 @@ let _lightAmb      = null;
 let _lightDir      = null;
 let _lightFill     = null;
 let _lightTop      = null;
+let _glowDisc      = null;
+let _shadowDisc    = null;
+let _glowBg        = null;
+let _gridHelper    = null;
+let _stageTone     = 'auto';   // 'auto' follows spec lighting; or a named stage
+let _resizeObs     = null;
 // Limb pivot groups — referenced by idle animation in _loop
 let _armL = null, _armR = null, _legL = null, _legR = null;
 
@@ -93,22 +99,25 @@ export async function initVoxel(container, spec) {
     const w = container.offsetWidth  || 200;
     const h = container.offsetHeight || 200;
 
-    _camera = new THREE.PerspectiveCamera(65, w / h, 0.1, 100);
+    // 50° FOV — poster/key-art framing, less wide-angle distortion than 65°
+    _camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
     _setCamera('front');
 
     _lightAmb  = new THREE.AmbientLight(0xffffff, 0.15);
     _lightDir  = new THREE.DirectionalLight(0xffffff, 1.2);
     _lightFill = new THREE.DirectionalLight(0x8888ff, 0.3);
+    // _lightTop doubles as the RIM light — behind and above the character,
+    // the signature edge-glow of Minecraft Dungeons cover art
     _lightTop  = new THREE.DirectionalLight(0xffffff, 0.5);
     _lightDir.position.set(3, 6, 5);
     _lightFill.position.set(-3, 1, -2);
-    _lightTop.position.set(0, 10, 1);
+    _lightTop.position.set(-1.5, 5, -6);
     _scene.add(_lightAmb);
     _scene.add(_lightDir);
     _scene.add(_lightFill);
     _scene.add(_lightTop);
 
-    _applyLighting(spec?.lighting ?? 'standard');
+    _buildGlow();
 
     _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -121,7 +130,15 @@ export async function initVoxel(container, spec) {
     _scene.add(_charGroup);
     _scene.add(_backdropGroup);
 
+    // After builds so stage visibility rules (grid/shadow) apply
+    _applyLighting(spec?.lighting ?? 'standard');
+
     _bindDrag(_renderer.domElement);
+
+    _resizeObs?.disconnect();
+    _resizeObs = new ResizeObserver(() => resizeVoxel());
+    _resizeObs.observe(container);
+
     _loop();
     return true;
 }
@@ -129,6 +146,8 @@ export async function initVoxel(container, spec) {
 export function disposeVoxel() {
     if (_animId) cancelAnimationFrame(_animId);
     _animId = null;
+    _resizeObs?.disconnect();
+    _resizeObs = null;
     if (_renderer) {
         _renderer.domElement.remove();
         _renderer.dispose();
@@ -140,10 +159,14 @@ export function disposeVoxel() {
     _backdropGroup = null;
     _scene         = null;
     _camera        = null;
-    _lightAmb  = null;
-    _lightDir  = null;
-    _lightFill = null;
-    _lightTop  = null;
+    _lightAmb   = null;
+    _lightDir   = null;
+    _lightFill  = null;
+    _lightTop   = null;
+    _glowDisc   = null;
+    _shadowDisc = null;
+    _glowBg     = null;
+    _gridHelper = null;
     _armL = null; _armR = null; _legL = null; _legR = null;
     _autoSpin  = false;
 }
@@ -152,11 +175,13 @@ export function setVoxelSpec(spec) {
     if (!_scene) return;
     if (_charGroup)     { _scene.remove(_charGroup);     _disposeGroup(_charGroup);     }
     if (_backdropGroup) { _scene.remove(_backdropGroup); _disposeGroup(_backdropGroup); }
-    _applyLighting(spec?.lighting ?? 'standard');
+    _gridHelper    = null;
     _charGroup     = _buildCharacter(spec);
     _backdropGroup = _buildBackdrop(spec);
     _scene.add(_charGroup);
     _scene.add(_backdropGroup);
+    // After builds so stage visibility rules apply to the fresh grid
+    _applyLighting(spec?.lighting ?? 'standard');
 }
 
 export function setView(type) { _setCamera(type); }
@@ -181,14 +206,18 @@ export function defaultSpec() { return _defaultSpec(); }
 
 function _setCamera(type) {
     if (!_camera) return;
+    // Hero framing: slightly low 3/4 angle looking up at the character,
+    // like Minecraft Dungeons cover art — never a flat straight-on mugshot.
     const targets = {
-        front:   [0,   1.1, 5.5],
-        quarter: [3,   1,   4  ],
-        back:    [0,   1,  -5.5],
-        fit:     [0,   1,   7.5],
+        front:    { pos: [2.4,  0.75, 5.2], look: [0, 1.2, 0] },  // hero 3/4 low angle (default)
+        straight: { pos: [0,    1.1,  5.5], look: [0, 1,   0] },  // classic head-on
+        quarter:  { pos: [-3.2, 1.4,  4.2], look: [0, 1,   0] },
+        back:     { pos: [-1.5, 1,   -5.5], look: [0, 1.1, 0] },
+        fit:      { pos: [2.6,  1,    9  ], look: [0, 1,   0] },
     };
-    _camera.position.set(...(targets[type] ?? targets.front));
-    _camera.lookAt(0, 1, 0);
+    const t = targets[type] ?? targets.front;
+    _camera.position.set(...t.pos);
+    _camera.lookAt(...t.look);
 }
 
 // ─── Render loop ──────────────────────────────────────────────────────────
@@ -215,21 +244,111 @@ function _loop() {
 
 // ─── Lighting presets ─────────────────────────────────────────────────────
 
+// ─── Stage presets ────────────────────────────────────────────────────────
+// Bright pastel studio stages (reference-art style: character brightly lit on
+// a soft gradient, dark contact shadow under the feet) plus two dark stages.
+// bright:true → contact shadow + hidden grid; false → additive glow pool.
+
+const _STAGES = {
+    //                       bg        amb               dir (key)                   fill                         rim               glow
+    bright_warm:  { bright: true,  bg: 0xefe4d0, amb: [0xffffff, 0.85], dir: [0xfff0da, 1.25, [ 3, 6, 5]], fill: [0xaac4ff, 0.35, [-3, 1, -2]], rim: [0xffb060, 0.8], glow: 0xfff6e8 },
+    bright_cool:  { bright: true,  bg: 0x9fc4e8, amb: [0xf0f6ff, 0.85], dir: [0xffffff, 1.25, [ 3, 6, 5]], fill: [0xcce0ff, 0.35, [-3, 1, -2]], rim: [0x6fa8ff, 0.9], glow: 0xeaf4ff },
+    bright_green: { bright: true,  bg: 0x9ed49a, amb: [0xf0fff0, 0.85], dir: [0xfffbe8, 1.25, [ 3, 6, 5]], fill: [0xbfe8bb, 0.35, [-3, 1, -2]], rim: [0x60cc70, 0.9], glow: 0xeeffe8 },
+    bright_pink:  { bright: true,  bg: 0xe4bcc8, amb: [0xfff4f6, 0.85], dir: [0xfff2ea, 1.25, [ 3, 6, 5]], fill: [0xf0ccd8, 0.35, [-3, 1, -2]], rim: [0xe07898, 0.9], glow: 0xffeef2 },
+    bright_amber: { bright: true,  bg: 0xf0d488, amb: [0xfff8e0, 0.85], dir: [0xffe8b0, 1.3,  [ 2, 6, 4]], fill: [0xf0d8a0, 0.3,  [-2, 1, -2]], rim: [0xff9930, 0.9], glow: 0xfff4d8 },
+    dark:         { bright: false, bg: 0x06060c, amb: [0x222233, 0.25], dir: [0xfff4e0, 1.7,  [ 5, 8, 3]], fill: [0x2222aa, 0.25, [-4, 0, -3]], rim: [0x4466ff, 1.8], glow: 0x2a2a5a },
+    eerie:        { bright: false, bg: 0x040a04, amb: [0x113311, 0.25], dir: [0x66ff99, 1.0,  [ 1, 6, 2]], fill: [0x330044, 0.45, [-2, 0, -3]], rim: [0x33ff88, 1.5], glow: 0x1a4a2a },
+};
+
+// Spec "lighting" value → stage (used when the stage tone setting is 'auto')
+const _LIGHTING_TO_STAGE = {
+    standard: 'bright_warm',
+    warm:     'bright_amber',
+    cool:     'bright_cool',
+    dramatic: 'dark',
+    eerie:    'eerie',
+};
+
+export function setStageTone(tone) {
+    _stageTone = tone ?? 'auto';
+    if (_scene) _applyLighting(_lastLighting);
+}
+
+let _lastLighting = 'standard';
+
 function _applyLighting(mode) {
     if (!_lightAmb || !_lightDir || !_lightFill) return;
-    const presets = {
-        //               bg        amb               dir                        fill
-        standard: { bg: 0x181b22, amb: [0xffffff, 0.15], dir: [0xffffff, 1.2,  [ 3,  6,  5]], fill: [0x8888ff, 0.3,  [-3,  1, -2]] },
-        warm:     { bg: 0x1a1008, amb: [0xffe0c0, 0.15], dir: [0xffcc88, 1.3,  [ 2,  6,  4]], fill: [0xcc8844, 0.25, [-2,  1, -2]] },
-        cool:     { bg: 0x0c1020, amb: [0xc0d0ff, 0.12], dir: [0x88aaff, 1.1,  [ 3,  6,  5]], fill: [0xaaccff, 0.35, [-3,  1, -2]] },
-        dramatic: { bg: 0x050508, amb: [0x111111, 0.08], dir: [0xffffff, 1.5,  [ 5,  8,  3]], fill: [0x000088, 0.15, [-4,  0, -3]] },
-        eerie:    { bg: 0x020a02, amb: [0x002200, 0.1],  dir: [0x00ff66, 0.7,  [ 1,  6,  2]], fill: [0x220033, 0.5,  [-2,  0, -3]] },
-    };
-    const p = presets[mode] ?? presets.standard;
-    if (_scene) _scene.background = new THREE.Color(p.bg);
+    _lastLighting = mode;
+    const key = _stageTone !== 'auto' && _STAGES[_stageTone]
+        ? _stageTone
+        : (_LIGHTING_TO_STAGE[mode] ?? 'bright_warm');
+    const p = _STAGES[key];
+    if (_scene) {
+        _scene.background = new THREE.Color(p.bg);
+        // Depth haze — pushes the backdrop away from the character like key art
+        _scene.fog = new THREE.Fog(p.bg, 11, 26);
+    }
     _lightAmb.color.setHex(p.amb[0]);    _lightAmb.intensity  = p.amb[1];
     _lightDir.color.setHex(p.dir[0]);    _lightDir.intensity  = p.dir[1];  _lightDir.position.set(...p.dir[2]);
     _lightFill.color.setHex(p.fill[0]);  _lightFill.intensity = p.fill[1]; _lightFill.position.set(...p.fill[2]);
+    if (_lightTop) { _lightTop.color.setHex(p.rim[0]); _lightTop.intensity = p.rim[1]; }
+    // Bright stage: soft dark contact shadow, no glow pool, no dark grid.
+    // Dark stage: additive glow pool, grid visible for depth.
+    if (_glowDisc)   _glowDisc.visible   = !p.bright;
+    if (_shadowDisc) _shadowDisc.visible = p.bright;
+    if (_gridHelper) _gridHelper.visible = !p.bright;
+    if (_glowDisc) _glowDisc.material.color.setHex(p.glow);
+    if (_glowBg)   _glowBg.material.color.setHex(p.glow);
+}
+
+// ─── Key-art glow staging ────────────────────────────────────────────────
+// A soft light pool under the character + a radial glow behind them — the
+// "spotlit hero on a poster" composition from Minecraft Dungeons cover art.
+
+function _radialTexture() {
+    const cv  = document.createElement('canvas');
+    cv.width  = 256;
+    cv.height = 256;
+    const ctx = cv.getContext('2d');
+    const g   = ctx.createRadialGradient(128, 128, 8, 128, 128, 128);
+    g.addColorStop(0,   'rgba(255,255,255,0.85)');
+    g.addColorStop(0.4, 'rgba(255,255,255,0.35)');
+    g.addColorStop(1,   'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 256, 256);
+    return new THREE.CanvasTexture(cv);
+}
+
+function _buildGlow() {
+    const tex = _radialTexture();
+    const mat = () => new THREE.MeshBasicMaterial({
+        map: tex, transparent: true, depthWrite: false,
+        blending: THREE.AdditiveBlending, fog: false,
+    });
+
+    // Additive glow pool — dark stages only
+    _glowDisc = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 5.5), mat());
+    _glowDisc.rotation.x = -Math.PI / 2;
+    _glowDisc.position.y = -0.54;
+    _scene.add(_glowDisc);
+
+    // Soft dark contact shadow — bright stages only (normal blending, black tint)
+    _shadowDisc = new THREE.Mesh(
+        new THREE.PlaneGeometry(3.6, 3.6),
+        new THREE.MeshBasicMaterial({
+            map: tex, transparent: true, depthWrite: false,
+            color: 0x000000, opacity: 0.32, fog: false,
+        }),
+    );
+    _shadowDisc.rotation.x = -Math.PI / 2;
+    _shadowDisc.position.y = -0.53;
+    _scene.add(_shadowDisc);
+
+    // Radial gradient behind the character — lighter centre on bright stages,
+    // coloured glow on dark ones (the studio-backdrop look from the refs)
+    _glowBg = new THREE.Mesh(new THREE.PlaneGeometry(13, 10), mat());
+    _glowBg.position.set(0, 1.6, -6.5);
+    _scene.add(_glowBg);
 }
 
 // ─── Three.js loader ─────────────────────────────────────────────────────
@@ -263,7 +382,7 @@ function _disposeGroup(group) {
 function _box(w, h, d, color, x, y, z) {
     const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(w, h, d),
-        new THREE.MeshLambertMaterial({ color: new THREE.Color(color) })
+        new THREE.MeshToonMaterial({ color: new THREE.Color(color) })
     );
     mesh.position.set(x, y, z);
     return mesh;
@@ -392,6 +511,8 @@ function _addDefaultBackdrop(group) {
     const grid = new THREE.GridHelper(8, 8, 0x484848, 0x303030);
     grid.position.y = -1.05;
     group.add(grid);
+    // Stage system hides this on bright stages (contact shadow replaces it)
+    _gridHelper = grid;
 }
 
 // ── Castle ───────────────────────────────────────────────────────────────
@@ -705,7 +826,7 @@ function _renderAccessory(group, acc, c, tier) {
         case 'antlers':      _addAntlers(group, color, sc);                                break;
         case 'necklace':     _addNecklace(group, color);                                   break;
         case 'wings':        _addWings(group, color, sc);                                  break;
-        case 'tail':         _addTail(group, _accColor(acc, c.hair));                      break;
+        case 'tail':         _addTail(group, _accColor(acc, c.hair), sc);                  break;
         case 'shoulder_pad': _addShoulderPad(group, color, sc, pos);                       break;
         case 'armor_chest':  if (tier !== 'minimum') _addArmorChest(group, color, sc);    break;
         case 'gloves':       if (tier === 'high')    _addGloves(group, color, pos);        break;
@@ -778,20 +899,29 @@ function _addHorns(group, color, sc) {
 }
 
 function _addAntlers(group, color, sc = 1) {
-    // Palmate antlers — wide branching spread from crown of head
-    _boxes(group, color || '#7a5018', [
-        // Left: trunk → palm bar → 3 tines
-        [0.1 * sc, 0.62 * sc, 0.1 * sc, -0.28,  3.3,  0],
-        [0.5 * sc, 0.1  * sc, 0.1 * sc, -0.52,  3.75, 0],
-        [0.1 * sc, 0.24 * sc, 0.1 * sc, -0.28,  3.82, 0],
-        [0.1 * sc, 0.2  * sc, 0.1 * sc, -0.72,  3.82, 0],
-        [0.1 * sc, 0.14 * sc, 0.1 * sc, -0.12,  3.82, 0],
-        // Right: mirrored
-        [0.1 * sc, 0.62 * sc, 0.1 * sc,  0.28,  3.3,  0],
-        [0.5 * sc, 0.1  * sc, 0.1 * sc,  0.52,  3.75, 0],
-        [0.1 * sc, 0.24 * sc, 0.1 * sc,  0.28,  3.82, 0],
-        [0.1 * sc, 0.2  * sc, 0.1 * sc,  0.72,  3.82, 0],
-        [0.1 * sc, 0.14 * sc, 0.1 * sc,  0.12,  3.82, 0],
+    const col = color || '#7a5018';
+    const dark = _darken(col, 0.15);
+    // Left beam: rises and sweeps outward; palm is a wide flat plate; 4 tines up
+    _boxes(group, col, [
+        [0.15*sc, 0.5*sc,  0.12*sc, -0.3,       3.28, 0.05],   // lower trunk
+        [0.13*sc, 0.38*sc, 0.1*sc,  -0.48*sc,   3.68, 0.04],   // upper trunk sweeping out
+        [0.72*sc, 0.16*sc, 0.1*sc,  -0.82*sc,   3.92, 0.04],   // palm plate (wide)
+        [0.12*sc, 0.3*sc,  0.08*sc, -0.5*sc,    4,    0.04],   // tine 1 — inner
+        [0.12*sc, 0.38*sc, 0.08*sc, -0.74*sc,   4,    0.04],   // tine 2
+        [0.12*sc, 0.42*sc, 0.08*sc, -0.98*sc,   4,    0.04],   // tine 3
+        [0.1*sc,  0.26*sc, 0.08*sc, -1.16*sc,   3.95, 0.04],   // outer tip
+        [0.1*sc,  0.22*sc, 0.08*sc, -0.32*sc,   3.72, 0.05],   // brow tine (forward)
+    ]);
+    _boxes(group, dark, [
+        // Right: mirror (negate x)
+        [0.15*sc, 0.5*sc,  0.12*sc,  0.3,       3.28, 0.05],
+        [0.13*sc, 0.38*sc, 0.1*sc,   0.48*sc,   3.68, 0.04],
+        [0.72*sc, 0.16*sc, 0.1*sc,   0.82*sc,   3.92, 0.04],
+        [0.12*sc, 0.3*sc,  0.08*sc,  0.5*sc,    4,    0.04],
+        [0.12*sc, 0.38*sc, 0.08*sc,  0.74*sc,   4,    0.04],
+        [0.12*sc, 0.42*sc, 0.08*sc,  0.98*sc,   4,    0.04],
+        [0.1*sc,  0.26*sc, 0.08*sc,  1.16*sc,   3.95, 0.04],
+        [0.1*sc,  0.22*sc, 0.08*sc,  0.32*sc,   3.72, 0.05],
     ]);
 }
 
@@ -809,11 +939,38 @@ function _addWings(group, color, sc) {
     ]);
 }
 
-function _addTail(group, color) {
-    _boxes(group, color, [
-        [0.22, 0.8,  0.22, 0, 0.6,   -0.52],
-        [0.18, 0.55, 0.18, 0, 0.05,  -0.8 ],
-    ]);
+function _addTail(group, color, sc = 1) {
+    const light = _lighten(color, 0.28);
+    if (sc < 0.85) {
+        // Small — short deer/reindeer bob: wide fluffy puff
+        _boxes(group, light, [
+            [0.3,  0.22, 0.16, 0,     0.7,  -0.52],
+            [0.22, 0.14, 0.12, 0,     0.88, -0.5 ],
+        ]);
+        _boxes(group, color, [
+            [0.18, 0.18, 0.12, 0,     0.72, -0.55],
+        ]);
+    } else if (sc < 1.2) {
+        // Medium — round fluffy tail (cat/fox mid-length)
+        _boxes(group, color, [
+            [0.22, 0.55, 0.2,  0,     0.7,  -0.52],
+            [0.18, 0.38, 0.16, 0,     0.25, -0.72],
+        ]);
+        _boxes(group, light, [
+            [0.16, 0.45, 0.12, 0,     0.68, -0.56],
+        ]);
+    } else {
+        // Large — long bushy tail (wolf/fox), sweeps down and back
+        _boxes(group, color, [
+            [0.24, 0.7,  0.22, 0,     0.75, -0.52],
+            [0.2,  0.55, 0.18, 0,     0.22, -0.8 ],
+            [0.16, 0.38, 0.14, 0,    -0.18, -0.94],
+        ]);
+        _boxes(group, light, [
+            [0.14, 0.55, 0.1,  0,     0.72, -0.56],
+            [0.12, 0.38, 0.08, 0,     0.2,  -0.83],
+        ]);
+    }
 }
 
 function _addShoulderPad(group, color, sc, pos) {
@@ -872,6 +1029,11 @@ function _buildScale(build) {
 function _lighten(hex, amt) {
     const c = new THREE.Color(hex);
     return `#${new THREE.Color(Math.min(c.r + amt, 1), Math.min(c.g + amt, 1), Math.min(c.b + amt, 1)).getHexString()}`;
+}
+
+function _darken(hex, amt) {
+    const c = new THREE.Color(hex);
+    return `#${new THREE.Color(Math.max(c.r - amt, 0), Math.max(c.g - amt, 0), Math.max(c.b - amt, 0)).getHexString()}`;
 }
 
 // ─── Drag rotation ────────────────────────────────────────────────────────
