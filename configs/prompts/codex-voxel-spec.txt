@@ -19,14 +19,16 @@ For anthro fur: use the natural animal tone but leaning slightly brighter than r
   "tier": "minimum",
   "build": "medium",
   "colors": {
-    "skin":       "#f4c08a",
-    "hair":       "#3a2010",
-    "hair_style": "short",
-    "eye":        "#4a6a8a",
-    "shirt":      "#3a5a9a",
-    "pants":      "#2a2a4a",
-    "shoes":      "#1a1218",
-    "accent":     "#c8a030"
+    "skin":          "#f4c08a",
+    "hair":          "#3a2010",
+    "hair_style":    "short",
+    "eye":           "#4a6a8a",
+    "shirt":         "#3a5a9a",
+    "shirt_pattern": "",
+    "pattern_color": "",
+    "pants":         "#2a2a4a",
+    "shoes":         "#1a1218",
+    "accent":        "#c8a030"
   },
   "tattoos": [],
   "accessories": [],
@@ -55,6 +57,13 @@ build:       "slim" | "medium" | "stocky" | "tall" | "short"
 hair_style:  "short" | "long" | "bun" | "spiky" | "bald"
              For anthro characters, hair = fur cap/crest colour. Use hair_style
              that best matches the character's head fur or mane.
+
+shirt_pattern: "" | "plaid" | "stripes" | "checker"
+             Fabric pattern overlaid on the torso (medium/high tier only —
+             ignored at minimum). Use for flannel, checked shirts, striped
+             tops. pattern_color sets the pattern lines; leave "" to derive
+             from the shirt colour. Example flannel: shirt "#8a3020",
+             shirt_pattern "plaid", pattern_color "#d8a060".
 
 lighting:    "standard" | "warm" | "cool" | "dramatic" | "eerie"
              Match to character tone. Renders as a stage:
@@ -202,9 +211,12 @@ Examples:
 ━━━ TIER COMPLEXITY BUDGETS ━━━
 
 Minimum tier (Minecraft-style biped):
-  • All tiers render full body: hair, face, eyes, anthro ears/muzzle always present
+  • All tiers render full body: hair, composed face (sclera/iris/pupil/brows/
+    mouth), anthro ears/muzzle/nose always present
+  • Zones DO apply: belly strip renders at every tier — always populate zones
+    for anthro characters
   • Max 2 accessories (hat, belt, cape, scarf, horns, antlers, tail, wings, necklace)
-  • No tattoos, no custom_parts, no zones applied
+  • No tattoos, no custom_parts, no shirt_pattern
   • No backdrop (grid only)
 
 Medium tier:

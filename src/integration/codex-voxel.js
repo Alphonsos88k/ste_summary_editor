@@ -120,7 +120,9 @@ export async function initVoxel(container, spec) {
     _buildGlow();
 
     _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Full device pixel ratio (up to 3) — capping at 2 left model edges soft
+    // on high-DPI displays
+    _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
     _renderer.setSize(w, h);
     container.innerHTML = '';
     container.appendChild(_renderer.domElement);
@@ -251,11 +253,13 @@ function _loop() {
 
 const _STAGES = {
     //                       bg        amb               dir (key)                   fill                         rim               glow
-    bright_warm:  { bright: true,  bg: 0xefe4d0, amb: [0xffffff, 0.85], dir: [0xfff0da, 1.25, [ 3, 6, 5]], fill: [0xaac4ff, 0.35, [-3, 1, -2]], rim: [0xffb060, 0.8], glow: 0xfff6e8 },
-    bright_cool:  { bright: true,  bg: 0x9fc4e8, amb: [0xf0f6ff, 0.85], dir: [0xffffff, 1.25, [ 3, 6, 5]], fill: [0xcce0ff, 0.35, [-3, 1, -2]], rim: [0x6fa8ff, 0.9], glow: 0xeaf4ff },
-    bright_green: { bright: true,  bg: 0x9ed49a, amb: [0xf0fff0, 0.85], dir: [0xfffbe8, 1.25, [ 3, 6, 5]], fill: [0xbfe8bb, 0.35, [-3, 1, -2]], rim: [0x60cc70, 0.9], glow: 0xeeffe8 },
-    bright_pink:  { bright: true,  bg: 0xe4bcc8, amb: [0xfff4f6, 0.85], dir: [0xfff2ea, 1.25, [ 3, 6, 5]], fill: [0xf0ccd8, 0.35, [-3, 1, -2]], rim: [0xe07898, 0.9], glow: 0xffeef2 },
-    bright_amber: { bright: true,  bg: 0xf0d488, amb: [0xfff8e0, 0.85], dir: [0xffe8b0, 1.3,  [ 2, 6, 4]], fill: [0xf0d8a0, 0.3,  [-2, 1, -2]], rim: [0xff9930, 0.9], glow: 0xfff4d8 },
+    // Bright stages: fill light comes from the FRONT (camera side) so the
+    // character face never falls into shadow — even, glowing illumination
+    bright_warm:  { bright: true,  bg: 0xefe4d0, amb: [0xffffff, 1.0], dir: [0xfff0da, 1.3, [ 3, 6, 5]], fill: [0xffeedd, 0.5, [-2, 2, 5]], rim: [0xffb060, 0.8], glow: 0xfff6e8 },
+    bright_cool:  { bright: true,  bg: 0x9fc4e8, amb: [0xf0f6ff, 1.0], dir: [0xffffff, 1.3, [ 3, 6, 5]], fill: [0xe8f2ff, 0.5, [-2, 2, 5]], rim: [0x6fa8ff, 0.9], glow: 0xeaf4ff },
+    bright_green: { bright: true,  bg: 0x9ed49a, amb: [0xf0fff0, 1.0], dir: [0xfffbe8, 1.3, [ 3, 6, 5]], fill: [0xf0ffe8, 0.5, [-2, 2, 5]], rim: [0x60cc70, 0.9], glow: 0xeeffe8 },
+    bright_pink:  { bright: true,  bg: 0xe4bcc8, amb: [0xfff4f6, 1.0], dir: [0xfff2ea, 1.3, [ 3, 6, 5]], fill: [0xfff0f4, 0.5, [-2, 2, 5]], rim: [0xe07898, 0.9], glow: 0xffeef2 },
+    bright_amber: { bright: true,  bg: 0xf0d488, amb: [0xfff8e0, 1.0], dir: [0xffe8b0, 1.35,[ 2, 6, 4]], fill: [0xfff0d0, 0.5, [-2, 2, 5]], rim: [0xff9930, 0.9], glow: 0xfff4d8 },
     dark:         { bright: false, bg: 0x06060c, amb: [0x222233, 0.25], dir: [0xfff4e0, 1.7,  [ 5, 8, 3]], fill: [0x2222aa, 0.25, [-4, 0, -3]], rim: [0x4466ff, 1.8], glow: 0x2a2a5a },
     eerie:        { bright: false, bg: 0x040a04, amb: [0x113311, 0.25], dir: [0x66ff99, 1.0,  [ 1, 6, 2]], fill: [0x330044, 0.45, [-2, 0, -3]], rim: [0x33ff88, 1.5], glow: 0x1a4a2a },
 };
@@ -298,7 +302,12 @@ function _applyLighting(mode) {
     if (_shadowDisc) _shadowDisc.visible = p.bright;
     if (_gridHelper) _gridHelper.visible = !p.bright;
     if (_glowDisc) _glowDisc.material.color.setHex(p.glow);
-    if (_glowBg)   _glowBg.material.color.setHex(p.glow);
+    if (_glowBg) {
+        _glowBg.material.color.setHex(p.glow);
+        // Bright stages: gentle backdrop gradient, not a blown-out hotspot.
+        // Dark stages: strong glow silhouetting the character.
+        _glowBg.material.opacity = p.bright ? 0.3 : 0.9;
+    }
 }
 
 // ─── Key-art glow staging ────────────────────────────────────────────────
@@ -407,21 +416,25 @@ function _accScale(a) {
 
 function _defaultSpec() {
     return {
+        // Stylised mascot default — vivid, friendly, reads instantly
         template: 'humanoid',
         tier:     'high',
         build:    'medium',
         colors: {
-            skin:       '#c8a06a',
-            hair:       '#2c1a08',
-            hair_style: 'short',
-            eye:        '#3a6a3a',
-            shirt:      '#2a3a5a',
-            pants:      '#2a2218',
-            shoes:      '#181008',
-            accent:     '#8a6030',
+            skin:       '#e8b478',
+            hair:       '#4a2c14',
+            hair_style: 'spiky',
+            eye:        '#2e9e4f',
+            shirt:      '#3fa7a0',
+            pants:      '#4a3a58',
+            shoes:      '#2a1c10',
+            accent:     '#fd971f',
         },
         tattoos:     [],
-        accessories: [],
+        accessories: [
+            { type: 'scarf', color: '#fd971f', size: 'medium' },
+            { type: 'belt',  color: '#7a4a20', size: 'small'  },
+        ],
         zones:       {},
         lighting:    'standard',
         backdrop:    [],
@@ -443,7 +456,8 @@ function _addGroundPlate(g, topColor, rimColor) {
 
 function _sceneGroundColors(name) {
     if (/castle|dungeon|stone/.test(name))              return { top: '#5a5248', rim: '#3a3030' };
-    if (/forest|field|meadow|outdoor|autumn|fall/.test(name)) return { top: '#5a7a3a', rim: '#3a5228' };
+    if (/autumn|fall/.test(name))                       return { top: '#8a6030', rim: '#5a3a1a' };
+    if (/forest|field|meadow|outdoor/.test(name))       return { top: '#5a7a3a', rim: '#3a5228' };
     if (/lake|ocean|sea|river|beach|water/.test(name))  return { top: '#c8b870', rim: '#a09050' };
     if (/cave/.test(name))                              return { top: '#303035', rim: '#202025' };
     if (/city|urban|downtown|street|neon/.test(name))   return { top: '#3e3e48', rim: '#28282e' };
@@ -454,7 +468,7 @@ const _SKY_ONLY = new Set(['clouds', 'sky', 'void', 'dark', 'abyss', 'shadow']);
 
 // ─── Backdrop builder ─────────────────────────────────────────────────────
 
-const _BACKDROP_MED = new Set(['none', 'floor', 'forest', 'castle', 'cave', 'clouds']);
+const _BACKDROP_MED = new Set(['none', 'floor', 'forest', 'castle', 'cave', 'clouds', 'autumn', 'fall']);
 
 function _buildBackdrop(spec) {
     const tier = spec.tier ?? 'minimum';
@@ -486,6 +500,7 @@ function _buildBackdrop(spec) {
         if (name === 'none' || name === 'floor') return;
         if (tier === 'medium' && !_BACKDROP_MED.has(name)) { _addGenericEnv(g, name, tier); return; }
         if      (name === 'castle')  _addCastle(g, tier);
+        else if (name === 'autumn' || name === 'fall') _addAutumn(g, tier);
         else if (name === 'forest')  _addForest(g, tier);
         else if (name === 'lake')    _addLake(g);
         else if (name === 'cave')    _addCave(g, tier);
@@ -541,6 +556,32 @@ function _addForest(group, tier) {
             group.add(_box(w, h, d, color, tx, dy, tz));
         });
     });
+}
+
+// ── Autumn — orange/red canopy trees + leaf scatter + midair drifting leaves ──
+
+const _AUTUMN_CANOPY = ['#d86020', '#b83018', '#e8a020'];
+
+function _addAutumn(group, tier) {
+    const pos = tier === 'high' ? [[-2.2, -1.5], [2.2, -1.5], [-1.4, -2.1]] : [[-2.2, -1.5], [2.2, -1.5]];
+    pos.forEach(([tx, tz], i) => {
+        const cap = _AUTUMN_CANOPY[i % _AUTUMN_CANOPY.length];
+        group.add(_box(0.35, 1.3, 0.35, '#4a2e14', tx, -0.4, tz));            // trunk
+        group.add(_box(1.15, 0.75, 1.15, cap,               tx, 0.62, tz));   // canopy lower
+        group.add(_box(0.8,  0.55, 0.8,  _lighten(cap, 0.08), tx, 1.22, tz)); // canopy upper
+    });
+    // Fallen leaf scatter on the ground plate
+    const scatter = [
+        ['#d86020', -1.6, 0.6], ['#b83018', -0.7, 1.1], ['#e8a020', 0.5, 0.9],
+        ['#d86020',  1.4, 0.5], ['#b83018', 1.9, 1.2],  ['#e8a020', -2.1, 1.3],
+    ];
+    scatter.forEach(([col, x, z]) => group.add(_box(0.18, 0.04, 0.18, col, x, -0.99, z)));
+    // Drifting leaves frozen midair
+    const midair = [
+        ['#d86020', -1.3, 1.6, 0.8], ['#e8a020', 1.5, 2.4, 0.4],
+        ['#b83018', -0.6, 3.1, -0.5], ['#e8a020', 2, 1.1, 1],
+    ];
+    midair.forEach(([col, x, y, z]) => group.add(_box(0.14, 0.05, 0.14, col, x, y, z)));
 }
 
 // ── Lake ─────────────────────────────────────────────────────────────────
@@ -678,44 +719,62 @@ function _addBaseBody(g, c, bx, bz) {
 
 function _addAnthroFeatures(g, c) {
     const zones = c.zones ?? {};
-    // Muzzle — protrudes from lower front of head; face_mask zone or darkened skin
+    // Two-part muzzle (fox-skin ref): snout block + dark nose tip — reads as a
+    // face at any distance, unlike the old single slab
     const muzzleColor = zones.face_mask ?? _lighten(c.skin, -0.07);
-    g.add(_box(0.44, 0.28, 0.3, muzzleColor, 0, 2.38, 0.58));
-    // Outer ears in fur/hair colour
+    g.add(_box(0.46, 0.3, 0.32, muzzleColor, 0, 2.4, 0.56));
+    g.add(_box(0.18, 0.11, 0.1, '#1a1210', 0, 2.47, 0.73));
+    // Tapered ears on the TOP corners of the head (not stubs on the sides):
+    // wide base + narrower tip, angled slightly outward
     _boxes(g, c.hair, [
-        [0.16, 0.3, 0.14, -0.52, 3.06, 0],
-        [0.16, 0.3, 0.14,  0.52, 3.06, 0],
+        [0.24, 0.34, 0.14, -0.3,  3.28, 0],
+        [0.24, 0.34, 0.14,  0.3,  3.28, 0],
+        [0.14, 0.2,  0.12, -0.34, 3.52, 0],
+        [0.14, 0.2,  0.12,  0.34, 3.52, 0],
     ]);
-    // Inner ear — ear_inner zone or a lightened hair colour
+    // Inner ear pads facing forward
     const earInner = zones.ear_inner ?? _lighten(c.hair, 0.22);
     _boxes(g, earInner, [
-        [0.08, 0.2, 0.08, -0.52, 3.1,  0.05],
-        [0.08, 0.2, 0.08,  0.52, 3.1,  0.05],
+        [0.12, 0.22, 0.05, -0.3, 3.26, 0.08],
+        [0.12, 0.22, 0.05,  0.3, 3.26, 0.08],
     ]);
 }
 
 // ─── Face features — eyes + nose/nostrils for all tiers ──────────────────
 
 function _addFace(g, c, template) {
-    // Eyes: z=0.50 is 0.05 proud of head front face (z=0.45) — clearly visible
-    _boxes(g, c.eye, [
-        [0.18, 0.14, 0.08, -0.22, 2.68, 0.5],
-        [0.18, 0.14, 0.08,  0.22, 2.68, 0.5],
+    // Composed face at ALL tiers (reference-art style): white sclera + coloured
+    // iris + pupil, eyebrows in hair colour, and a mouth — not flat eye blocks.
+
+    // Sclera — slightly proud of head front face (z=0.45)
+    _boxes(g, '#f6f4ee', [
+        [0.24, 0.18, 0.06, -0.21, 2.67, 0.48],
+        [0.24, 0.18, 0.06,  0.21, 2.67, 0.48],
     ]);
+    // Iris — inner-biased for a focused look
+    _boxes(g, c.eye, [
+        [0.13, 0.15, 0.04, -0.17, 2.66, 0.52],
+        [0.13, 0.15, 0.04,  0.17, 2.66, 0.52],
+    ]);
+    // Pupil
+    _boxes(g, '#141210', [
+        [0.06, 0.1, 0.03, -0.16, 2.65, 0.55],
+        [0.06, 0.1, 0.03,  0.16, 2.65, 0.55],
+    ]);
+    // Eyebrows — hair colour, sit just above the sclera
+    _boxes(g, c.hair, [
+        [0.26, 0.07, 0.06, -0.21, 2.8, 0.49],
+        [0.26, 0.07, 0.06,  0.21, 2.8, 0.49],
+    ]);
+
     if (template === 'anthro_biped') {
-        // Nostrils on tip of muzzle (muzzle front face ≈ z=0.73)
-        _boxes(g, '#080806', [
-            [0.07, 0.07, 0.05, -0.1, 2.36, 0.74],
-            [0.07, 0.07, 0.05,  0.1, 2.36, 0.74],
-        ]);
+        // Nose tip is drawn by _addAnthroFeatures; just the mouth line here
+        g.add(_box(0.18, 0.045, 0.04, _lighten(c.skin, -0.22), 0, 2.26, 0.72));
     } else {
         // Nose bridge
         g.add(_box(0.12, 0.18, 0.08, _lighten(c.skin, -0.08), 0, 2.48, 0.5));
-        // Nostrils
-        _boxes(g, '#080806', [
-            [0.05, 0.07, 0.05, -0.07, 2.43, 0.53],
-            [0.05, 0.07, 0.05,  0.07, 2.43, 0.53],
-        ]);
+        // Mouth — subtle dark line low on the face
+        g.add(_box(0.2, 0.05, 0.04, _lighten(c.skin, -0.25), 0, 2.3, 0.48));
     }
 }
 
@@ -727,9 +786,19 @@ function _buildMinimum(spec) {
     const c = spec.colors ?? _defaultSpec().colors;
     const { bx, bz } = _buildScale(spec.build);
     _addBaseBody(g, c, bx, bz);
+    // Low tier = fewer voxels, NOT less character: hem line + two-tone
+    // hand/paw tips give the silhouette colour breaks for near-zero cost
+    g.add(_box(bx + 0.02, 0.1, bz + 0.02, _lighten(c.shirt, -0.12), 0, _Y.CHEST - 0.55, 0));
+    const tipColor = _lighten(c.skin, -0.15);
+    if (_armL) _armL.add(_box(0.52, 0.22, 0.52, tipColor, 0, -1, 0));
+    if (_armR) _armR.add(_box(0.52, 0.22, 0.52, tipColor, 0, -1, 0));
     // All tiers get hair + face; anthro features (ears/muzzle) always rendered
     _addHairMedium(g, c);
-    if ((spec.template ?? 'humanoid') === 'anthro_biped') _addAnthroFeatures(g, c);
+    if ((spec.template ?? 'humanoid') === 'anthro_biped') {
+        _addAnthroFeatures(g, c);
+        // Belly zone at min too — it's THE signature anthro read (fox ref)
+        _addBellyZone(g, c, bx, bz);
+    }
     _addFace(g, c, spec.template ?? 'humanoid');
     const simpleTypes = new Set(['hat', 'belt', 'cape', 'scarf', 'horns', 'antlers', 'tail', 'wings', 'necklace']);
     (spec.accessories ?? []).slice(0, 2)
@@ -741,6 +810,47 @@ function _buildMinimum(spec) {
 
 function _renderCustomParts(g, parts = [], limit = 24) {
     parts.slice(0, limit).forEach(p => g.add(_box(p.w, p.h, p.d, p.color, p.x, p.y, p.z)));
+}
+
+// ─── Shirt pattern overlay — plaid / stripes / checker (medium+ tiers) ─────
+// Thin sub-blocks 0.02 proud of the torso front and back faces. Data-driven
+// from colors.shirt_pattern + colors.pattern_color — no per-outfit hardcoding.
+
+function _addShirtPattern(g, c, bx, bz) {
+    const kind = (c.shirt_pattern ?? '').toLowerCase();
+    if (!kind || kind === 'none') return;
+    const pc   = c.pattern_color || _lighten(c.shirt, 0.25);
+    const pcD  = _darken(pc, 0.12);
+    const faces = [bz / 2 + 0.02, -(bz / 2 + 0.02)];   // front z, back z
+    const yMid  = _Y.CHEST;
+
+    faces.forEach(fz => {
+        if (kind === 'checker') {
+            // 4×4 alternating cells across the torso face
+            const cw = bx / 4, ch = 1.2 / 4;
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    if ((i + j) % 2 === 0) continue;
+                    const x = -bx / 2 + cw * (i + 0.5);
+                    const y = yMid - 0.6 + ch * (j + 0.5);
+                    g.add(_box(cw, ch, 0.03, pc, x, y, fz));
+                }
+            }
+        } else if (kind === 'stripes') {
+            // 3 horizontal bands
+            [-0.38, 0, 0.38].forEach(dy => {
+                g.add(_box(bx, 0.14, 0.03, pc, 0, yMid + dy, fz));
+            });
+        } else if (kind === 'plaid') {
+            // Vertical + horizontal thin lines crossing — flannel grid
+            [-bx / 4, 0, bx / 4].forEach(dx => {
+                g.add(_box(0.09, 1.2, 0.03, pc, dx, yMid, fz));
+            });
+            [-0.35, 0, 0.35].forEach(dy => {
+                g.add(_box(bx, 0.09, 0.035, pcD, 0, yMid + dy, fz));
+            });
+        }
+    });
 }
 
 // ─── MEDIUM tier ──────────────────────────────────────────────────────────
@@ -757,6 +867,7 @@ function _buildMedium(spec) {
     if (_armR) _armR.add(_box(0.52, 0.65, 0.52, sleeveColor, 0, -0.25, 0));
     // Collar strip at neck
     g.add(_box(0.85, 0.12, 0.62, _lighten(c.shirt, 0.2), 0, _Y.COLLAR, 0));
+    _addShirtPattern(g, c, bx, bz);
     _addHairMedium(g, c);
     if ((spec.template ?? 'humanoid') === 'anthro_biped') {
         _addAnthroFeatures(g, c);
@@ -793,6 +904,7 @@ function _buildHigh(spec) {
     }
     // Collar strip at neck
     g.add(_box(0.85, 0.12, 0.62, _lighten(c.shirt, 0.2), 0, _Y.COLLAR, 0));
+    _addShirtPattern(g, c, bx, bz);
     _addHairMedium(g, c);
     if ((spec.template ?? 'humanoid') === 'anthro_biped') {
         _addAnthroFeatures(g, c);
