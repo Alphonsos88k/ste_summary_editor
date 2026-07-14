@@ -26,6 +26,8 @@ let _lightFill     = null;
 let _lightTop      = null;
 let _glowDisc      = null;
 let _shadowDisc    = null;
+let _shadowCatcher = null;
+let _toonGrad      = null;
 let _glowBg        = null;
 let _gridHelper    = null;
 let _stageTone     = 'auto';   // 'auto' follows spec lighting; or a named stage
@@ -120,9 +122,21 @@ export async function initVoxel(container, spec) {
     _buildGlow();
 
     _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    // Full device pixel ratio (up to 3) — capping at 2 left model edges soft
-    // on high-DPI displays
-    _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
+    // 2× supersampling on top of device pixel ratio (capped 4×): render at
+    // double resolution, browser downscales → crisp MC-Dungeons-style edges.
+    // Canvas is small, so the fill-rate cost is negligible.
+    _renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * 2, 4));
+    // Real shadow mapping — self-shadowing carves the model's definition and
+    // grounds it with a true contact shadow (the MC Dungeons render trick)
+    _renderer.shadowMap.enabled = true;
+    _renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+    _lightDir.castShadow = true;
+    _lightDir.shadow.mapSize.set(2048, 2048);
+    _lightDir.shadow.bias = -0.0005;
+    const shCam = _lightDir.shadow.camera;
+    shCam.near = 1; shCam.far = 25;
+    shCam.left = -7; shCam.right = 7; shCam.top = 9; shCam.bottom = -3;
+    shCam.updateProjectionMatrix();
     _renderer.setSize(w, h);
     container.innerHTML = '';
     container.appendChild(_renderer.domElement);
@@ -165,10 +179,11 @@ export function disposeVoxel() {
     _lightDir   = null;
     _lightFill  = null;
     _lightTop   = null;
-    _glowDisc   = null;
-    _shadowDisc = null;
-    _glowBg     = null;
-    _gridHelper = null;
+    _glowDisc      = null;
+    _shadowDisc    = null;
+    _shadowCatcher = null;
+    _glowBg        = null;
+    _gridHelper    = null;
     _armL = null; _armR = null; _legL = null; _legR = null;
     _autoSpin  = false;
 }
@@ -341,17 +356,29 @@ function _buildGlow() {
     _glowDisc.position.y = -0.54;
     _scene.add(_glowDisc);
 
-    // Soft dark contact shadow — bright stages only (normal blending, black tint)
+    // Soft ambient blob — bright stages only. Real shadow mapping does the
+    // crisp contact shadow; this just adds the soft AO halo around it.
     _shadowDisc = new THREE.Mesh(
         new THREE.PlaneGeometry(3.6, 3.6),
         new THREE.MeshBasicMaterial({
             map: tex, transparent: true, depthWrite: false,
-            color: 0x000000, opacity: 0.32, fog: false,
+            color: 0x000000, opacity: 0.16, fog: false,
         }),
     );
     _shadowDisc.rotation.x = -Math.PI / 2;
     _shadowDisc.position.y = -0.53;
     _scene.add(_shadowDisc);
+
+    // Invisible shadow-catcher — receives the REAL cast shadow from the key
+    // light on any stage (ShadowMaterial renders only the shadow)
+    _shadowCatcher = new THREE.Mesh(
+        new THREE.PlaneGeometry(14, 14),
+        new THREE.ShadowMaterial({ opacity: 0.3 }),
+    );
+    _shadowCatcher.rotation.x = -Math.PI / 2;
+    _shadowCatcher.position.y = -0.549;
+    _shadowCatcher.receiveShadow = true;
+    _scene.add(_shadowCatcher);
 
     // Radial gradient behind the character — lighter centre on bright stages,
     // coloured glow on dark ones (the studio-backdrop look from the refs)
@@ -364,10 +391,12 @@ function _buildGlow() {
 
 async function _loadThree() {
     try {
-        return await import('../../lib/three.module.js');
+        // Vendored min build — gitignored, present locally via deploy;
+        // fresh git installs fall through to the CDN below
+        return await import('../../lib/three.module.min.js');
     } catch {
         try {
-            return await import('https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js');
+            return await import('https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.min.js');
         } catch {
             return null;
         }
@@ -388,11 +417,24 @@ function _disposeGroup(group) {
     });
 }
 
+// 4-step toon gradient — defined shade bands per face instead of 2-tone mush
+function _toonGradient() {
+    if (_toonGrad) return _toonGrad;
+    const data = new Uint8Array([90, 150, 210, 255]);
+    _toonGrad = new THREE.DataTexture(data, 4, 1, THREE.RedFormat);
+    _toonGrad.minFilter = THREE.NearestFilter;
+    _toonGrad.magFilter = THREE.NearestFilter;
+    _toonGrad.needsUpdate = true;
+    return _toonGrad;
+}
+
 function _box(w, h, d, color, x, y, z) {
     const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(w, h, d),
-        new THREE.MeshToonMaterial({ color: new THREE.Color(color) })
+        new THREE.MeshToonMaterial({ color: new THREE.Color(color), gradientMap: _toonGradient() })
     );
+    mesh.castShadow    = true;
+    mesh.receiveShadow = true;
     mesh.position.set(x, y, z);
     return mesh;
 }
@@ -423,7 +465,7 @@ function _defaultSpec() {
         colors: {
             skin:       '#e8b478',
             hair:       '#4a2c14',
-            hair_style: 'spiky',
+            hair_style: 'short',
             eye:        '#2e9e4f',
             shirt:      '#3fa7a0',
             pants:      '#4a3a58',
@@ -676,9 +718,17 @@ function _buildCharacter(spec) {
     return _buildMinimum(spec);
 }
 
+// ─── Clothing layer rule ──────────────────────────────────────────────────
+// Every overlay must sit strictly OUTSIDE the surface it covers — never share
+// a face plane (coplanar faces z-fight and shimmer). Layer offsets from the
+// torso surface: hem +0.02 · pattern +0.035 · belt +0.06. Belt sizes off the
+// live body scale so it clears every build.
+let _bodyScale = { bx: 1.1, bz: 0.6 };
+
 // Shared base body — Minecraft-biped proportions, limbs in pivot groups for idle animation.
 // _armL/_armR/_legL/_legR are module-level so _loop can animate them.
 function _addBaseBody(g, c, bx, bz) {
+    _bodyScale = { bx, bz };
     // Head — 1.0 cube (Minecraft 8×8×8 pixel ratio)
     g.add(_box(1, 1, 1, c.skin, 0, _Y.HEAD, 0));
 
@@ -768,13 +818,18 @@ function _addFace(g, c, template) {
     ]);
 
     if (template === 'anthro_biped') {
-        // Nose tip is drawn by _addAnthroFeatures; just the mouth line here
-        g.add(_box(0.18, 0.045, 0.04, _lighten(c.skin, -0.22), 0, 2.26, 0.72));
+        // Nose tip is drawn by _addAnthroFeatures; just a thin mouth line here
+        g.add(_box(0.16, 0.035, 0.03, _lighten(c.skin, -0.28), 0, 2.27, 0.73));
     } else {
         // Nose bridge
         g.add(_box(0.12, 0.18, 0.08, _lighten(c.skin, -0.08), 0, 2.48, 0.5));
-        // Mouth — subtle dark line low on the face
-        g.add(_box(0.2, 0.05, 0.04, _lighten(c.skin, -0.25), 0, 2.3, 0.48));
+        // Mouth — thin subtle line, clearly proud of the face (never a chin badge)
+        g.add(_box(0.14, 0.035, 0.03, '#4a2a20', 0, 2.32, 0.52));
+        // Small skin-colour ears on the head sides (stylised-voxel look)
+        _boxes(g, c.skin, [
+            [0.08, 0.2, 0.2, -0.53, 2.62, 0],
+            [0.08, 0.2, 0.2,  0.53, 2.62, 0],
+        ]);
     }
 }
 
@@ -787,8 +842,9 @@ function _buildMinimum(spec) {
     const { bx, bz } = _buildScale(spec.build);
     _addBaseBody(g, c, bx, bz);
     // Low tier = fewer voxels, NOT less character: hem line + two-tone
-    // hand/paw tips give the silhouette colour breaks for near-zero cost
-    g.add(_box(bx + 0.02, 0.1, bz + 0.02, _lighten(c.shirt, -0.12), 0, _Y.CHEST - 0.55, 0));
+    // hand/paw tips give the silhouette colour breaks for near-zero cost.
+    // Hem floats 0.03 above the torso bottom edge — no coplanar faces.
+    g.add(_box(bx + 0.04, 0.1, bz + 0.04, _lighten(c.shirt, -0.12), 0, _Y.CHEST - 0.52, 0));
     const tipColor = _lighten(c.skin, -0.15);
     if (_armL) _armL.add(_box(0.52, 0.22, 0.52, tipColor, 0, -1, 0));
     if (_armR) _armR.add(_box(0.52, 0.22, 0.52, tipColor, 0, -1, 0));
@@ -948,10 +1004,24 @@ function _renderAccessory(group, acc, c, tier) {
 // ─── Hair ─────────────────────────────────────────────────────────────────
 
 function _addHairMedium(group, c) {
+    if (c.hair_style === 'bald') return;
     // Cap bottom at 3.12 — clear of head top face (3.10) by 0.02 to prevent z-fighting
     _boxes(group, c.hair, [[0.96, 0.26, 0.96, 0, 3.25, 0]]);
     _boxes(group, c.hair, _HAIR_STYLE[c.hair_style] ?? _HAIR_STYLE.short);
-    _boxes(group, c.hair, [[0.18, 0.5, 0.18, -0.47, _Y.HEAD, 0], [0.18, 0.5, 0.18, 0.47, _Y.HEAD, 0]]);
+    // Short sideburn tabs on the upper head — NOT the old full-height ear-muff
+    // slabs (those read as weird side plates and hid the new skin ears)
+    _boxes(group, c.hair, [
+        [0.14, 0.28, 0.5, -0.48, 2.96, 0],
+        [0.14, 0.28, 0.5,  0.48, 2.96, 0],
+    ]);
+    // Wavy fringe — three staggered bumps along the front hairline
+    _boxes(group, c.hair, [
+        [0.3,  0.14, 0.1, -0.3,  3.06, 0.47],
+        [0.26, 0.2,  0.1,  0.02, 3.02, 0.47],
+        [0.3,  0.12, 0.1,  0.32, 3.07, 0.47],
+    ]);
+    // Back panel so the cap doesn't look like a floating lid from behind
+    _boxes(group, c.hair, [[0.96, 0.5, 0.14, 0, 2.92, -0.46]]);
 }
 
 // ─── Accessories ──────────────────────────────────────────────────────────
@@ -1000,7 +1070,9 @@ function _addCape(group, color, sc) {
 }
 
 function _addBelt(group, color) {
-    group.add(_box(0.95, 0.14, 0.62, color, 0, 0.95, 0));
+    // Layered OUTSIDE hem (+0.02) and pattern (+0.035) — never coplanar
+    const { bx, bz } = _bodyScale;
+    group.add(_box(bx + 0.12, 0.16, bz + 0.12, color, 0, 0.95, 0));
 }
 
 function _addHorns(group, color, sc) {
