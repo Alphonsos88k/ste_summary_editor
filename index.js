@@ -68,6 +68,7 @@ import { showDiffView } from './src/editor/diff-view.js';
 import { openSplitDialog, closeSplitDialog } from './src/editor/split-entry.js';
 import { closeIngestSplit, swapIngestSplit, openIngestPreview, closeIngestPreview, refreshIngestPreviewIfOpen } from './src/ingest/ingest-split.js';
 import { isCharacterBlocked, bindBlacklistEvents, refreshBlockedState } from './src/integration/blacklist.js';
+import { openCodex, closeCodex } from './src/integration/codex.js';
 import {
     registerPrompt, getPrompt, seedDefaultPrompts, loadPromptDefaults,
     openEditPromptPopup, openSystemPromptHub,
@@ -771,6 +772,7 @@ function resetEditorState() {
     persistState();
 
     closeChatFilesManager();
+    closeCodex();
     // Close the editor if it's open
     $('#se-modal-overlay').removeClass('active');
 }
@@ -797,6 +799,7 @@ async function handleClearAll() {
     state.fileRawContent.clear();
     closeIngestSplit();
     closeChatFilesManager();
+    closeCodex();
 
     pushUndo(`Cleared all (${entryCount} entries)`, () => {
         restoreSnapshot(snap);
@@ -1629,7 +1632,14 @@ function bindActsEvents() {
     $('#se-btn-chat-files').on('click', () => {
         if (!state.associatedCharacter) return;
         if ($('#se-minimap-overlay').hasClass('open')) toggleMinimap();
+        closeCodex();
         openChatFilesManager(state.associatedCharacter);
+    });
+
+    $('#se-btn-codex').on('click', () => {
+        if ($('#se-minimap-overlay').hasClass('open')) toggleMinimap();
+        closeChatFilesManager();
+        openCodex();
     });
 
     // ── View toggle: Timeline ↔ Location Bubbles ───────────────

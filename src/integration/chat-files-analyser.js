@@ -99,6 +99,13 @@ export function refreshAnalyserCanvas() {
     _lgc?.setDirty(true, true);
 }
 
+export function refreshAnalyserFileList() {
+    const sidebar = _panel?.querySelector('#se-cfm-an-file-list');
+    if (sidebar) _renderFileListInto(sidebar);
+    const popList = _panel?.querySelector('.se-cfm-an-pop-panel [id$="-file-list"]');
+    if (popList) _renderFileListInto(popList);
+}
+
 export function getGraphState() {
     return _graph ? _graph.serialize() : null;
 }
@@ -401,7 +408,18 @@ function _renderFileListInto(container) {
         } else if (onCanvas) {
             tkBadge = `<span class="se-cfm-an-tk-badge se-cfm-an-tk-spin"><span class="se-an-spin">&#x27F3;</span></span>`;
         }
-        return `<div class="se-cfm-an-node-item">` +
+        const rawColor = f._branchColor ?? null;
+        let itemStyle = '';
+        let itemCls   = '';
+        if (f._isBranch && rawColor) {
+            itemStyle = ` style="--se-cfm-bc:${rawColor}33"`;
+            itemCls   = ' se-cfm-branch-item';
+        } else if (!f._isBranch && rawColor) {
+            itemStyle = ` style="--se-cfm-bc:${rawColor}"`;
+        } else if (f._isStandalone) {
+            itemCls = ' se-cfm-no-family';
+        }
+        return `<div class="se-cfm-an-node-item${itemCls}"${itemStyle}>` +
             `<span class="se-cfm-an-node-date">${escHtml(date)}</span>` +
             `<span class="se-cfm-an-node-label" title="${escHtml(name)}">${escHtml(label)}</span>` +
             tkBadge +

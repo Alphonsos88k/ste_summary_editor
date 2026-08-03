@@ -1,0 +1,101 @@
+<div class="se-cx-header">
+    <span class="se-cx-title">&#x1F4D6; Character Codex</span>
+    <div class="se-cx-header-btns">
+        <button class="se-close-circle" id="se-cx-help-btn"     title="Character Codex guide">?</button>
+        <button class="se-close-circle" id="se-cx-settings-btn" title="Settings">&#9881;</button>
+        <button class="se-close-circle se-cx-fullscreen-btn" id="se-cx-fullscreen-btn" title="Fullscreen">&#x26F6;</button>
+        <button class="se-close-circle se-cx-close-btn"     id="se-cx-close-btn"      title="Close">&times;</button>
+    </div>
+</div>
+
+<div class="se-cx-book">
+
+    <!-- ── LEFT PAGE — always fixed ────────────────────────────────────── -->
+    <div class="se-cx-page-left">
+
+        <!-- Voxel viewer: square canvas + 3 control buttons -->
+        <div class="se-cx-voxel-row">
+            <div class="se-cx-voxel-frame" id="se-cx-voxel-frame">
+                <img class="se-cx-avatar" id="se-cx-avatar" src="" alt="" />
+            </div>
+            <div class="se-cx-voxel-ctrls">
+                <button class="se-cx-vctl" id="se-cx-vctl-front" title="Front view" disabled>&#9673;</button>
+                <button class="se-cx-vctl" id="se-cx-vctl-spin"  title="Toggle auto-spin" disabled>&#10227;</button>
+                <button class="se-cx-vctl" id="se-cx-vctl-regen" title="Generate voxel" disabled>&#10022;</button>
+                <button class="se-cx-vctl" id="se-cx-vctl-quick" title="Quick gen from Appearance &amp; Personality (requires both sections)" disabled>&#9889;</button>
+                <button class="se-cx-vctl" id="se-cx-vctl-fit"   title="Fit to view" disabled>&#8857;</button>
+            </div>
+        </div>
+
+        <!-- Voxel description + tier — shown only when voxel is available -->
+        <div class="se-cx-voxel-prompt-section" id="se-cx-voxel-prompt-section" style="display:none;">
+            <div class="se-cx-field-lbl">Voxel Description</div>
+            <textarea class="se-cx-voxel-notes" id="se-cx-voxel-notes"
+                      placeholder="Describe appearance for voxel render (hair, clothing, accessories…)&#10;Leave blank to use character card only."></textarea>
+            <div class="se-cx-tier-row">
+                <span class="se-cx-field-lbl">Quality</span>
+                <div class="se-cx-tier-btns">
+                    <button class="se-cx-tier-btn active" data-tier="minimum">Min</button>
+                    <button class="se-cx-tier-btn"        data-tier="medium">Med</button>
+                    <button class="se-cx-tier-btn"        data-tier="high">High</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Biography config fields -->
+        <div class="se-cx-left-fields">
+
+            <div class="se-cx-field-group">
+                <span class="se-cx-field-lbl">Character</span>
+                <div class="se-cx-char-pill" id="se-cx-char-pill">Detecting&hellip;</div>
+                <select class="se-cx-char-select" id="se-cx-char-select" style="display:none;"></select>
+            </div>
+
+            <input class="se-cx-override-input" id="se-cx-override" type="text"
+                   placeholder="Override character name (optional)" autocomplete="off" />
+
+            <div class="se-cx-field-group">
+                <span class="se-cx-field-lbl">Include in context</span>
+                <label class="se-cx-check-row">
+                    <input type="checkbox" id="se-cx-chk-supp" />
+                    <span>Supplementary files</span>
+                </label>
+                <label class="se-cx-check-row">
+                    <input type="checkbox" id="se-cx-chk-entries" />
+                    <span>Summary entries</span>
+                </label>
+            </div>
+
+            <div class="se-cx-token-row">
+                <span class="se-cx-token-est" id="se-cx-token-est">Select sources above to estimate tokens</span>
+            </div>
+
+            <button class="se-cx-gen-btn" id="se-cx-gen-btn" disabled>Generate Codex</button>
+
+        </div>
+    </div>
+
+    <!-- ── RIGHT PAGE — content changes per page ─────────────────────── -->
+    <div class="se-cx-page-right">
+
+        <!-- Progress overlay -->
+        <div class="se-cx-progress-overlay" id="se-cx-progress-overlay" style="display:none;">
+            <div class="se-cx-progress-bar-wrap">
+                <div class="se-cx-progress-fill" id="se-cx-progress-fill"></div>
+            </div>
+            <span class="se-cx-progress-txt" id="se-cx-progress-txt">Generating&hellip;</span>
+        </div>
+
+        <!-- Dynamic content -->
+        <div class="se-cx-right-content" id="se-cx-right-content"></div>
+
+        <!-- Paginator footer -->
+        <div class="se-cx-paginator">
+            <button class="se-cx-pager-arrow" id="se-cx-prev" disabled>&#8592;</button>
+            <div class="se-cx-pager-dots" id="se-cx-pager-dots"></div>
+            <button class="se-cx-pager-arrow" id="se-cx-next">&#8594;</button>
+        </div>
+
+    </div>
+
+</div>
