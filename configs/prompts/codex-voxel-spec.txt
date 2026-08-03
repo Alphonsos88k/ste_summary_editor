@@ -26,6 +26,7 @@ For anthro fur: use the natural animal tone but leaning slightly brighter than r
     "shirt":         "#3a5a9a",
     "shirt_pattern": "",
     "pattern_color": "",
+    "facial_hair":   "",
     "pants":         "#2a2a4a",
     "shoes":         "#1a1218",
     "accent":        "#c8a030"
@@ -55,8 +56,14 @@ tier:        Preserve whatever tier was requested — do NOT change it.
 build:       "slim" | "medium" | "stocky" | "tall" | "short"
 
 hair_style:  "short" | "long" | "bun" | "spiky" | "bald"
+             Hair renders as a procedural cluster of small shaded cubes
+             (stylised figurine look) — hair_style picks the silhouette.
              For anthro characters, hair = fur cap/crest colour. Use hair_style
              that best matches the character's head fur or mane.
+
+facial_hair: "" | "beard" | "mustache" | "stubble"   (humanoid only)
+             Rendered as small hair-colour tufts on the jaw/lip. Anthro
+             characters ignore this — the muzzle carries their fur.
 
 shirt_pattern: "" | "plaid" | "stripes" | "checker"
              Fabric pattern overlaid on the torso (medium/high tier only —
@@ -188,9 +195,17 @@ Use "custom_parts" for body features that have no matching accessory type:
 extra heads, missing/replaced limbs, tentacles, wings used as arms, non-standard
 body segments, creature-specific anatomy, etc.
 
-Each element is a box placed in world space:
+Each element is a box placed in world space. Optional rx / ry / rz rotate the
+box in DEGREES — use rotation to build curved, flowing shapes (tails, wings,
+tentacles) from chained segments instead of rigid stair-steps:
 
   { "w": 0.4, "h": 0.4, "d": 0.4, "color": "#8a2020", "x": 0.8, "y": 2.5, "z": 0.3 }
+  { "w": 0.18, "h": 0.4, "d": 0.15, "color": "#7a4a20", "x": 0.1, "y": 0.6, "z": -0.7, "rz": 25 }
+
+Curved tail example (three segments, rotation increasing along the curve):
+  { "w": 0.2, "h": 0.45, "d": 0.18, "color": "#8a5a2a", "x": 0,    "y": 0.55, "z": -0.6,  "rx": -20 }
+  { "w": 0.18,"h": 0.4,  "d": 0.16, "color": "#8a5a2a", "x": 0,    "y": 0.25, "z": -0.92, "rx": -55 }
+  { "w": 0.16,"h": 0.35, "d": 0.14, "color": "#a06a3a", "x": 0,    "y": 0.12, "z": -1.25, "rx": -85 }
 
 Coordinate reference (group-local space; biped centre at x=0, z=0):
   x: left = negative, right = positive (arms reach ±0.75)

@@ -75,16 +75,8 @@ const _LAKE_ROCKS = [[0.5, -1, 1.8], [2.8, -0.9, 0.5], [3.2, -0.95, 1.6]];
 
 // All hair geometry is positioned so NO face coincides with a head face (avoids z-fighting).
 // Head outer faces: top y=3.10, back z=-0.45, sides x=±0.45.
-const _HAIR_STYLE = {
-    // Back tuft visible from behind; extends clearly past head-back face
-    short: [[0.92, 0.28, 0.2, 0, 3.18, -0.47]],
-    // Curtain hangs behind + side locks hang beside head
-    long:  [[0.88, 0.85, 0.16, 0, 2.62, -0.52], [0.16, 0.6, 0.16, -0.47, 2.45, 0], [0.16, 0.6, 0.16, 0.47, 2.45, 0]],
-    // Ball sits above head, centred behind
-    bun:   [[0.5, 0.42, 0.4, 0, 3.5, -0.45]],
-    // Spikes fully above head top (y>3.10)
-    spiky: [[0.2, 0.55, 0.16, -0.22, 3.52, 0], [0.2, 0.58, 0.16, 0, 3.56, 0], [0.2, 0.55, 0.16, 0.22, 3.52, 0]],
-};
+// Hair silhouettes are generated procedurally in _addHairMedium (cluster
+// system) — no fixed style table.
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
@@ -428,7 +420,164 @@ function _toonGradient() {
     return _toonGrad;
 }
 
-function _box(w, h, d, color, x, y, z) {
+// ─── Pixel-texture system ("fake voxel") ──────────────────────────────────
+// Surface detail is PAINTED onto box faces as pixel art (the Minecraft-skin
+// technique) instead of built from micro-boxes. One box + a 16px noise
+// texture reads as many voxels; faces/patterns/cuffs are pixels, not meshes.
+
+const _texCache = new Map();
+
+function _pixelNoiseCanvas(base, size, seedKey, opts = {}) {
+    const { patch = 2, amp = 0.028, coverage = 0.24 } = opts;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, size, size);
+    // Soft patchwork shading — sparse 2px patches at ~3% tone shift, like the
+    // reference renders. NOT per-pixel salt-and-pepper (reads as sand).
+    const rnd = _seededRnd(`${base}|${seedKey}`);
+    for (let px = 0; px < size; px += patch) {
+        for (let py = 0; py < size; py += patch) {
+            const r = rnd();
+            if (r < 1 - coverage) continue;
+            ctx.fillStyle = r > 1 - coverage / 2 ? _lighten(base, amp) : _darken(base, amp);
+            ctx.fillRect(px, py, patch, patch);
+        }
+    }
+    return { cv, ctx };
+}
+
+function _canvasToTexture(cv) {
+    const tex = new THREE.CanvasTexture(cv);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+}
+
+// Flat base + optional horizontal bands [{from,to,color}] in 0..1 of height
+// from the top (cuffs, hems, collars are painted bands, not shells).
+// SKIN IS ALWAYS FLAT — no grain. Pass noiseOpts only for clothing, and only
+// as large soft blocks (see _CLOTH_NOISE).
+function _skinTexture(base, bands, seedKey, noiseOpts) {
+    const key = `skin|${base}|${JSON.stringify(bands ?? [])}|${seedKey ?? ''}`;
+    if (_texCache.has(key)) return _texCache.get(key);
+    const size = 16;
+    const { cv, ctx } = _pixelNoiseCanvas(base, size, key, noiseOpts ?? { coverage: 0 });
+    (bands ?? []).forEach(b => {
+        const y0 = Math.round(b.from * size), y1 = Math.round(b.to * size);
+        ctx.fillStyle = b.color;
+        ctx.fillRect(0, y0, size, y1 - y0);
+    });
+    const tex = _canvasToTexture(cv);
+    _texCache.set(key, tex);
+    return tex;
+}
+
+// Clothing-only shading: large 6px blocks, ~2% tone, sparse — reads as soft
+// fabric shading, never as grain
+const _CLOTH_NOISE = { patch: 6, amp: 0.02, coverage: 0.14 };
+
+// Shirt texture: noise + painted collar/hem bands + optional plaid/stripes/
+// checker pattern — patterns are pixels now, so they work at EVERY tier and
+// can never clip or z-fight
+function _paintShirtPattern(ctx, size, c) {
+    const pat = (c.shirt_pattern ?? '').toLowerCase();
+    if (!pat || pat === 'none') return;
+    const pc  = c.pattern_color || _lighten(c.shirt, 0.25);
+    const pcD = _darken(pc, 0.12);
+    if (pat === 'checker') {
+        const cell = size / 4;
+        for (let i = 0; i < 4; i++) {
+            for (let j = 0; j < 4; j++) {
+                if ((i + j) % 2 === 0) continue;
+                ctx.fillStyle = pc;
+                ctx.fillRect(i * cell, j * cell, cell, cell);
+            }
+        }
+    } else if (pat === 'stripes') {
+        ctx.fillStyle = pc;
+        [0.2, 0.5, 0.8].forEach(f => ctx.fillRect(0, Math.round(f * size) - 1, size, 3));
+    } else if (pat === 'plaid') {
+        ctx.fillStyle = pc;
+        [0.18, 0.5, 0.82].forEach(f => ctx.fillRect(Math.round(f * size) - 1, 0, 2, size));
+        ctx.fillStyle = pcD;
+        [0.25, 0.55, 0.85].forEach(f => ctx.fillRect(0, Math.round(f * size) - 1, size, 2));
+    }
+}
+
+function _shirtTexture(c) {
+    const key = `shirt|${c.shirt}|${c.shirt_pattern ?? ''}|${c.pattern_color ?? ''}`;
+    if (_texCache.has(key)) return _texCache.get(key);
+    const size = 24;
+    const { cv, ctx } = _pixelNoiseCanvas(c.shirt, size, key, _CLOTH_NOISE);
+    _paintShirtPattern(ctx, size, c);
+    // Collar (top rows) + hem (bottom rows) painted over the pattern
+    ctx.fillStyle = _lighten(c.shirt, 0.18);
+    ctx.fillRect(0, 0, size, 2);
+    ctx.fillStyle = _darken(c.shirt, 0.1);
+    ctx.fillRect(0, size - 2, size, 2);
+    const tex = _canvasToTexture(cv);
+    _texCache.set(key, tex);
+    return tex;
+}
+
+// Face texture — eyes, brows, nose, mouth painted as pixels on a noise base.
+// Anthro variants skip nose/mouth (the geometry muzzle carries those).
+function _faceTexture(c, template) {
+    const key = `face|${c.skin}|${c.eye}|${c.hair}|${c.hair_style ?? ''}|${template}`;
+    if (_texCache.has(key)) return _texCache.get(key);
+    const size = 32;
+    // Skin is flat — no grain on faces, ever
+    const { cv, ctx } = _pixelNoiseCanvas(c.skin, size, key, { coverage: 0 });
+    const px = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
+    // Hairline — top 1/5 of the head cube is painted hair (the voxel hair
+    // attaches onto this base), with stepped fringe notches like an MC skin
+    const hairCol = _hairColor(c);
+    if ((c.hair_style ?? 'short') !== 'bald') {
+        px(0, 0, size, 6, hairCol);
+        px(2, 6, 5, 2, hairCol);      // fringe notch left
+        px(13, 6, 4, 1, hairCol);     // shallow centre notch
+        px(24, 6, 6, 2, hairCol);     // fringe notch right
+    }
+    // Brows
+    px(6, 8, 7, 2, hairCol);
+    px(19, 8, 7, 2, hairCol);
+    // Eyes: sclera → iris → pupil, inner-biased
+    px(6, 11, 7, 5, '#f8f6ef');
+    px(19, 11, 7, 5, '#f8f6ef');
+    px(8, 11, 3, 5, c.eye);
+    px(21, 11, 3, 5, c.eye);
+    px(9, 12, 2, 3, '#141210');
+    px(21, 12, 2, 3, '#141210');
+    if (template !== 'anthro_biped') {
+        px(14, 16, 4, 5, _darken(c.skin, 0.07));           // nose
+        px(14, 20, 1, 1, _darken(c.skin, 0.16));           // nostril hint
+        px(17, 20, 1, 1, _darken(c.skin, 0.16));
+        px(12, 24, 8, 2, '#4a2a20');                        // mouth
+    }
+    const tex = _canvasToTexture(cv);
+    _texCache.set(key, tex);
+    return tex;
+}
+
+function _toonMat(opts) {
+    return new THREE.MeshToonMaterial({ gradientMap: _toonGradient(), ...opts });
+}
+
+// Box with a texture on all faces (torso/limbs — bands wrap consistently)
+function _texBox(w, h, d, tex, x, y, z) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), _toonMat({ map: tex }));
+    mesh.castShadow    = true;
+    mesh.receiveShadow = true;
+    mesh.position.set(x, y, z);
+    return mesh;
+}
+
+// rot: optional [rx, ry, rz] radians — rotated boxes are how flowing shapes
+// (hair tufts, scarf drape, curved tails) escape the rigid grid look
+function _box(w, h, d, color, x, y, z, rot) {
     const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(w, h, d),
         new THREE.MeshToonMaterial({ color: new THREE.Color(color), gradientMap: _toonGradient() })
@@ -436,12 +585,29 @@ function _box(w, h, d, color, x, y, z) {
     mesh.castShadow    = true;
     mesh.receiveShadow = true;
     mesh.position.set(x, y, z);
+    if (rot) mesh.rotation.set(rot[0] ?? 0, rot[1] ?? 0, rot[2] ?? 0);
     return mesh;
 }
 
 // Same-color batch: specs are [w, h, d, x, y, z]
 function _boxes(group, color, specs) {
-    specs.forEach(([w, h, d, x, y, z]) => group.add(_box(w, h, d, color, x, y, z)));
+    specs.forEach(([w, h, d, x, y, z, rot]) => group.add(_box(w, h, d, color, x, y, z, rot)));
+}
+
+// Deterministic PRNG (mulberry32) — same seed = same hair every rerender,
+// so a character's look is stable across sessions
+function _seededRnd(str) {
+    let h = 1779033703;
+    for (let i = 0; i < str.length; i++) {
+        h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+        h = (h << 13) | (h >>> 19);
+    }
+    return function () {
+        h = Math.imul(h ^ (h >>> 16), 2246822507);
+        h = Math.imul(h ^ (h >>> 13), 3266489909);
+        h ^= h >>> 16;
+        return (h >>> 0) / 4294967296;
+    };
 }
 
 
@@ -458,24 +624,25 @@ function _accScale(a) {
 
 function _defaultSpec() {
     return {
-        // Stylised mascot default — vivid, friendly, reads instantly
+        // Stylised mascot default — clean MC-figurine look (target ref):
+        // cyan shirt, purple pants, brown hair, green eyes, grey belt
         template: 'humanoid',
         tier:     'high',
         build:    'medium',
         colors: {
-            skin:       '#e8b478',
-            hair:       '#4a2c14',
-            hair_style: 'short',
-            eye:        '#2e9e4f',
-            shirt:      '#3fa7a0',
-            pants:      '#4a3a58',
-            shoes:      '#2a1c10',
-            accent:     '#fd971f',
+            skin:        '#e8b478',
+            hair:        '#6b4423',
+            hair_style:  'short',
+            facial_hair: '',
+            eye:         '#2e9e4f',
+            shirt:       '#35b3cc',
+            pants:       '#6a4a9a',
+            shoes:       '#4a2c14',
+            accent:      '#b8b8b8',
         },
         tattoos:     [],
         accessories: [
-            { type: 'scarf', color: '#fd971f', size: 'medium' },
-            { type: 'belt',  color: '#7a4a20', size: 'small'  },
+            { type: 'belt', color: '#b8b8b8', size: 'small' },
         ],
         zones:       {},
         lighting:    'standard',
@@ -725,43 +892,78 @@ function _buildCharacter(spec) {
 // live body scale so it clears every build.
 let _bodyScale = { bx: 1.1, bz: 0.6 };
 
+// Head — 1/5 hair band painted around all faces, hair-colour top face,
+// painted pixel face on the front (+z). Voxel hair attaches onto this base.
+function _addHead(g, c, template) {
+    const bald    = (c.hair_style ?? 'short') === 'bald';
+    const hairCol = _hairColor(c);
+    const bands   = bald ? null : [{ from: 0, to: 0.2, color: hairCol }];
+    const sideTex = _skinTexture(c.skin, bands, 'head');
+    const topTex  = bald ? sideTex : _skinTexture(hairCol, null, 'headtop');
+    const side    = () => _toonMat({ map: sideTex });
+    const front   = _toonMat({ map: _faceTexture(c, template) });
+    // BoxGeometry material order: +x, -x, +y (top), -y, +z (front), -z
+    const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 1, 1),
+        [side(), side(), _toonMat({ map: topTex }), side(), front, side()],
+    );
+    mesh.castShadow    = true;
+    mesh.receiveShadow = true;
+    mesh.position.set(0, _Y.HEAD, 0);
+    g.add(mesh);
+}
+
 // Shared base body — Minecraft-biped proportions, limbs in pivot groups for idle animation.
-// _armL/_armR/_legL/_legR are module-level so _loop can animate them.
-function _addBaseBody(g, c, bx, bz) {
+// All surfaces are pixel-textured (noise + painted bands); detail lives in the
+// textures, not in extra boxes. _armL/_armR/_legL/_legR animate in _loop.
+function _addBaseBody(g, c, bx, bz, template) {
     _bodyScale = { bx, bz };
-    // Head — 1.0 cube (Minecraft 8×8×8 pixel ratio)
-    g.add(_box(1, 1, 1, c.skin, 0, _Y.HEAD, 0));
+    _addHead(g, c, template);
 
-    // Torso (shirt block)
-    g.add(_box(bx, 1.2, bz, c.shirt, 0, _Y.CHEST, 0));
+    // Torso — shirt texture carries noise, collar, hem, and any pattern
+    g.add(_texBox(bx, 1.2, bz, _shirtTexture(c), 0, _Y.CHEST, 0));
 
-    // Arm pivot groups: shoulder joint at y=2.0 (top of torso)
-    // In local space the arm mesh hangs 0.55 below the pivot centre
+    // Arms — flat skin; hand is a separate same-colour cube tilted a few
+    // degrees for that leveraged, 3D figurine feel (reference detail)
+    const armTex = _skinTexture(c.skin, null, 'arm');
     const shoulderY = _Y.CHEST + 0.6;   // 2.0
-    const armX      = bx * 0.5 + 0.25; // centre of arm (inner edge flush with torso)
+    // +0.26 keeps the arm inner face 0.01 clear of the torso side — flush
+    // (coplanar) faces bled shirt colour onto the arms/hands (the "blue ring")
+    const armX = bx * 0.5 + 0.26;
+    // Hands: 8% lighter skin, tilted slightly OUTWARD (away from the torso —
+    // tilting inward clipped the shirt/belt and caused colour bleed)
+    const handTex = _skinTexture(_lighten(c.skin, 0.08), null, 'hand');
     _armL = new THREE.Group();
     _armL.position.set(-armX, shoulderY, 0);
-    _armL.add(_box(0.5, 1.1, 0.5, c.skin, 0, -0.55, 0));
+    _armL.add(_texBox(0.5, 0.92, 0.5, armTex, 0, -0.46, 0));
+    const handL = _texBox(0.47, 0.31, 0.47, handTex, -0.06, -1.05, 0.03);
+    handL.rotation.set(0.05, 0.07, 0.05);
+    _armL.add(handL);
     g.add(_armL);
 
     _armR = new THREE.Group();
     _armR.position.set(armX, shoulderY, 0);
-    _armR.add(_box(0.5, 1.1, 0.5, c.skin, 0, -0.55, 0));
+    _armR.add(_texBox(0.5, 0.92, 0.5, armTex, 0, -0.46, 0));
+    const handR = _texBox(0.47, 0.31, 0.47, handTex, 0.06, -1.05, 0.03);
+    handR.rotation.set(0.05, -0.07, -0.05);
+    _armR.add(handR);
     g.add(_armR);
 
-    // Leg pivot groups: hip joint at y=0.8 (top of leg).
-    // Pants + shoe both live inside so they animate with the leg.
+    // Legs — soft cloth shading + painted cuff; flat shoes
+    const legTex  = _skinTexture(c.pants, [{ from: 0.9, to: 1, color: _darken(c.pants, 0.1) }], 'leg', _CLOTH_NOISE);
+    const shoeTex = _skinTexture(c.shoes, null, 'shoe');
     const hipTopY = _Y.HIP + 0.6;    // 0.8
+    // Leg depth 0.8×bz — near torso depth, no pencil legs
     _legL = new THREE.Group();
     _legL.position.set(-0.22, hipTopY, 0);
-    _legL.add(_box(0.42 * bx, 1.2, 0.5 * bz, c.pants, 0, -0.6,  0    ));
-    _legL.add(_box(0.48 * bx, 0.28, 0.65,    c.shoes, 0, -1.26, 0.05 ));
+    _legL.add(_texBox(0.42 * bx, 1.2, 0.8 * bz, legTex,  0, -0.6,  0    ));
+    _legL.add(_texBox(0.48 * bx, 0.28, 0.7,     shoeTex, 0, -1.26, 0.05 ));
     g.add(_legL);
 
     _legR = new THREE.Group();
     _legR.position.set(0.22, hipTopY, 0);
-    _legR.add(_box(0.42 * bx, 1.2, 0.5 * bz, c.pants, 0, -0.6,  0    ));
-    _legR.add(_box(0.48 * bx, 0.28, 0.65,    c.shoes, 0, -1.26, 0.05 ));
+    _legR.add(_texBox(0.42 * bx, 1.2, 0.8 * bz, legTex,  0, -0.6,  0    ));
+    _legR.add(_texBox(0.48 * bx, 0.28, 0.7,     shoeTex, 0, -1.26, 0.05 ));
     g.add(_legR);
 }
 
@@ -793,43 +995,54 @@ function _addAnthroFeatures(g, c) {
 // ─── Face features — eyes + nose/nostrils for all tiers ──────────────────
 
 function _addFace(g, c, template) {
-    // Composed face at ALL tiers (reference-art style): white sclera + coloured
-    // iris + pupil, eyebrows in hair colour, and a mouth — not flat eye blocks.
-
-    // Sclera — slightly proud of head front face (z=0.45)
-    _boxes(g, '#f6f4ee', [
-        [0.24, 0.18, 0.06, -0.21, 2.67, 0.48],
-        [0.24, 0.18, 0.06,  0.21, 2.67, 0.48],
-    ]);
-    // Iris — inner-biased for a focused look
-    _boxes(g, c.eye, [
-        [0.13, 0.15, 0.04, -0.17, 2.66, 0.52],
-        [0.13, 0.15, 0.04,  0.17, 2.66, 0.52],
-    ]);
-    // Pupil
-    _boxes(g, '#141210', [
-        [0.06, 0.1, 0.03, -0.16, 2.65, 0.55],
-        [0.06, 0.1, 0.03,  0.16, 2.65, 0.55],
-    ]);
-    // Eyebrows — hair colour, sit just above the sclera
-    _boxes(g, c.hair, [
-        [0.26, 0.07, 0.06, -0.21, 2.8, 0.49],
-        [0.26, 0.07, 0.06,  0.21, 2.8, 0.49],
-    ]);
-
+    // Eyes/brows/nose/mouth are PAINTED on the head's front-face texture
+    // (_faceTexture). Only volume features remain as geometry.
     if (template === 'anthro_biped') {
-        // Nose tip is drawn by _addAnthroFeatures; just a thin mouth line here
+        // Mouth line under the geometry muzzle (painted face sits behind it)
         g.add(_box(0.16, 0.035, 0.03, _lighten(c.skin, -0.28), 0, 2.27, 0.73));
     } else {
-        // Nose bridge
-        g.add(_box(0.12, 0.18, 0.08, _lighten(c.skin, -0.08), 0, 2.48, 0.5));
-        // Mouth — thin subtle line, clearly proud of the face (never a chin badge)
-        g.add(_box(0.14, 0.035, 0.03, '#4a2a20', 0, 2.32, 0.52));
-        // Small skin-colour ears on the head sides (stylised-voxel look)
-        _boxes(g, c.skin, [
+        // Ears — skin blended toward pink, 6% darker than the face
+        const earCol = _darken(_mixColor(c.skin, '#e09090', 0.3), 0.06);
+        _boxes(g, earCol, [
             [0.08, 0.2, 0.2, -0.53, 2.62, 0],
             [0.08, 0.2, 0.2,  0.53, 2.62, 0],
         ]);
+        _addFacialHair(g, c);
+    }
+}
+
+// Facial hair clusters (humanoid only — anthro muzzles carry their own fur)
+function _addFacialHair(g, c) {
+    const kind = (c.facial_hair ?? '').toLowerCase();
+    if (!kind || kind === 'none') return;
+    const rnd    = _seededRnd(`${c.hair}|${kind}`);
+    // Neat: base colour dominates, tiny tone step, near-axis-aligned
+    const shades = [c.hair, c.hair, _darken(c.hair, 0.04)];
+    const tuft = (w, h, d, x, y, z) => {
+        const rot = [(rnd() - 0.5) * 0.1, (rnd() - 0.5) * 0.14, (rnd() - 0.5) * 0.1];
+        g.add(_box(w, h, d, shades[(rnd() * 3) | 0], x, y, z, rot));
+    };
+    if (kind === 'mustache' || kind === 'beard') {
+        // Mustache — two angled tufts above the mouth
+        tuft(0.17, 0.08, 0.07, -0.1, 2.39, 0.5);
+        tuft(0.17, 0.08, 0.07,  0.1, 2.39, 0.5);
+    }
+    if (kind === 'beard') {
+        // Jawline — tufts wrapping chin and cheeks below the mouth
+        for (let i = 0; i < 5; i++) {
+            tuft(0.16 + rnd() * 0.08, 0.14 + rnd() * 0.1, 0.12, -0.34 + i * 0.17, 2.2 + rnd() * 0.05, 0.42);
+        }
+        [-0.45, 0.45].forEach(sx => {
+            tuft(0.12, 0.2 + rnd() * 0.1, 0.24, sx, 2.32, 0.28);
+        });
+        // Chin block underneath
+        tuft(0.34, 0.14, 0.2, 0, 2.1, 0.34);
+    }
+    if (kind === 'stubble') {
+        // Sparse micro-tufts, shorter and flatter
+        for (let i = 0; i < 4; i++) {
+            tuft(0.1 + rnd() * 0.05, 0.05, 0.04, -0.25 + i * 0.17, 2.24 + rnd() * 0.06, 0.48);
+        }
     }
 }
 
@@ -840,14 +1053,8 @@ function _buildMinimum(spec) {
     const g = new THREE.Group();
     const c = spec.colors ?? _defaultSpec().colors;
     const { bx, bz } = _buildScale(spec.build);
-    _addBaseBody(g, c, bx, bz);
-    // Low tier = fewer voxels, NOT less character: hem line + two-tone
-    // hand/paw tips give the silhouette colour breaks for near-zero cost.
-    // Hem floats 0.03 above the torso bottom edge — no coplanar faces.
-    g.add(_box(bx + 0.04, 0.1, bz + 0.04, _lighten(c.shirt, -0.12), 0, _Y.CHEST - 0.52, 0));
-    const tipColor = _lighten(c.skin, -0.15);
-    if (_armL) _armL.add(_box(0.52, 0.22, 0.52, tipColor, 0, -1, 0));
-    if (_armR) _armR.add(_box(0.52, 0.22, 0.52, tipColor, 0, -1, 0));
+    _addBaseBody(g, c, bx, bz, spec.template ?? 'humanoid');
+    // Hem + hand/paw tips are painted into the textures now — no extra boxes.
     // All tiers get hair + face; anthro features (ears/muzzle) always rendered
     _addHairMedium(g, c);
     if ((spec.template ?? 'humanoid') === 'anthro_biped') {
@@ -856,7 +1063,7 @@ function _buildMinimum(spec) {
         _addBellyZone(g, c, bx, bz);
     }
     _addFace(g, c, spec.template ?? 'humanoid');
-    const simpleTypes = new Set(['hat', 'belt', 'cape', 'scarf', 'horns', 'antlers', 'tail', 'wings', 'necklace']);
+    const simpleTypes = new Set(['hat', 'belt', 'cape', 'scarf', 'glasses', 'horns', 'antlers', 'tail', 'wings', 'necklace']);
     (spec.accessories ?? []).slice(0, 2)
         .filter(a => simpleTypes.has(_accType(a)))
         .forEach(a => _renderAccessory(g, a, c, 'minimum'));
@@ -865,49 +1072,15 @@ function _buildMinimum(spec) {
 }
 
 function _renderCustomParts(g, parts = [], limit = 24) {
-    parts.slice(0, limit).forEach(p => g.add(_box(p.w, p.h, p.d, p.color, p.x, p.y, p.z)));
-}
-
-// ─── Shirt pattern overlay — plaid / stripes / checker (medium+ tiers) ─────
-// Thin sub-blocks 0.02 proud of the torso front and back faces. Data-driven
-// from colors.shirt_pattern + colors.pattern_color — no per-outfit hardcoding.
-
-function _addShirtPattern(g, c, bx, bz) {
-    const kind = (c.shirt_pattern ?? '').toLowerCase();
-    if (!kind || kind === 'none') return;
-    const pc   = c.pattern_color || _lighten(c.shirt, 0.25);
-    const pcD  = _darken(pc, 0.12);
-    const faces = [bz / 2 + 0.02, -(bz / 2 + 0.02)];   // front z, back z
-    const yMid  = _Y.CHEST;
-
-    faces.forEach(fz => {
-        if (kind === 'checker') {
-            // 4×4 alternating cells across the torso face
-            const cw = bx / 4, ch = 1.2 / 4;
-            for (let i = 0; i < 4; i++) {
-                for (let j = 0; j < 4; j++) {
-                    if ((i + j) % 2 === 0) continue;
-                    const x = -bx / 2 + cw * (i + 0.5);
-                    const y = yMid - 0.6 + ch * (j + 0.5);
-                    g.add(_box(cw, ch, 0.03, pc, x, y, fz));
-                }
-            }
-        } else if (kind === 'stripes') {
-            // 3 horizontal bands
-            [-0.38, 0, 0.38].forEach(dy => {
-                g.add(_box(bx, 0.14, 0.03, pc, 0, yMid + dy, fz));
-            });
-        } else if (kind === 'plaid') {
-            // Vertical + horizontal thin lines crossing — flannel grid
-            [-bx / 4, 0, bx / 4].forEach(dx => {
-                g.add(_box(0.09, 1.2, 0.03, pc, dx, yMid, fz));
-            });
-            [-0.35, 0, 0.35].forEach(dy => {
-                g.add(_box(bx, 0.09, 0.035, pcD, 0, yMid + dy, fz));
-            });
-        }
+    const rad = deg => (Number(deg) || 0) * Math.PI / 180;
+    parts.slice(0, limit).forEach(p => {
+        const rot = (p.rx || p.ry || p.rz) ? [rad(p.rx), rad(p.ry), rad(p.rz)] : undefined;
+        g.add(_box(p.w, p.h, p.d, p.color, p.x, p.y, p.z, rot));
     });
 }
+
+// Shirt patterns are painted into the torso texture (_shirtTexture) — pixels,
+// not overlay boxes, so they work at every tier and can never clip.
 
 // ─── MEDIUM tier ──────────────────────────────────────────────────────────
 // Budget: max 4 accessories, max 2 tattoos (arm/chest/back only)
@@ -916,14 +1089,13 @@ function _buildMedium(spec) {
     const g = new THREE.Group();
     const c = spec.colors ?? _defaultSpec().colors;
     const { bx, bz } = _buildScale(spec.build);
-    _addBaseBody(g, c, bx, bz);
-    // Shirt sleeves on upper arms (medium+)
+    _addBaseBody(g, c, bx, bz, spec.template ?? 'humanoid');
+    // Shirt sleeves on upper arms (medium+) — geometry shells for volume
     const sleeveColor = _lighten(c.shirt, 0.04);
     if (_armL) _armL.add(_box(0.52, 0.65, 0.52, sleeveColor, 0, -0.25, 0));
     if (_armR) _armR.add(_box(0.52, 0.65, 0.52, sleeveColor, 0, -0.25, 0));
     // Collar strip at neck
     g.add(_box(0.85, 0.12, 0.62, _lighten(c.shirt, 0.2), 0, _Y.COLLAR, 0));
-    _addShirtPattern(g, c, bx, bz);
     _addHairMedium(g, c);
     if ((spec.template ?? 'humanoid') === 'anthro_biped') {
         _addAnthroFeatures(g, c);
@@ -946,21 +1118,14 @@ function _buildHigh(spec) {
     const g = new THREE.Group();
     const c = spec.colors ?? _defaultSpec().colors;
     const { bx, bz } = _buildScale(spec.build);
-    _addBaseBody(g, c, bx, bz);
-    // Full sleeves + wrist cuffs on arm groups
+    _addBaseBody(g, c, bx, bz, spec.template ?? 'humanoid');
+    // Sleeves on upper arms — NO wrist cuffs (the light-shirt cuff ring read
+    // as a blue glitch band around the hands)
     const sleeveColor = _lighten(c.shirt, 0.04);
-    const cuffColor   = _lighten(c.shirt, 0.18);
-    if (_armL) {
-        _armL.add(_box(0.52, 0.65, 0.52, sleeveColor, 0, -0.25, 0));
-        _armL.add(_box(0.54, 0.15, 0.54, cuffColor,   0, -1.02, 0));
-    }
-    if (_armR) {
-        _armR.add(_box(0.52, 0.65, 0.52, sleeveColor, 0, -0.25, 0));
-        _armR.add(_box(0.54, 0.15, 0.54, cuffColor,   0, -1.02, 0));
-    }
+    if (_armL) _armL.add(_box(0.52, 0.65, 0.52, sleeveColor, 0, -0.25, 0));
+    if (_armR) _armR.add(_box(0.52, 0.65, 0.52, sleeveColor, 0, -0.25, 0));
     // Collar strip at neck
     g.add(_box(0.85, 0.12, 0.62, _lighten(c.shirt, 0.2), 0, _Y.COLLAR, 0));
-    _addShirtPattern(g, c, bx, bz);
     _addHairMedium(g, c);
     if ((spec.template ?? 'humanoid') === 'anthro_biped') {
         _addAnthroFeatures(g, c);
@@ -1003,25 +1168,68 @@ function _renderAccessory(group, acc, c, tier) {
 
 // ─── Hair ─────────────────────────────────────────────────────────────────
 
+// Cluster hair — voxel-art principles: (1) silhouette first, one rounded
+// dome mass; (2) shade by REGION like a light source — front/top highlighted,
+// nape/under darkened — never randomly; (3) heavy overlap, no gaps; (4) waves
+// live only on the trim edge as alternating curl depth. Axis-aligned.
+// Deterministic per colour+style, so the same character always renders alike.
+// Hair render colour — one uniform tone, 14% darker than the spec colour
+// (multi-shade variants read as light-brown/red-brown patches; removed)
+function _hairColor(c) { return _darken(c.hair, 0.14); }
+
 function _addHairMedium(group, c) {
-    if (c.hair_style === 'bald') return;
-    // Cap bottom at 3.12 — clear of head top face (3.10) by 0.02 to prevent z-fighting
-    _boxes(group, c.hair, [[0.96, 0.26, 0.96, 0, 3.25, 0]]);
-    _boxes(group, c.hair, _HAIR_STYLE[c.hair_style] ?? _HAIR_STYLE.short);
-    // Short sideburn tabs on the upper head — NOT the old full-height ear-muff
-    // slabs (those read as weird side plates and hid the new skin ears)
-    _boxes(group, c.hair, [
-        [0.14, 0.28, 0.5, -0.48, 2.96, 0],
-        [0.14, 0.28, 0.5,  0.48, 2.96, 0],
-    ]);
-    // Wavy fringe — three staggered bumps along the front hairline
-    _boxes(group, c.hair, [
-        [0.3,  0.14, 0.1, -0.3,  3.06, 0.47],
-        [0.26, 0.2,  0.1,  0.02, 3.02, 0.47],
-        [0.3,  0.12, 0.1,  0.32, 3.07, 0.47],
-    ]);
-    // Back panel so the cap doesn't look like a floating lid from behind
-    _boxes(group, c.hair, [[0.96, 0.5, 0.14, 0, 2.92, -0.46]]);
+    const style = c.hair_style ?? 'short';
+    if (style === 'bald') return;
+    const rnd  = _seededRnd(`${c.hair}|${style}`);
+    const col  = _hairColor(c);
+    const tuft = (w, h, d, x, y, z) => group.add(_box(w, h, d, col, x, y, z));
+    _addHairDome(tuft, rnd);
+    _addHairSilhouette(tuft, rnd, style);
+}
+
+// Shared dome: two crown layers + wavy fringe trim + side/nape settle cubes
+function _addHairDome(tuft, rnd) {
+    // Layer 1 — 5×5 wide
+    for (let ix = 0; ix < 5; ix++) {
+        for (let iz = 0; iz < 5; iz++) {
+            tuft(0.24, 0.16 + rnd() * 0.04, 0.24, -0.4 + ix * 0.2, 3.2, -0.4 + iz * 0.2);
+        }
+    }
+    // Layer 2 — 3×3 shifted slightly back → rounded top
+    for (let ix = 0; ix < 3; ix++) {
+        for (let iz = 0; iz < 3; iz++) {
+            tuft(0.26, 0.14 + rnd() * 0.03, 0.26, -0.24 + ix * 0.24, 3.33, -0.28 + iz * 0.22);
+        }
+    }
+    // Wavy trim — alternating curl depth along the front fringe
+    [[-0.32, 0.47], [-0.1, 0.42], [0.12, 0.47], [0.34, 0.43]].forEach(([x, z], i) => {
+        tuft(0.2, 0.1 + (i % 2) * 0.05, 0.13, x, 3.1, z);
+    });
+    // Sides — flush settle cubes over the painted band
+    tuft(0.13, 0.22, 0.55, -0.5, 3.04, -0.08);
+    tuft(0.13, 0.22, 0.55,  0.5, 3.04, -0.08);
+    // Nape — under-row settling the back edge
+    for (let i = 0; i < 3; i++) {
+        tuft(0.3, 0.18, 0.13, -0.3 + i * 0.3, 2.98, -0.5);
+    }
+}
+
+// Style-specific silhouette on top of the dome (axis-aligned)
+function _addHairSilhouette(tuft, rnd, style) {
+    if (style === 'long') {
+        for (let i = 0; i < 5; i++) {
+            tuft(0.22, 0.5 + rnd() * 0.12, 0.14, -0.36 + i * 0.18, 2.5, -0.52);
+        }
+        tuft(0.14, 0.55, 0.2, -0.52, 2.55, 0.05);
+        tuft(0.14, 0.55, 0.2,  0.52, 2.55, 0.05);
+    } else if (style === 'spiky') {
+        for (let i = 0; i < 4; i++) {
+            tuft(0.16, 0.3 + rnd() * 0.12, 0.16, -0.3 + i * 0.2, 3.48, -0.15 + (i % 2) * 0.3);
+        }
+    } else if (style === 'bun') {
+        tuft(0.34, 0.3, 0.3, 0, 3.42, -0.42);
+        tuft(0.24, 0.18, 0.2, 0, 3.6, -0.4);
+    }
 }
 
 // ─── Accessories ──────────────────────────────────────────────────────────
@@ -1059,9 +1267,23 @@ function _addHalo(group, color, sc) {
 }
 
 function _addScarf(group, color, sc) {
+    const dark = _darken(color, 0.08);
+    // Wrap ring — four segments around the neck, each slightly rotated so the
+    // scarf reads as wrapped fabric rather than a rigid collar box
     _boxes(group, color, [
-        [0.92, 0.28 * sc, 0.65,   0,    2.1,  0  ],
-        [0.22, 0.55 * sc, 0.22,  -0.18, 1.7,  0.3],
+        [0.88, 0.26 * sc, 0.32, 0,     2.12, 0.24,  [0.05,  0.1,  0.04]],
+        [0.88, 0.28 * sc, 0.3,  0,     2.15, -0.24, [-0.04, -0.08, 0  ]],
+        [0.3,  0.26 * sc, 0.6,  -0.38, 2.12, 0,     [0,     0.09, 0.05]],
+        [0.3,  0.24 * sc, 0.6,   0.38, 2.14, 0,     [0,    -0.07, -0.04]],
+    ]);
+    // Hanging tail — three segments draping down the chest, alternating tilt
+    // like folded fabric; layered proud of the torso front
+    _boxes(group, color, [
+        [0.27, 0.44 * sc, 0.14, -0.13, 1.76, 0.37, [0.07, 0,  0.13]],
+        [0.23, 0.32 * sc, 0.12, -0.15, 1.16, 0.42, [0.05, 0,  0.16]],
+    ]);
+    _boxes(group, dark, [
+        [0.25, 0.4 * sc, 0.13, -0.2, 1.45, 0.4, [0.09, 0, -0.11]],
     ]);
 }
 
@@ -1070,9 +1292,10 @@ function _addCape(group, color, sc) {
 }
 
 function _addBelt(group, color) {
-    // Layered OUTSIDE hem (+0.02) and pattern (+0.035) — never coplanar
+    // Layered OUTSIDE the torso, and tall/low enough to fully cover the
+    // shirt-to-pants seam — no shirt sliver bulging out beneath the belt
     const { bx, bz } = _bodyScale;
-    group.add(_box(bx + 0.12, 0.16, bz + 0.12, color, 0, 0.95, 0));
+    group.add(_box(bx + 0.12, 0.24, bz + 0.12, color, 0, 0.9, 0));
 }
 
 function _addHorns(group, color, sc) {
@@ -1218,6 +1441,11 @@ function _lighten(hex, amt) {
 function _darken(hex, amt) {
     const c = new THREE.Color(hex);
     return `#${new THREE.Color(Math.max(c.r - amt, 0), Math.max(c.g - amt, 0), Math.max(c.b - amt, 0)).getHexString()}`;
+}
+
+// Blend two colours: t=0 → a, t=1 → b
+function _mixColor(a, b, t) {
+    return `#${new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString()}`;
 }
 
 // ─── Drag rotation ────────────────────────────────────────────────────────
