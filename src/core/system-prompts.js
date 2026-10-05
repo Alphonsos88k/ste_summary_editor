@@ -12,7 +12,7 @@
  * Call `seedDefaultPrompts()` once after init to fill in missing keys.
  */
 
-import { EXT_NAME, TEMPLATES } from './constants.js';
+import { EXT_PATH, TEMPLATES } from './constants.js';
 import { state } from './state.js';
 import { escHtml, spawnPanel } from './utils.js';
 import { loadTemplate, fillTemplate } from './template-loader.js';
@@ -21,7 +21,7 @@ import { loadTemplate, fillTemplate } from './template-loader.js';
 const PROMPTS_KEY = 'se-system-prompts-v1';
 
 /** Base URL for prompt text files. */
-const PROMPTS_BASE = `/scripts/extensions/third-party/${EXT_NAME}/configs/prompts`;
+const PROMPTS_BASE = `${EXT_PATH}/configs/prompts`;
 
 /** @type {PromptEntry[]} */
 const _registry = [];

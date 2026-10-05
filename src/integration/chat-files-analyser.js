@@ -10,7 +10,7 @@ import { escHtml } from '../core/utils.js';
 import { registerPrompt, getRegisteredPrompts, getPrompt, setPrompt } from '../core/system-prompts.js';
 import { loadTemplate, fillTemplate } from '../core/template-loader.js';
 import { logLLMCall } from '../core/llm-history.js';
-import { TEMPLATES } from '../core/constants.js';
+import { EXT_PATH, TEMPLATES } from '../core/constants.js';
 import { shiftEntriesUp } from '../table/reorder.js';
 import { renderTable } from '../table/table.js';
 import { detectGaps } from '../ingest/gap-detection.js';
@@ -39,7 +39,7 @@ let _runMaxTokens            = null;   // per-run max_tokens override set from r
 let _apiBusyListener         = null;
 let _activeFileChangeListener = null;
 
-const _LG_SRC     = '/scripts/extensions/third-party/summary-editor/lib/litegraph.min.js';
+const _LG_SRC     = `${EXT_PATH}/lib/litegraph.min.js`;
 
 const _EDGE_PALETTE = ['#a6e22e', '#66d9e8', '#f92672', '#fd971f', '#ae81ff', '#e6db74', '#cfcfc2'];
 

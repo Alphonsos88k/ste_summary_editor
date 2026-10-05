@@ -14,7 +14,7 @@
  */
 
 // ─── Core modules ───
-import { EXT_NAME, STORAGE_KEY, TABLE_COLS, TEMPLATES } from './src/core/constants.js';
+import { EXT_PATH, STORAGE_KEY, TABLE_COLS, TEMPLATES } from './src/core/constants.js';
 import { state, persistState, snapshotState, restoreSnapshot } from './src/core/state.js';
 import { debounce, makeDraggable, escHtml, escAttr, spawnPanel, registerPanel } from './src/core/utils.js';
 import { loadTemplate, fillTemplate, preloadAllTemplates } from './src/core/template-loader.js';
@@ -178,7 +178,7 @@ function loadFuseJS() {
     return new Promise((resolve) => {
         if (typeof Fuse !== 'undefined') { resolve(); return; }
         const script = document.createElement('script');
-        script.src = `/scripts/extensions/third-party/${EXT_NAME}/lib/fuse.min.js`;
+        script.src = `${EXT_PATH}/lib/fuse.min.js`;
         script.onload = resolve;
         script.onerror = () => {
             console.warn('[Summary Editor] Fuse.js failed to load, fuzzy search unavailable');
@@ -195,7 +195,7 @@ function loadDiffJS() {
     return new Promise((resolve) => {
         if (typeof Diff !== 'undefined') { resolve(); return; }
         const script = document.createElement('script');
-        script.src = `/scripts/extensions/third-party/${EXT_NAME}/lib/diff.min.js`;
+        script.src = `${EXT_PATH}/lib/diff.min.js`;
         script.onload = resolve;
         script.onerror = () => {
             console.warn('[Summary Editor] jsdiff failed to load, diff view unavailable');
@@ -212,7 +212,7 @@ function loadLocalForageJS() {
     return new Promise((resolve) => {
         if (typeof localforage !== 'undefined') { resolve(); return; }
         const script = document.createElement('script');
-        script.src = `/scripts/extensions/third-party/${EXT_NAME}/lib/localforage.min.js`;
+        script.src = `${EXT_PATH}/lib/localforage.min.js`;
         script.onload = resolve;
         script.onerror = () => {
             console.warn('[Summary Editor] localForage failed to load, falling back to localStorage');
@@ -230,7 +230,7 @@ function loadIroJS() {
         if (typeof iro !== 'undefined') { resolve(); return; }
 
         const script = document.createElement('script');
-        script.src = `/scripts/extensions/third-party/${EXT_NAME}/lib/iro.min.js`;
+        script.src = `${EXT_PATH}/lib/iro.min.js`;
         script.onload = resolve;
         script.onerror = () => {
             console.warn('[Summary Editor] iro.js failed to load, color picker unavailable');
@@ -276,7 +276,7 @@ jQuery(async () => {
     }
 
     // Load the settings panel HTML into ST's extensions sidebar
-    const settingsHtml = await $.get(`/scripts/extensions/third-party/${EXT_NAME}/settings.html`);
+    const settingsHtml = await $.get(`${EXT_PATH}/settings.html`);
     $('#extensions_settings2').append(settingsHtml);
 
     // Load Tailwind, iro.js, localForage, Fuse.js, jsdiff, and all HTML templates in parallel
