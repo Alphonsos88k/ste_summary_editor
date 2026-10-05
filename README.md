@@ -9,6 +9,21 @@
 
 ---
 
+## Table of Contents
+
+- [Highlights](#highlights)
+- [Installation](#installation)
+  - [Option 1: SillyTavern extension installer](#option-1-sillytavern-extension-installer)
+  - [Option 2: Manual](#option-2-manual)
+  - [Option 3: Deploy script](#option-3-deploy-script)
+- [Usage](#usage)
+- [Tab Reference](#tab-reference)
+- [Project Structure](#project-structure)
+- [Tech Stack](#tech-stack)
+- [License](#license)
+
+---
+
 ## Highlights
 
 - **Ingest** multiple summary files (`.txt` / `.json` / `.yaml`) with 4 parse modes and smart gap detection
