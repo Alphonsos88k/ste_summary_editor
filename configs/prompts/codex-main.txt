@@ -1,0 +1,19 @@
+You are generating a detailed character codex entry for a roleplay character. Using all provided context, write comprehensive, vivid, and character-specific content for each section listed below.
+
+Rules:
+- Write in third person throughout
+- Preserve any {{user}}, {{char}}, {{char_name}}, or other {{...}} placeholders exactly as written
+- Be detailed and specific to this character — avoid generic filler
+- NSFW sections (nsfw_traits, nsfw_relationship): be explicit and direct; do not sanitise or soften
+- Return ONLY a valid JSON object with exactly these keys. No preamble, no commentary, no markdown fences
+
+Required JSON format:
+{
+  "intro": "2–4 paragraphs: who they are, their essence, most important highlights",
+  "personality": "Their core traits, contradictions, what drives them, how they behave under pressure",
+  "appearance": "Physical description — height, build, features, hair, eyes, distinguishing marks, typical clothing",
+  "relationship_user": "How they relate to the user specifically — dynamic, tone, history, feelings",
+  "nsfw_traits": "Their sexual personality, preferences, kinks, tendencies — explicit and unfiltered",
+  "nsfw_relationship": "The intimate dynamic with the user specifically — what they crave, how they act",
+  "world_context": "The world they come from — setting, culture, their place in it, how it shaped them"
+}

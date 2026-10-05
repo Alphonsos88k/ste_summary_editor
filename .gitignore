@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# Vendored three.js builds — local only (deploy copies them; git installs use CDN fallback)
+lib/three.module.js
+lib/three.module.min.js
+
 # Build artifacts
 *.zip
 dist/

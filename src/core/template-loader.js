@@ -19,13 +19,13 @@
  * ```
  */
 
-import { EXT_NAME, TEMPLATES } from './constants.js';
+import { EXT_PATH, TEMPLATES } from './constants.js';
 
 /** @type {Map<string, string>} Cache of loaded template HTML strings. */
 const templateCache = new Map();
 
 /** Base URL path for template files relative to ST's server root. */
-const TEMPLATE_BASE = `/scripts/extensions/third-party/${EXT_NAME}/templates`;
+const TEMPLATE_BASE = `${EXT_PATH}/templates`;
 
 /**
  * Load an HTML template file by name.

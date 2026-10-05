@@ -9,6 +9,21 @@
 
 ---
 
+## Table of Contents
+
+- [Highlights](#highlights)
+- [Installation](#installation)
+  - [Option 1: SillyTavern extension installer](#option-1-sillytavern-extension-installer)
+  - [Option 2: Manual](#option-2-manual)
+  - [Option 3: Deploy script](#option-3-deploy-script)
+- [Usage](#usage)
+- [Tab Reference](#tab-reference)
+- [Project Structure](#project-structure)
+- [Tech Stack](#tech-stack)
+- [License](#license)
+
+---
+
 ## Highlights
 
 - **Ingest** multiple summary files (`.txt` / `.json` / `.yaml`) with 4 parse modes and smart gap detection
@@ -47,6 +62,7 @@
 | **Bulk Refine** | Select multiple entries → run LLM revision on all sequentially; accept or discard each result individually |
 | **Chat File Analysis** | Browse JSONL chat files in a multi-tab node canvas; connect a file to summary entries; run a two-pass LLM pipeline (Pass 1: structured digest; Pass 2: per-entry REWRITE / SPLIT / MERGE / SWAP / NO_CHANGE recommendations); changes staged and undo-safe |
 | **Chat File Content Search** | Searches message content across all chat files (debounced, cached); floating find bar with ‹ › prev/next; works across JSONL, Plain, YAML, and Form views |
+| **Branch Family Colours** | Reads `chat_metadata.main_chat` from each chat file header to detect ST branch/checkpoint relationships; assigns a unique colour per family — parent gets full-opacity left border, branch children get 65% alpha border + indent; standalone/orphaned files get a grey border; Date/Groups sort toggle clusters families together |
 
 </details>
 

@@ -1,0 +1,180 @@
+<div class="se-cx-help-hdr se-cfm-an-help-hdr">
+    <span>Character Codex — Guide</span>
+    <button class="se-close-circle se-cx-help-close">&times;</button>
+</div>
+<div class="se-cfm-an-help-main">
+    <nav class="se-cfm-an-help-nav">
+        <button class="se-cfm-an-help-nav-item active" data-sec="overview">Overview</button>
+        <button class="se-cfm-an-help-nav-item" data-sec="buttons">Buttons</button>
+        <button class="se-cfm-an-help-nav-item" data-sec="voxel">Voxel Renderer</button>
+        <button class="se-cfm-an-help-nav-item" data-sec="tiers">Tiers</button>
+        <button class="se-cfm-an-help-nav-item" data-sec="features">What Renders</button>
+    </nav>
+    <div class="se-cfm-an-help-content">
+
+        <div class="se-cfm-an-help-sec active" data-sec="overview">
+            <div class="se-cfm-an-help-page">
+                <h3>What is Character Codex?</h3>
+                <p>Character Codex generates a structured character biography for any SillyTavern character card and renders them as a stylised 3D voxel avatar.</p>
+                <ul>
+                    <li>Select a character on the left page (auto-detected from active chat, or choose from the dropdown).</li>
+                    <li>Optionally tick <b>Supplementary files</b> or <b>Summary entries</b> to include more context.</li>
+                    <li>Click <b>Generate Codex</b> to produce all biography sections in one API call.</li>
+                    <li>The right page shows the TOC — click any section dot or use the ← → arrows to navigate.</li>
+                </ul>
+                <p><b>Context note:</b> Regen uses only the character card + ticked sources. SillyTavern lorebooks/world info are not included unless they have been imported as supplementary files.</p>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>Biography Sections</h3>
+                <ul>
+                    <li><b>Introduction &amp; Highlights</b> — quick-reference summary.</li>
+                    <li><b>Personality</b> — traits, quirks, motivations.</li>
+                    <li><b>Appearance &amp; Quirks</b> — physical description, style, notable features.</li>
+                    <li><b>Relationship with User</b> — how they relate to the player/user character.</li>
+                    <li><b>NSFW Traits</b> and <b>Intimate Dynamic</b> — hidden behind blur until revealed.</li>
+                    <li><b>Their World</b> — setting, factions, backstory context.</li>
+                </ul>
+                <p>Each section is independent — regen one without touching the others. Custom sections can be added from the TOC page.</p>
+            </div>
+        </div>
+
+        <div class="se-cfm-an-help-sec" data-sec="buttons" hidden>
+            <div class="se-cfm-an-help-page">
+                <h3>Panel Header Buttons</h3>
+                <ul>
+                    <li><b>?</b> — Opens this guide (click again to close).</li>
+                    <li><b>&#9881;</b> — Opens the Settings popup. Configure default tier and all API output token budgets.</li>
+                    <li><b>&#x26F6;</b> — Toggle fullscreen mode for the Codex panel.</li>
+                    <li><b>&times;</b> — Close the Codex panel.</li>
+                </ul>
+                <h3>Section Page Buttons</h3>
+                <ul>
+                    <li><b>&#x270E; pencil</b> — Toggle the section textarea between <em>read-only</em> and <em>editable</em>. Use this to manually write or paste content without calling the LLM.</li>
+                    <li><b>&#x21BB; circle (header)</b> — Regenerate this section using the character context. Same as the Regen button below the text.</li>
+                    <li><b>Feedback for regen…</b> — Type a note here before clicking Regen to guide the rewrite (e.g. "make it more emotional" or "focus on her rivalry with X").</li>
+                    <li><b>&#x21BB; Regen</b> — Regenerate the current section, incorporating any feedback. Token budget set in ⚙ Settings → Section regen tokens.</li>
+                    <li><b>System Prompt</b> — Expandable — shows the AI instruction used for this section's regen. Edit it to permanently customise the writing style for that section.</li>
+                </ul>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>TOC Page Buttons</h3>
+                <ul>
+                    <li><b>+ Add</b> — Opens a form to create a <em>custom section</em>. Type a name (e.g. "Combat Style") and the AI generates its content automatically.</li>
+                    <li><b>&#x1F4AC; Suggest</b> — Asks the AI to suggest a new section that's missing from the current codex, then generates it.</li>
+                    <li><b>&#x2B07; Export ZIP</b> — Downloads all sections as a <code>.zip</code> of plain-text <code>.txt</code> files.</li>
+                </ul>
+                <h3>Voxel Control Buttons</h3>
+                <ul>
+                    <li><b>&#9673; Front</b> — Reset camera to front-facing view.</li>
+                    <li><b>&#10227; Spin</b> — Toggle auto-rotation (turns green when active).</li>
+                    <li><b>&#10022; Generate Voxel</b> — Send the Voxel Description to the LLM and render the result.</li>
+                    <li><b>&#9889; Quick Gen</b> — Auto-fill the Voxel Description from Appearance &amp; Personality sections (requires both to be generated first).</li>
+                    <li><b>&#8857; Fit</b> — Zoom out to show the full character.</li>
+                    <li><b>Drag</b> / <b>Scroll</b> — Rotate and zoom the canvas manually.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="se-cfm-an-help-sec" data-sec="voxel" hidden>
+            <div class="se-cfm-an-help-page">
+                <h3>Generating a Voxel Avatar</h3>
+                <p>The voxel renderer builds a stylised 3D character (indie game / voxel ARPG aesthetic) from a JSON spec the LLM produces.</p>
+                <ol>
+                    <li>Type a plain-text appearance description in the <b>Voxel Description</b> textarea — or paste a character quote directly.</li>
+                    <li>Click <b>&#10022; Generate Voxel</b> — the LLM interprets your description and returns a spec, which renders immediately.</li>
+                    <li>Adjust the <b>Quality</b> tier and click Generate Voxel again to re-render at that level.</li>
+                </ol>
+                <p>A Codex biography is not required — a plain description is enough. For best results, mention build, fur/skin colour, outfit colours, and any accessories.</p>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>Token Settings (⚙)</h3>
+                <p>All LLM output budgets are configurable in the ⚙ Settings popup:</p>
+                <ul>
+                    <li><b>Voxel spec tokens</b> — output budget for &#10022; Generate Voxel (default 900). Increase if specs get cut off for complex characters with many accessories.</li>
+                    <li><b>Quick gen tokens</b> — output budget for &#9889; Quick Gen (default 300). 300 is usually plenty for a 2–5 sentence description.</li>
+                    <li><b>Section regen tokens</b> — output budget for per-section &#x21BB; Regen (default 800). Increase for sections that feel truncated.</li>
+                </ul>
+                <p>Higher values allow longer LLM responses but use more API tokens and cost more.</p>
+                <p>Non-token settings: <b>Stage tone</b> — override the render's backdrop mood (Auto follows the character's lighting; bright pastel studios or dark stages). <b>Camera angle</b> — the default view on open/reset: Hero 3/4 low angle, straight on, or quarter.</p>
+            </div>
+        </div>
+
+        <div class="se-cfm-an-help-sec" data-sec="tiers" hidden>
+            <div class="se-cfm-an-help-page">
+                <h3>Min — Minecraft Style</h3>
+                <p>All tiers render the full body: head, hair, face (eyes + nose), arms, legs, shoes. Anthro characters always get ears and muzzle.</p>
+                <p><b>Min</b> is a clean Minecraft-biped with:</p>
+                <ul>
+                    <li>Idle animation — breathing bob + arm/leg swing so limbs don't look fused.</li>
+                    <li>Composed face: sclera + iris + pupil, eyebrows, mouth; anthro get tapered top ears + two-part muzzle with nose tip. Optional facial hair (beard/mustache/stubble) on humanoids.</li>
+                    <li>Cluster hair: dozens of small shaded cubes with slight rotations — figurine-style hair at every tier, stable per character.</li>
+                    <li>Belly zone, shirt hem line, two-tone hand/paw tips — low voxel count, full character.</li>
+                    <li>Up to <b>2 accessories</b>.</li>
+                    <li>Grid floor only, no backdrop. No tattoos, custom parts, or shirt patterns.</li>
+                </ul>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>Med — More Detail</h3>
+                <ul>
+                    <li>Shirt sleeves and collar visible on arms.</li>
+                    <li>Colour zones applied — belly fur strip, face mask, inner ears for anthro.</li>
+                    <li>Up to <b>4 accessories</b>; up to 2 tattoos (arm / chest / back).</li>
+                    <li>Backdrop scenes: forest, castle, cave, clouds, plus free-text (city, fire, ice…).</li>
+                    <li>Up to 12 custom-part boxes.</li>
+                </ul>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>High — Full Detail</h3>
+                <ul>
+                    <li>Shirt cuffs + belt overlay added on top of sleeves and collar.</li>
+                    <li>All colour zones active.</li>
+                    <li>Up to <b>6 accessories</b>; tattoos on any location.</li>
+                    <li>All named backdrop scenes (lake, dungeon) + free-text fully rendered.</li>
+                    <li>Up to 24 custom-part boxes — tentacles, extra heads, non-standard limbs.</li>
+                    <li>Ground scenes on raised voxel pedestal; sky-only backdrops (clouds, void) skip it.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="se-cfm-an-help-sec" data-sec="features" hidden>
+            <div class="se-cfm-an-help-page">
+                <h3>Templates &amp; Body Types</h3>
+                <ul>
+                    <li><b>humanoid</b> — standard biped, no head modifications.</li>
+                    <li><b>anthro_biped</b> — biped with animal muzzle/snout and side ears. Use for furries, beastkin, kemonomimi, any two-legged creature with animal head features.</li>
+                    <li><b>robot / monster</b> — same frame as humanoid (future: heavier proportions).</li>
+                </ul>
+                <p>Builds: <b>slim</b>, <b>medium</b>, <b>stocky</b>, <b>tall</b>, <b>short</b>.</p>
+                <p>Hair styles: <b>short</b>, <b>long</b>, <b>bun</b>, <b>spiky</b>, <b>bald</b>. For anthro this sets the fur cap/crest colour.</p>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>Accessories</h3>
+                <p>Up to 6 at high tier. Types and locations:</p>
+                <ul>
+                    <li><b>Head:</b> hat, crown, halo, glasses, horns (curved — demons/bulls), antlers (palmate — deer/reindeer/moose)</li>
+                    <li><b>Body:</b> scarf, necklace, cape, armor_chest, wings, shoulder_pad</li>
+                    <li><b>Lower:</b> belt, tail (size-aware: small = bob, medium = fluffy, large = bushy), gloves</li>
+                </ul>
+                <p>Hooves: set <b>shoes</b> to a very dark brown (<code>#1a0a04</code>). Paws: match shoes to fur/skin colour.</p>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>Anthro Colour Zones</h3>
+                <p>For anthro_biped, three optional zones override defaults:</p>
+                <ul>
+                    <li><b>belly</b> — lighter fur strip on torso front. Keep lighter than shirt so the stripe shows.</li>
+                    <li><b>face_mask</b> — muzzle/snout colour (default: darkened skin).</li>
+                    <li><b>ear_inner</b> — inner ear pad colour (default: lightened hair).</li>
+                </ul>
+                <p>Describe these in the voxel textarea: <em>"cream belly, dark orange face mask, pink inner ears"</em>.</p>
+            </div>
+            <div class="se-cfm-an-help-page" hidden>
+                <h3>Lighting &amp; Backdrops</h3>
+                <p>Moods render as stages: <b>standard</b> (bright cream studio), <b>warm</b> (bright amber), <b>cool</b> (bright sky-blue), <b>dramatic</b> (dark spotlight + blue rim), <b>eerie</b> (dark green glow). Bright stages show a soft contact shadow under the character; dark stages show a glow pool and grid. Override any time via ⚙ Settings → Stage tone.</p>
+                <p>Backdrop takes 0–2 elements. Named scenes: <b>castle</b>, <b>forest</b>, <b>lake</b>, <b>cave</b>, <b>dungeon</b>, <b>clouds</b>.</p>
+                <p>Free-text keyword-matched: <em>city/neon/urban</em> → dark concrete + amber windows; <em>fire/lava</em> → red; <em>ice/arctic</em> → pale blue; <em>magic/arcane</em> → purple.</p>
+                <p>Ground scenes render on a raised voxel plate. Sky-only (clouds, void, shadow) skip the plate.</p>
+            </div>
+        </div>
+
+    </div>
+</div>

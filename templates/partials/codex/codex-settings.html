@@ -1,0 +1,74 @@
+<div class="se-cx-set-hdr">
+    <span>&#9881; Codex Settings</span>
+    <button class="se-close-circle se-cx-set-close">&times;</button>
+</div>
+<div class="se-cx-set-body">
+
+    <div class="se-cx-set-row">
+        <div class="se-cx-set-lbl-wrap">
+            <label class="se-cx-set-lbl" for="se-cx-set-tier">Default tier</label>
+            <span class="se-cx-set-sub">Quality selected when Codex opens</span>
+        </div>
+        <select class="se-cx-set-select" id="se-cx-set-tier">
+            <option value="minimum">Min</option>
+            <option value="medium">Med</option>
+            <option value="high">High</option>
+        </select>
+    </div>
+
+    <div class="se-cx-set-row">
+        <div class="se-cx-set-lbl-wrap">
+            <label class="se-cx-set-lbl" for="se-cx-set-vtok">Voxel spec tokens</label>
+            <span class="se-cx-set-sub">&#10022; Generate Voxel output budget</span>
+        </div>
+        <input class="se-cx-set-num" id="se-cx-set-vtok" type="number" min="400" max="2000" step="50" />
+    </div>
+
+    <div class="se-cx-set-row">
+        <div class="se-cx-set-lbl-wrap">
+            <label class="se-cx-set-lbl" for="se-cx-set-qtok">Quick gen tokens</label>
+            <span class="se-cx-set-sub">&#9889; Quick Gen description output budget</span>
+        </div>
+        <input class="se-cx-set-num" id="se-cx-set-qtok" type="number" min="100" max="600" step="50" />
+    </div>
+
+    <div class="se-cx-set-row">
+        <div class="se-cx-set-lbl-wrap">
+            <label class="se-cx-set-lbl" for="se-cx-set-rtok">Section regen tokens</label>
+            <span class="se-cx-set-sub">&#8635; Per-section Regen output budget</span>
+        </div>
+        <input class="se-cx-set-num" id="se-cx-set-rtok" type="number" min="200" max="1500" step="50" />
+    </div>
+
+    <div class="se-cx-set-row">
+        <div class="se-cx-set-lbl-wrap">
+            <label class="se-cx-set-lbl" for="se-cx-set-stage">Stage tone</label>
+            <span class="se-cx-set-sub">Backdrop &amp; lighting mood behind the voxel render</span>
+        </div>
+        <select class="se-cx-set-select" id="se-cx-set-stage">
+            <option value="auto">Auto (match character)</option>
+            <option value="bright_warm">Bright &#8212; Warm</option>
+            <option value="bright_cool">Bright &#8212; Cool</option>
+            <option value="bright_green">Bright &#8212; Green</option>
+            <option value="bright_pink">Bright &#8212; Pink</option>
+            <option value="bright_amber">Bright &#8212; Amber</option>
+            <option value="dark">Dark &#8212; Dramatic</option>
+            <option value="eerie">Dark &#8212; Eerie</option>
+        </select>
+    </div>
+
+    <div class="se-cx-set-row">
+        <div class="se-cx-set-lbl-wrap">
+            <label class="se-cx-set-lbl" for="se-cx-set-cam">Camera angle</label>
+            <span class="se-cx-set-sub">Default view when the render opens or resets</span>
+        </div>
+        <select class="se-cx-set-select" id="se-cx-set-cam">
+            <option value="front">Hero 3/4 (low angle)</option>
+            <option value="straight">Straight on</option>
+            <option value="quarter">Quarter (left)</option>
+        </select>
+    </div>
+
+    <div class="se-cx-set-hint">All values are API output token limits. Higher = longer responses, more API cost.</div>
+
+</div>

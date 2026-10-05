@@ -4,8 +4,16 @@
  * Changing a value here updates it everywhere — no magic strings scattered around.
  */
 
-/** Extension identifier used for ST registration and localStorage keys. */
+/** Extension identifier used for ST registration and settings keys. Not tied to the install folder name. */
 export const EXT_NAME = 'summary-editor';
+
+/**
+ * URL path of the folder this extension is actually installed in, e.g.
+ * `/scripts/extensions/third-party/ste_summary_editor`. ST names the folder after the
+ * repo when installing from a URL, so asset paths must never hardcode `summary-editor`.
+ * This file lives at `src/core/`, so the extension root is two levels up.
+ */
+export const EXT_PATH = new URL('../../', import.meta.url).pathname.replace(/\/$/, '');
 
 /** Human-readable name shown in headers and UI. */
 export const EXT_DISPLAY = 'Summary Editor';
@@ -167,6 +175,10 @@ export const TEMPLATES = Object.freeze({
     ENTRY_ROW:               'entry-row',
     GAP_ROW:                 'gap-row',
     ACT_ITEM:                'act-item',
+    // codex/
+    CODEX_PANEL:               'partials/codex/codex-panel',
+    CODEX_HELP:                'partials/codex/codex-help',
+    CODEX_SETTINGS:            'partials/codex/codex-settings',
     // chat-files/
     CHAT_FILES_MANAGER:        'partials/chat-files/chat-files-manager',
     CHAT_FILES_HELP:           'partials/chat-files/chat-files-help',

@@ -569,7 +569,7 @@ function buildContentForEntries(entries, format) {
  * Build a minimal ZIP file blob from an array of { name, content } files.
  * Uses the ZIP format spec directly — no external library needed.
  */
-function buildZipBlob(files) {
+export function buildZipBlob(files) {
     const encoder = new TextEncoder();
     const parts = [];
     const centralDir = [];
